@@ -1279,7 +1279,12 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         <div className="detail-hero">
           <div className="hero-left">
             <div className="detail-art-wrap">
-              <img className="detail-art" src={detailImg} alt={name} loading="lazy" />
+              <img
+                className={`detail-art ${animated ? "is-animated" : "is-static"}`}
+                src={detailImg}
+                alt={name}
+                loading="lazy"
+              />
             </div>
             <div className="hero-controls">
               <div className="toggle-group">
