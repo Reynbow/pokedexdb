@@ -158,10 +158,10 @@ const DEX_FILTERS = [
   {
     key: "kalos",
     label: "Kalos",
-    apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
+    apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain", "lumiose-city"],
     pad: 3,
     games: [
-      { key: "legends-za", label: "Legends: Z-A", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] },
+      { key: "legends-za", label: "Legends: Z-A", apiNames: ["lumiose-city"] },
       { key: "x-y", label: "X & Y", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] },
     ],
   },
