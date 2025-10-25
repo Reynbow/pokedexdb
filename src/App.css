@@ -479,7 +479,7 @@
   max-width: 260px;
   margin-top: auto;
   align-self: flex-start;
-  margin-left: 0;
+  margin-left: 16px;
 }
 .matchup-box {
   border: 1px solid rgba(255,255,255,0.10);
@@ -489,7 +489,6 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  min-height: 128px;
 }
 .matchup-box.weak-matchup {
   background: rgba(248, 113, 113, 0.12);
