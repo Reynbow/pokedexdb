@@ -101,6 +101,29 @@
   gap: 8px;
   justify-content: center;
 }
+.filter-chip.game-chip {
+  text-transform: none;
+  gap: 8px;
+  padding: 6px 12px;
+}
+.game-chip-logos {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.game-chip-logo {
+  height: 18px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.6));
+  pointer-events: none;
+}
+.game-chip-label {
+  display: inline-block;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: left;
+}
 .neutral-chip {
   background: rgba(148, 163, 184, 0.12);
   border-color: rgba(148, 163, 184, 0.28);

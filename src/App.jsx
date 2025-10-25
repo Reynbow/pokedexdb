@@ -109,9 +109,24 @@ const DEX_FILTERS = [
     apiNames: ["kanto"],
     pad: 3,
     games: [
-      { key: "lets-go", label: "Let's Go Pikachu & Let's Go Eevee", apiNames: ["letsgo-kanto"] },
-      { key: "firered-leafgreen", label: "FireRed & LeafGreen", apiNames: ["kanto"] },
-      { key: "red-blue-yellow", label: "Red, Blue & Yellow", apiNames: ["kanto"] },
+      {
+        key: "lets-go",
+        label: "Let's Go Pikachu & Let's Go Eevee",
+        apiNames: ["letsgo-kanto"],
+        logos: ["letsgopikachu.png", "letsgoeevee.png"],
+      },
+      {
+        key: "firered-leafgreen",
+        label: "FireRed & LeafGreen",
+        apiNames: ["kanto"],
+        logos: ["firered.png", "leafgreen.png"],
+      },
+      {
+        key: "red-blue-yellow",
+        label: "Red, Blue & Yellow",
+        apiNames: ["kanto"],
+        logos: ["red.png", "blue.png", "yellow.png"],
+      },
     ],
   },
   {
@@ -120,8 +135,18 @@ const DEX_FILTERS = [
     apiNames: ["original-johto", "updated-johto"],
     pad: 3,
     games: [
-      { key: "heartgold-soulsilver", label: "HeartGold & SoulSilver", apiNames: ["updated-johto"] },
-      { key: "gold-silver-crystal", label: "Gold, Silver & Crystal", apiNames: ["original-johto"] },
+      {
+        key: "heartgold-soulsilver",
+        label: "HeartGold & SoulSilver",
+        apiNames: ["updated-johto"],
+        logos: ["heartgold.png", "soulsilver.png"],
+      },
+      {
+        key: "gold-silver-crystal",
+        label: "Gold, Silver & Crystal",
+        apiNames: ["original-johto"],
+        logos: ["gold.png", "silver.png", "crystal.png"],
+      },
     ],
   },
   {
@@ -130,8 +155,18 @@ const DEX_FILTERS = [
     apiNames: ["hoenn", "updated-hoenn"],
     pad: 3,
     games: [
-      { key: "omega-ruby-alpha-sapphire", label: "Omega Ruby & Alpha Sapphire", apiNames: ["updated-hoenn"] },
-      { key: "ruby-sapphire-emerald", label: "Ruby, Sapphire & Emerald", apiNames: ["hoenn"] },
+      {
+        key: "omega-ruby-alpha-sapphire",
+        label: "Omega Ruby & Alpha Sapphire",
+        apiNames: ["updated-hoenn"],
+        logos: ["omegaruby.png", "alphasapphire.png"],
+      },
+      {
+        key: "ruby-sapphire-emerald",
+        label: "Ruby, Sapphire & Emerald",
+        apiNames: ["hoenn"],
+        logos: ["ruby.png", "sapphire.png", "emerald.png"],
+      },
     ],
   },
   {
@@ -140,9 +175,24 @@ const DEX_FILTERS = [
     apiNames: ["original-sinnoh", "extended-sinnoh"],
     pad: 3,
     games: [
-      { key: "brilliant-diamond-shining-pearl", label: "Brilliant Diamond & Shining Pearl", apiNames: ["original-sinnoh"] },
-      { key: "platinum", label: "Platinum", apiNames: ["extended-sinnoh"] },
-      { key: "diamond-pearl", label: "Diamond & Pearl", apiNames: ["original-sinnoh"] },
+      {
+        key: "brilliant-diamond-shining-pearl",
+        label: "Brilliant Diamond & Shining Pearl",
+        apiNames: ["original-sinnoh"],
+        logos: ["brilliantdiamond.png", "shiningpearl.png"],
+      },
+      {
+        key: "platinum",
+        label: "Platinum",
+        apiNames: ["extended-sinnoh"],
+        logos: ["platinum.png"],
+      },
+      {
+        key: "diamond-pearl",
+        label: "Diamond & Pearl",
+        apiNames: ["original-sinnoh"],
+        logos: ["diamond.png", "pearl.png"],
+      },
     ],
   },
   {
@@ -151,8 +201,18 @@ const DEX_FILTERS = [
     apiNames: ["original-unova", "updated-unova"],
     pad: 3,
     games: [
-      { key: "black-2-white-2", label: "Black 2 & White 2", apiNames: ["updated-unova"] },
-      { key: "black-white", label: "Black & White", apiNames: ["original-unova"] },
+      {
+        key: "black-2-white-2",
+        label: "Black 2 & White 2",
+        apiNames: ["updated-unova"],
+        logos: ["black2.png", "white2.png"],
+      },
+      {
+        key: "black-white",
+        label: "Black & White",
+        apiNames: ["original-unova"],
+        logos: ["black.png", "white.png"],
+      },
     ],
   },
   {
@@ -161,8 +221,18 @@ const DEX_FILTERS = [
     apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain", "lumiose-city"],
     pad: 3,
     games: [
-      { key: "legends-za", label: "Legends: Z-A", apiNames: ["lumiose-city"] },
-      { key: "x-y", label: "X & Y", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] },
+      {
+        key: "legends-za",
+        label: "Legends: Z-A",
+        apiNames: ["lumiose-city"],
+        logos: ["za.png"],
+      },
+      {
+        key: "x-y",
+        label: "X & Y",
+        apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
+        logos: ["x.png", "y.png"],
+      },
     ],
   },
   {
@@ -171,8 +241,18 @@ const DEX_FILTERS = [
     apiNames: ["original-alola", "updated-alola"],
     pad: 3,
     games: [
-      { key: "ultra-sun-ultra-moon", label: "Ultra Sun & Ultra Moon", apiNames: ["updated-alola"] },
-      { key: "sun-moon", label: "Sun & Moon", apiNames: ["original-alola"] },
+      {
+        key: "ultra-sun-ultra-moon",
+        label: "Ultra Sun & Ultra Moon",
+        apiNames: ["updated-alola"],
+        logos: ["ultrasun.png", "ultramoon.png"],
+      },
+      {
+        key: "sun-moon",
+        label: "Sun & Moon",
+        apiNames: ["original-alola"],
+        logos: ["sun.png", "moon.png"],
+      },
     ],
   },
   {
@@ -180,23 +260,67 @@ const DEX_FILTERS = [
     label: "Galar",
     apiNames: ["galar"],
     pad: 3,
-    games: [{ key: "sword-shield", label: "Sword & Shield", apiNames: ["galar"] }],
+    games: [
+      {
+        key: "sword-shield",
+        label: "Sword & Shield",
+        apiNames: ["galar"],
+        logos: ["sword.png", "shield.png"],
+      },
+    ],
   },
   {
     key: "hisui",
     label: "Hisui",
     apiNames: ["hisui"],
     pad: 3,
-    games: [{ key: "legends-arceus", label: "Legends: Arceus", apiNames: ["hisui"] }],
+    games: [
+      {
+        key: "legends-arceus",
+        label: "Legends: Arceus",
+        apiNames: ["hisui"],
+        logos: ["arceus.png"],
+      },
+    ],
   },
   {
     key: "paldea",
     label: "Paldea",
     apiNames: ["paldea"],
     pad: 3,
-    games: [{ key: "scarlet-violet", label: "Scarlet & Violet", apiNames: ["paldea"] }],
+    games: [
+      {
+        key: "scarlet-violet",
+        label: "Scarlet & Violet",
+        apiNames: ["paldea"],
+        logos: ["scarlet.png", "violet.png"],
+      },
+    ],
   },
 ];
+
+const GAME_LOGO_IMPORTS = import.meta.glob("./assets/game-logos/*", {
+  eager: true,
+  import: "default",
+  query: "?url",
+});
+
+const GAME_LOGO_LOOKUP = new Map(
+  Object.entries(GAME_LOGO_IMPORTS).map(([path, url]) => {
+    const parts = path.split("/");
+    return [parts[parts.length - 1], url];
+  })
+);
+
+const ALL_GAME_OPTIONS = DEX_FILTERS.flatMap((cfg) =>
+  (cfg.games || []).map((game) => ({
+    ...game,
+    dexKey: cfg.key,
+    pad: cfg.pad ?? 3,
+  }))
+);
+
+const GAME_LOOKUP = new Map(ALL_GAME_OPTIONS.map((game) => [game.key, game]));
 
 const DEX_LOOKUP = new Map(DEX_FILTERS.map((cfg) => [cfg.key, cfg]));
 const LEGENDARY_NAMES = new Set([
@@ -433,9 +557,11 @@ function App() {
   const [selectedDex, setSelectedDex] = useState("national");
   const [selectedGame, setSelectedGame] = useState(null);
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
+  const [gameIndexes, setGameIndexes] = useState(() => new Map());
   const typeIndexRef = useRef(new Map()); // type -> Set(names)
   const specialTagCacheRef = useRef(new Map()); // name -> cached tag array
-  const dexLoadingRef = useRef(new Set());
+  const pokedexCacheRef = useRef(new Map());
+  const pokedexPromiseRef = useRef(new Map());
   const [bootParam, setBootParam] = useState(() => {
     const u = new URL(window.location.href);
     return u.searchParams.get("p");
@@ -456,6 +582,64 @@ function App() {
       .then((r) => r.json())
       .then((data) => setPokemon(data.results || []));
   }, []);
+
+  const loadEntryMap = useCallback(
+    async (apiNames = []) => {
+      const names = Array.from(new Set((apiNames || []).filter(Boolean)));
+      if (names.length === 0) {
+        return new Map();
+      }
+      const cacheKey = names.join("|");
+      if (pokedexCacheRef.current.has(cacheKey)) {
+        return pokedexCacheRef.current.get(cacheKey);
+      }
+      if (pokedexPromiseRef.current.has(cacheKey)) {
+        return pokedexPromiseRef.current.get(cacheKey);
+      }
+      const promise = (async () => {
+        try {
+          const sources = new Map();
+          for (const apiName of names) {
+            const response = await queuedFetch(`https://pokeapi.co/api/v2/pokedex/${apiName}`);
+            if (!response?.ok) {
+              throw new Error(`Failed to load pokedex/${apiName}: ${response?.status} ${response?.statusText}`);
+            }
+            const data = await response.json();
+            sources.set(apiName, data);
+          }
+          const finalMap = new Map();
+          const seen = new Set();
+          let counter = 1;
+          const multipleLists = names.length > 1;
+          for (const apiName of names) {
+            const data = sources.get(apiName);
+            if (!data) continue;
+            const entries = data.pokemon_entries || [];
+            for (const entry of entries) {
+              const idNum = getIdNumberFromUrl(entry.pokemon_species?.url);
+              if (idNum == null || seen.has(idNum)) continue;
+              seen.add(idNum);
+              let number;
+              if (multipleLists) {
+                number = counter++;
+              } else {
+                number = entry.entry_number;
+                counter = Math.max(counter, number + 1);
+              }
+              finalMap.set(idNum, number);
+            }
+          }
+          pokedexCacheRef.current.set(cacheKey, finalMap);
+          return finalMap;
+        } finally {
+          pokedexPromiseRef.current.delete(cacheKey);
+        }
+      })();
+      pokedexPromiseRef.current.set(cacheKey, promise);
+      return promise;
+    },
+    []
+  );
 
   useEffect(() => {
     if (selectedDex === "national") {
@@ -478,80 +662,75 @@ function App() {
   useEffect(() => {
     const cfg = DEX_LOOKUP.get(selectedDex);
     if (!cfg || selectedDex === "national") return;
-    if (dexIndexes.has(selectedDex) || dexLoadingRef.current.has(selectedDex)) return;
-    const gameApiNames = (cfg.games || []).flatMap((game) => game.apiNames || []);
-    const allApiNames = Array.from(new Set([...(cfg.apiNames || []), ...gameApiNames]));
-    if (allApiNames.length === 0) return;
-    dexLoadingRef.current.add(selectedDex);
-    let ignore = false;
+    if (dexIndexes.has(selectedDex)) return;
+    let cancelled = false;
     const loadDex = async () => {
       try {
-        const sources = new Map();
-        for (const apiName of allApiNames) {
-          const response = await queuedFetch(`https://pokeapi.co/api/v2/pokedex/${apiName}`);
-          if (!response?.ok) {
-            throw new Error(`Failed to load pokedex/${apiName}: ${response?.status} ${response?.statusText}`);
-          }
-          const data = await response.json();
-          if (ignore) return;
-          sources.set(apiName, data);
-        }
-        if (ignore) return;
-
-        const buildEntryMap = (apiList = []) => {
-          const finalMap = new Map();
-          const seen = new Set();
-          let counter = 1;
-          const multipleLists = apiList.length > 1;
-          for (const apiName of apiList) {
-            const data = sources.get(apiName);
-            if (!data) continue;
-            const entries = data.pokemon_entries || [];
-            for (const entry of entries) {
-              const idNum = getIdNumberFromUrl(entry.pokemon_species?.url);
-              if (idNum == null || seen.has(idNum)) continue;
-              seen.add(idNum);
-              let number;
-              if (multipleLists) {
-                number = counter++;
-              } else {
-                number = entry.entry_number;
-                counter = Math.max(counter, number + 1);
-              }
-              finalMap.set(idNum, number);
+        const combined = await loadEntryMap(cfg.apiNames || []);
+        const gameEntries = new Map();
+        await Promise.all(
+          (cfg.games || []).map(async (game) => {
+            const entryMap = await loadEntryMap(
+              (game.apiNames && game.apiNames.length > 0) ? game.apiNames : cfg.apiNames
+            );
+            if (!cancelled) {
+              gameEntries.set(game.key, {
+                key: game.key,
+                label: game.label,
+                entryMap,
+              });
             }
-          }
-          return finalMap;
-        };
-
-        const primaryApiList = (cfg.apiNames && cfg.apiNames.length > 0) ? cfg.apiNames : allApiNames;
-        const combined = buildEntryMap(primaryApiList);
-        const games = new Map();
-        for (const game of cfg.games || []) {
-          const apiList = (game.apiNames && game.apiNames.length > 0) ? game.apiNames : primaryApiList;
-          games.set(game.key, {
-            key: game.key,
-            label: game.label,
-            entryMap: buildEntryMap(apiList),
-          });
-        }
-
+          })
+        );
+        if (cancelled) return;
         setDexIndexes((prev) => {
+          if (prev.has(selectedDex)) return prev;
           const next = new Map(prev);
-          next.set(selectedDex, { combined, games });
+          next.set(selectedDex, { combined, games: gameEntries });
+          return next;
+        });
+        setGameIndexes((prev) => {
+          const next = new Map(prev);
+          for (const [gameKey, info] of gameEntries) {
+            next.set(gameKey, info.entryMap);
+          }
           return next;
         });
       } catch (err) {
         console.error(`Failed to load dex data for ${selectedDex}`, err);
-      } finally {
-        dexLoadingRef.current.delete(selectedDex);
       }
     };
     loadDex();
     return () => {
-      ignore = true;
+      cancelled = true;
     };
-  }, [selectedDex, dexIndexes]);
+  }, [selectedDex, dexIndexes, loadEntryMap]);
+
+  useEffect(() => {
+    if (!selectedGame) return;
+    if (gameIndexes.has(selectedGame)) return;
+    const cfg = GAME_LOOKUP.get(selectedGame);
+    if (!cfg) return;
+    let cancelled = false;
+    const loadGame = async () => {
+      try {
+        const entryMap = await loadEntryMap(cfg.apiNames || []);
+        if (cancelled) return;
+        setGameIndexes((prev) => {
+          if (prev.has(selectedGame)) return prev;
+          const next = new Map(prev);
+          next.set(selectedGame, entryMap);
+          return next;
+        });
+      } catch (err) {
+        console.error(`Failed to load dex data for ${selectedGame}`, err);
+      }
+    };
+    loadGame();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGame, gameIndexes, loadEntryMap]);
 
   // Apply URL param selection after data loads
   useEffect(() => {
@@ -608,11 +787,16 @@ function App() {
     if (selectedDex !== "national" && !dexData) {
       return [];
     }
-    const gameData =
-      selectedDex === "national" || !selectedGame ? null : dexData?.games?.get(selectedGame) ?? null;
     const combinedMap = selectedDex === "national" ? null : dexData?.combined ?? null;
+    const regionGameEntryMap =
+      selectedDex !== "national" && selectedGame ? dexData?.games?.get(selectedGame)?.entryMap ?? null : null;
+    const nationalGameEntryMap =
+      selectedDex === "national" && selectedGame ? gameIndexes.get(selectedGame) ?? null : null;
+    if (selectedDex === "national" && selectedGame && !nationalGameEntryMap) {
+      return [];
+    }
     const activeEntryMap =
-      selectedDex === "national" ? null : gameData?.entryMap ?? combinedMap;
+      selectedDex === "national" ? nationalGameEntryMap : regionGameEntryMap ?? combinedMap;
     if (selectedDex !== "national" && !activeEntryMap) {
       return [];
     }
@@ -649,7 +833,11 @@ function App() {
         const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
         if (!hasSpecialTag) continue;
       }
-      if (activeEntryMap && !activeEntryMap.has(idNum)) continue;
+      if (selectedDex === "national") {
+        if (selectedGame && activeEntryMap && !activeEntryMap.has(idNum)) continue;
+      } else if (activeEntryMap && !activeEntryMap.has(idNum)) {
+        continue;
+      }
       if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
         continue;
       }
@@ -705,30 +893,38 @@ function App() {
     }
 
     return matches.map((item) => item.entry);
-  }, [pokemon, query, selectedTypes, selectedTags, selectedDex, selectedGame, dexIndexes]);
+  }, [pokemon, query, selectedTypes, selectedTags, selectedDex, selectedGame, dexIndexes, gameIndexes]);
 
   const formatDexNumber = useCallback(
     (value) => {
       const idNum = Number(value);
       if (!Number.isFinite(idNum)) return "-";
-      const cfg = DEX_LOOKUP.get(selectedDex);
-      if (!cfg) {
-        return `#${idNum}`;
-      }
-      const pad = Math.max(1, cfg.pad ?? 3);
+      const gameCfg = selectedGame ? GAME_LOOKUP.get(selectedGame) : null;
+      const padSource =
+        selectedDex === "national" && gameCfg?.dexKey
+          ? DEX_LOOKUP.get(gameCfg.dexKey) ?? DEX_LOOKUP.get(selectedDex)
+          : DEX_LOOKUP.get(selectedDex);
+      const pad = Math.max(1, padSource?.pad ?? 3);
       if (selectedDex === "national") {
-        return `#${String(idNum).padStart(pad, "0")}`;
+        if (!selectedGame) {
+          return `#${String(idNum).padStart(pad, "0")}`;
+        }
+        const entryMap = gameIndexes.get(selectedGame);
+        if (!entryMap) return "-";
+        const entry = entryMap.get(idNum);
+        if (entry == null) return "-";
+        return `#${String(entry).padStart(pad, "0")}`;
       }
       const dexData = dexIndexes.get(selectedDex);
       if (!dexData) return "-";
-      const gameEntry = selectedGame ? dexData.games?.get(selectedGame) : null;
-      const entryMap = gameEntry?.entryMap ?? dexData.combined;
+      const gameEntryMap = selectedGame ? dexData.games?.get(selectedGame)?.entryMap : null;
+      const entryMap = gameEntryMap ?? dexData.combined;
       if (!entryMap) return "-";
       const entry = entryMap.get(idNum);
       if (entry == null) return "-";
       return `#${String(entry).padStart(pad, "0")}`;
     },
-    [dexIndexes, selectedDex, selectedGame]
+    [dexIndexes, selectedDex, selectedGame, gameIndexes]
   );
 
   const selectedDexNumber = useMemo(() => {
@@ -778,8 +974,8 @@ function App() {
   }, []);
 
   const selectedDexConfig = DEX_LOOKUP.get(selectedDex);
-  const availableGames = selectedDexConfig?.games || [];
-  const showGameFilters = selectedDex !== "national" && availableGames.length > 0;
+  const availableGames = selectedDex === "national" ? ALL_GAME_OPTIONS : selectedDexConfig?.games || [];
+  const showGameFilters = availableGames.length > 0;
 
   return (
     <div className="app-shell">
@@ -906,19 +1102,35 @@ function App() {
             <div className="game-filters">
               {availableGames.map((game) => {
                 const isOn = game.key === selectedGame;
+                const logoUrls = (game.logos || [])
+                  .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+                  .filter(Boolean);
                 return (
                   <button
                     key={game.key}
                     type="button"
-                    className={`filter-chip${isOn ? " is-on" : ""}`}
+                    className={`filter-chip game-chip${isOn ? " is-on" : ""}`}
                     onClick={() => {
-                      if (selectedGame === game.key) return;
+                      if (selectedGame === game.key) {
+                        if (selectedDex === "national") {
+                          setSelectedGame(null);
+                          clearSelection();
+                        }
+                        return;
+                      }
                       setSelectedGame(game.key);
                       clearSelection();
                     }}
                     aria-pressed={isOn}
                   >
-                    {game.label}
+                    {logoUrls.length > 0 && (
+                      <span className="game-chip-logos" aria-hidden="true">
+                        {logoUrls.map((src) => (
+                          <img key={src} src={src} alt="" className="game-chip-logo" />
+                        ))}
+                      </span>
+                    )}
+                    <span className="game-chip-label">{game.label}</span>
                   </button>
                 );
               })}
@@ -2464,13 +2676,4 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
 }
 
 export default App;
-
-
-
-
-
-
-
-
-
 
