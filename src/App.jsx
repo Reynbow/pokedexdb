@@ -1207,11 +1207,16 @@ function App() {
               <div className="special-filters">
                 {SPECIAL_FILTERS.map((tag) => {
                   const isOn = selectedTags.has(tag);
+                  const meta = SPECIAL_TAG_META.get(tag);
+                  const classNames = ["type-chip", "special-filter-chip"];
+                  if (meta?.className) classNames.push(meta.className);
+                  if (isOn) classNames.push("is-on");
+                  const buttonClassName = classNames.join(" ");
                   return (
                     <button
                       key={tag}
                       type="button"
-                      className={`type-chip neutral-chip${isOn ? " is-on" : ""}`}
+                      className={buttonClassName}
                       onClick={() => {
                         setSelectedTags((prev) => {
                           const next = new Set(prev);
