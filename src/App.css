@@ -476,10 +476,10 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: 260px;
   margin-top: auto;
-  align-self: flex-start;
-  margin-left: 16px;
+  align-self: stretch;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 .matchup-box {
   border: 1px solid rgba(255,255,255,0.10);
@@ -489,6 +489,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 .matchup-box.weak-matchup {
   background: rgba(248, 113, 113, 0.12);
@@ -635,7 +636,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
   gap: 28px;
   width: min(960px, 100%);
-  max-height: min(640px, calc(100vh - 96px));
+  height: min(660px, calc(100vh - 96px));
   padding: 32px;
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.1);
@@ -649,6 +650,7 @@
 .ability-modal-right {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -826,6 +828,7 @@
 .ability-modal-right {
   border-left: 1px solid rgba(148,163,184,0.2);
   padding-left: 24px;
+  height: 100%;
   gap: 14px;
 }
 
@@ -870,7 +873,7 @@
 
 .ability-learners-scroll {
   flex: 1 1 0;
-  min-height: 0;
+  min-height: calc((6 * 66px) + (5 * 10px));
   overflow-y: auto;
   padding-right: 6px;
   display: flex;
@@ -1034,6 +1037,16 @@
   .ability-modal-close {
     top: 10px;
     right: 10px;
+  }
+}
+
+@media (max-height: 720px) {
+  .ability-modal {
+    height: calc(100vh - 72px);
+  }
+
+  .ability-learners-scroll {
+    min-height: clamp(240px, calc(100vh - 240px), calc((6 * 66px) + (5 * 10px)));
   }
 }
 
