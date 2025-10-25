@@ -1451,6 +1451,8 @@ function App() {
 
 const detailsCache = new Map();
 const abilityCache = new Map();
+const natureDetailsCache = new Map();
+let cachedNatureList = null;
 
 // Simple global fetch queue to limit concurrent requests
 let IN_FLIGHT = 0;
@@ -1714,6 +1716,16 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [abilityData, setAbilityData] = useState(null);
   const [abilityLoading, setAbilityLoading] = useState(false);
   const [abilityError, setAbilityError] = useState(null);
+  const [natureOverlayName, setNatureOverlayName] = useState(null);
+  useEffect(() => {
+    setNatureOverlayName(null);
+  }, [id]);
+
+  useEffect(() => {
+    if (!smogonNature) {
+      setNatureOverlayName(null);
+    }
+  }, [smogonNature]);
   const addLog = (msg, data) => {
     const line = `[${new Date().toISOString()}] ${msg}` + (data !== undefined ? ` :: ${typeof data === 'string' ? data : JSON.stringify(data)}` : '');
     setDebugLog((d) => d.concat(line).slice(-200));
@@ -2174,6 +2186,15 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     });
   }, []);
 
+  const handleNatureClick = useCallback(() => {
+    if (!smogonNature) return;
+    setNatureOverlayName(smogonNature);
+  }, [smogonNature]);
+
+  const closeNatureOverlay = useCallback(() => {
+    setNatureOverlayName(null);
+  }, []);
+
   const closeAbilityOverlay = useCallback(() => {
     setActiveAbility(null);
     setAbilityData(null);
@@ -2429,9 +2450,14 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                           Loading
                         </span>
                       ) : smogonNature ? (
-                        <span className="nature-chip">
+                        <button
+                          type="button"
+                          className="nature-chip"
+                          onClick={handleNatureClick}
+                          aria-label={`View details for ${smogonNature} nature`}
+                        >
                           <span className="text-capitalize">{smogonNature}</span>
-                        </span>
+                        </button>
                       ) : (
                         <span className="nature-placeholder">-</span>
                       )}
@@ -2520,6 +2546,13 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           </>
         )}
       </div>
+      {natureOverlayName && smogonNature && (
+        <NatureOverlay
+          natureName={natureOverlayName}
+          recommendedNature={smogonNature}
+          onClose={closeNatureOverlay}
+        />
+      )}
       {activeAbility && (
         <AbilityOverlay
           ability={activeAbility}
@@ -2546,6 +2579,359 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, lineHeight: 1.2 }}>{debugLog.join('\n')}</pre>
       </div>
     </aside>
+  );
+}
+
+function NatureOverlay({ natureName, recommendedNature, onClose }) {
+  const normalizedNature = (natureName || "").toLowerCase();
+  const recommendedNormalized = (recommendedNature || "").toLowerCase();
+  const natureTitleId = normalizedNature ? `nature-modal-title-${normalizedNature}` : undefined;
+  const initialSelectedNature = normalizedNature || null;
+  const initialNatureData =
+    initialSelectedNature ? natureDetailsCache.get(initialSelectedNature) || null : null;
+
+  const [selectedNature, setSelectedNature] = useState(initialSelectedNature);
+  const [natureData, setNatureData] = useState(initialNatureData);
+  const [natureLoading, setNatureLoading] = useState(() => !!initialSelectedNature && !initialNatureData);
+  const [natureError, setNatureError] = useState(null);
+  const [natureList, setNatureList] = useState(() => cachedNatureList);
+  const [listLoading, setListLoading] = useState(() => !cachedNatureList);
+  const [listError, setListError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    setSearchTerm("");
+    setSelectedNature(normalizedNature || null);
+  }, [normalizedNature]);
+
+  useEffect(() => {
+    if (cachedNatureList) {
+      setNatureList(cachedNatureList);
+      setListLoading(false);
+      return;
+    }
+    let ignore = false;
+    setListLoading(true);
+    setListError(null);
+    queuedFetch("https://pokeapi.co/api/v2/nature?limit=100")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        if (ignore) return;
+        const list = Array.isArray(data?.results)
+          ? data.results
+              .filter((entry) => entry?.name)
+              .map((entry) => ({ name: entry.name.toLowerCase(), url: entry.url }))
+              .sort((a, b) => a.name.localeCompare(b.name))
+          : [];
+        cachedNatureList = list;
+        setNatureList(list);
+        setListLoading(false);
+      })
+      .catch(() => {
+        if (ignore) return;
+        setListError("Unable to load nature list. Please try again.");
+        setListLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedNature) {
+      setNatureData(null);
+      setNatureError(null);
+      setNatureLoading(false);
+      return;
+    }
+    const cached = natureDetailsCache.get(selectedNature);
+    if (cached) {
+      setNatureData(cached);
+      setNatureError(null);
+      setNatureLoading(false);
+      return;
+    }
+    let ignore = false;
+    setNatureLoading(true);
+    setNatureError(null);
+    setNatureData(null);
+    queuedFetch(`https://pokeapi.co/api/v2/nature/${selectedNature}`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        if (ignore) return;
+        natureDetailsCache.set(selectedNature, data);
+        setNatureData(data);
+        setNatureLoading(false);
+      })
+      .catch(() => {
+        if (ignore) return;
+        setNatureError("Unable to load nature details. Please try again.");
+        setNatureLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [selectedNature]);
+
+  const filteredNatures = useMemo(() => {
+    if (!Array.isArray(natureList) || natureList.length === 0) return [];
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return natureList;
+    return natureList.filter((entry) => entry.name.includes(query));
+  }, [natureList, searchTerm]);
+
+  const likesFlavor = natureData?.likes_flavor?.name || null;
+  const hatesFlavor = natureData?.hates_flavor?.name || null;
+  const increasedStat = natureData?.increased_stat?.name || null;
+  const decreasedStat = natureData?.decreased_stat?.name || null;
+  const isNeutralNature =
+    increasedStat && decreasedStat && increasedStat === decreasedStat;
+
+  const battlePreferences = useMemo(() => {
+    if (!Array.isArray(natureData?.move_battle_style_preferences)) return [];
+    return natureData.move_battle_style_preferences
+      .map((pref) => {
+        const style = pref?.move_battle_style?.name;
+        if (!style) return null;
+        return {
+          style,
+          low: pref.low_hp_preference ?? null,
+          high: pref.high_hp_preference ?? null,
+        };
+      })
+      .filter(Boolean);
+  }, [natureData]);
+
+  const pokeathlonChanges = useMemo(() => {
+    if (!Array.isArray(natureData?.pokeathlon_stat_changes)) return [];
+    return natureData.pokeathlon_stat_changes
+      .map((entry) => {
+        const stat = entry?.pokeathlon_stat?.name;
+        if (!stat) return null;
+        const change = entry.max_change ?? 0;
+        if (change === 0) return null;
+        return { stat, change };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.stat.localeCompare(b.stat));
+  }, [natureData]);
+
+  const selectedLabel = selectedNature ? humanizeName(selectedNature) : "Nature";
+  const isRecommendedSelection =
+    selectedNature && selectedNature === recommendedNormalized;
+
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  const handleNatureSelect = (name) => {
+    if (!name) return;
+    setSelectedNature(name);
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  return (
+    <div className="ability-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="ability-modal nature-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={natureTitleId}
+        onMouseDown={handleModalMouseDown}
+      >
+        <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close nature details">
+          X
+        </button>
+        <div className="ability-modal-left">
+          <div className="ability-modal-header">
+            <h2 className="ability-modal-title" id={natureTitleId}>
+              <span className="text-capitalize">{selectedLabel}</span>
+              {isRecommendedSelection && <span className="ability-tag ability-title-tag">Recommended</span>}
+            </h2>
+            <div className="ability-modal-subtle">
+              {isRecommendedSelection ? "Smogon recommended nature" : "Comparing alternative nature"}
+            </div>
+          </div>
+          <div className="ability-modal-body nature-modal-body">
+            {natureLoading ? (
+              <div className="ability-modal-loading">Loading nature details...</div>
+            ) : natureError ? (
+              <div className="ability-modal-error">
+                <p>{natureError}</p>
+              </div>
+            ) : natureData ? (
+              <>
+                <div className="nature-section">
+                  <h3 className="nature-section-title">Stat Changes</h3>
+                  {isNeutralNature ? (
+                    <div className="nature-neutral-card">This nature does not alter stats.</div>
+                  ) : (
+                    <div className="nature-highlight-grid">
+                      {increasedStat && (
+                        <div className="nature-highlight nature-highlight-positive">
+                          <span className="nature-highlight-label">Raises</span>
+                          <span className="nature-highlight-value text-capitalize">
+                            {humanizeName(increasedStat)}
+                          </span>
+                        </div>
+                      )}
+                      {decreasedStat && (
+                        <div className="nature-highlight nature-highlight-negative">
+                          <span className="nature-highlight-label">Lowers</span>
+                          <span className="nature-highlight-value text-capitalize">
+                            {humanizeName(decreasedStat)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {(likesFlavor || hatesFlavor) && (
+                  <div className="nature-section">
+                    <h3 className="nature-section-title">Flavor Preferences</h3>
+                    <div className="nature-highlight-grid">
+                      {likesFlavor && (
+                        <div className="nature-highlight nature-highlight-flavor-like">
+                          <span className="nature-highlight-label">Likes</span>
+                          <span className="nature-highlight-value text-capitalize">
+                            {humanizeName(likesFlavor)} flavor
+                          </span>
+                        </div>
+                      )}
+                      {hatesFlavor && (
+                        <div className="nature-highlight nature-highlight-flavor-hate">
+                          <span className="nature-highlight-label">Dislikes</span>
+                          <span className="nature-highlight-value text-capitalize">
+                            {humanizeName(hatesFlavor)} flavor
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {battlePreferences.length > 0 && (
+                  <div className="nature-section">
+                    <h3 className="nature-section-title">Move Style Preference</h3>
+                    <ul className="nature-info-list">
+                      {battlePreferences.map((pref) => (
+                        <li key={pref.style} className="nature-info-card">
+                          <div className="nature-info-card-title text-capitalize">
+                            {humanizeName(pref.style)}
+                          </div>
+                          <div className="nature-info-card-grid">
+                            <div>
+                              <span className="nature-info-chip-label">Low HP</span>
+                              <span className="nature-info-chip-value">{pref.low ?? "-"}</span>
+                            </div>
+                            <div>
+                              <span className="nature-info-chip-label">High HP</span>
+                              <span className="nature-info-chip-value">{pref.high ?? "-"}</span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {pokeathlonChanges.length > 0 && (
+                  <div className="nature-section">
+                    <h3 className="nature-section-title">Pokeathlon Impact</h3>
+                    <ul className="nature-info-list">
+                      {pokeathlonChanges.map((entry) => (
+                        <li key={entry.stat} className="nature-info-card">
+                          <div className="nature-info-card-title text-capitalize">
+                            {humanizeName(entry.stat)}
+                          </div>
+                          <div className={`nature-info-change ${entry.change > 0 ? "is-positive" : "is-negative"}`}>
+                            {entry.change > 0 ? "+" : ""}
+                            {entry.change}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="ability-modal-error">
+                <p>Nature details unavailable.</p>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="ability-modal-right nature-modal-right">
+          <h3 className="ability-modal-subtitle">All Natures</h3>
+          <div className="ability-learners-header">
+            <input
+              type="search"
+              className="ability-search-input"
+              placeholder="Search natures..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              aria-label="Search natures"
+            />
+          </div>
+          <div className="ability-learners-scroll nature-list-scroll">
+            {listLoading ? (
+              <div className="ability-learners-loading">Loading natures...</div>
+            ) : listError ? (
+              <div className="ability-learners-error">{listError}</div>
+            ) : filteredNatures.length > 0 ? (
+              <ul className="nature-list">
+                {filteredNatures.map((entry) => {
+                  const isActive = entry.name === selectedNature;
+                  const isRecommended = entry.name === recommendedNormalized;
+                  return (
+                    <li key={entry.name}>
+                      <button
+                        type="button"
+                        className={`nature-item${isActive ? " is-active" : ""}${isRecommended ? " is-recommended" : ""}`}
+                        onClick={() => handleNatureSelect(entry.name)}
+                        aria-pressed={isActive}
+                      >
+                        <span className="nature-item-name text-capitalize">{humanizeName(entry.name)}</span>
+                        {isRecommended && <span className="nature-item-tag">Recommended</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="ability-learners-empty">No natures match your search.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
