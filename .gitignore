@@ -1,0 +1,34 @@
+# Dependency directories
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.log
+
+# Local env and secrets
+.env
+.env.local
+.env.*.local
+
+# Editor & system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# OS / package manager cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnp.*
+.pnp.js
+
+# Vite cache
+.vite/
+vite.config.timestamp*
+vite-plugin-*

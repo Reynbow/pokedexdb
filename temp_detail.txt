@@ -1,0 +1,370 @@
+function DetailPanel({ selected, onClose, onSelectPokemon }) {
+  const { id, name, url } = selected || {};
+  const [details, setDetails] = useState(null);
+  const [shiny, setShiny] = useState(() => {
+    try {
+      return localStorage.getItem("pref:shiny") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [animated, setAnimated] = useState(() => {
+    try {
+      return localStorage.getItem("pref:animated") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [species, setSpecies] = useState(null);
+  const [evoPaths, setEvoPaths] = useState([]);
+  const [weaknesses, setWeaknesses] = useState([]); // [{type, mult}]
+  const [resistances, setResistances] = useState([]); // [{type, mult}]
+
+  useEffect(() => {
+    try { localStorage.setItem("pref:shiny", shiny ? "1" : "0"); } catch {}
+  }, [shiny]);
+
+  useEffect(() => {
+    try { localStorage.setItem("pref:animated", animated ? "1" : "0"); } catch {}
+  }, [animated]);
+
+  useEffect(() => {
+    if (!url) return;
+    let ignore = false;
+    setSpecies(null);
+    setEvoPaths([]);
+    setWeaknesses([]);
+    queuedFetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (ignore) return;
+        setDetails(data);
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, [url]);
+
+  // After details are loaded, fetch species, evolution chain, and compute weaknesses
+  useEffect(() => {
+    if (!details) return;
+    let ignore = false;
+
+    // Helper to extract id from a PokeAPI URL
+    const getId = (u) => {
+      const parts = (u || "").split("/").filter(Boolean);
+      return parts[parts.length - 1];
+    };
+
+    // Compute defensive multipliers by aggregating damage relations across all types
+    const computeMultipliers = async () => {
+      try {
+        const typeUrls = (details.types || []).map((t) => t.type.url);
+        const typeDatas = await Promise.all(typeUrls.map((tu) => queuedFetch(tu).then((r) => r.json())));
+        const mult = new Map(); // type -> multiplier
+        const inc = (arr, factor) => {
+          (arr || []).forEach((t) => {
+            const key = t.name;
+            const prev = mult.get(key) ?? 1;
+            mult.set(key, prev * factor);
+          });
+        };
+        for (const td of typeDatas) {
+          const dr = td.damage_relations || {};
+          inc(dr.double_damage_from, 2);
+          inc(dr.half_damage_from, 0.5);
+          inc(dr.no_damage_from, 0);
+        }
+        const weak = [];
+        const resist = [];
+        mult.forEach((v, k) => {
+          if (v > 1) weak.push({ type: k, mult: v });
+          else if (v < 1 || v === 0) resist.push({ type: k, mult: v });
+        });
+        weak.sort((a, b) => b.mult - a.mult || a.type.localeCompare(b.type));
+        resist.sort((a, b) => a.mult - b.mult || a.type.localeCompare(b.type));
+        if (!ignore) {
+          setWeaknesses(weak);
+          setResistances(resist);
+        }
+      } catch {}
+    };
+
+    const humanize = (s) => String(s || "").replace(/-/g, " ");
+    const describeEvolution = (eds) => {
+      if (!eds || eds.length === 0) return "evolves";
+      const ed = eds[0];
+      const trig = ed.trigger?.name;
+      const parts = [];
+      const gender = ed.gender;
+      if (trig === "level-up") {
+        if (ed.min_level != null) return { text: `${ed.min_level}` };
+        // If no explicit level provided, just show level up without extra details
+        return { text: "level up" };
+      }
+      if (trig === "use-item") {
+        if (ed.item?.name) {
+          const name = ed.item.name;
+          const isStone = name.includes("stone");
+          const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${name}.png`;
+          return { text: humanize(name), itemSprite: isStone ? sprite : undefined };
+        }
+        return { text: "use item" };
+      }
+      if (trig === "trade") {
+        if (ed.trade_species?.name) parts.push(`for ${humanize(ed.trade_species.name)}`);
+        if (ed.held_item?.name) parts.push(`holding ${humanize(ed.held_item.name)}`);
+        return { text: parts.length ? `trade: ${parts.join(", ")}` : "trade" };
+      }
+      if (trig) return { text: humanize(trig) };
+      return { text: "evolves" };
+    };
+
+    // Build evolution paths from chain, attaching condition to the edge to next node
+    const buildPaths = (node, prefix = []) => {
+      const current = [...prefix, { name: node.species.name, id: getId(node.species.url) }];
+      if (!node.evolves_to || node.evolves_to.length === 0) return [current];
+      let paths = [];
+      for (const child of node.evolves_to) {
+        const cond = describeEvolution(child.evolution_details);
+        const withCond = current.slice();
+        withCond[withCond.length - 1] = {
+          ...withCond[withCond.length - 1],
+          toNext: cond,
+        };
+        paths = paths.concat(buildPaths(child, withCond));
+      }
+      return paths;
+    };
+
+    const fetchEvolution = async () => {
+      try {
+        const speciesUrl = details.species?.url;
+        if (!speciesUrl) return;
+        const sp = await queuedFetch(speciesUrl).then((r) => r.json());
+        if (ignore) return;
+        setSpecies(sp);
+        const evoUrl = sp.evolution_chain?.url;
+        if (!evoUrl) return;
+        const chain = await queuedFetch(evoUrl).then((r) => r.json());
+        if (ignore) return;
+        const paths = buildPaths(chain.chain);
+        setEvoPaths(paths);
+      } catch {}
+    };
+
+    computeMultipliers();
+    fetchEvolution();
+
+    return () => { ignore = true; };
+  }, [details]);
+
+  // Prefer higher quality sources. If animated is enabled, try Showdown; otherwise use HD static (HOME > official-artwork > dream_world if not shiny) before pixel fallback.
+  const detailImg = (() => {
+    const d = details?.sprites?.other || {};
+    const pixel = shiny
+      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+      : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+
+    if (animated) {
+      const showdown = d?.showdown?.[shiny ? "front_shiny" : "front_default"];
+      if (showdown) return showdown;
+      // fall through to HD static if no animated available
+    }
+
+    const home = d?.home?.[shiny ? "front_shiny" : "front_default"];
+    if (home) return home;
+    const art = d?.["official-artwork"]?.[shiny ? "front_shiny" : "front_default"];
+    if (art) return art;
+    if (!shiny) {
+      const dream = d?.dream_world?.front_default;
+      if (dream) return dream;
+    }
+    return pixel;
+  })();
+
+  return (
+    <aside className="detail-panel">
+      <div className="detail-inner">
+        <button className="close" onClick={onClose} aria-label="Close">×</button>
+        <div className="detail-hero">
+          <div className="hero-left">
+            <img className="detail-art" src={detailImg} alt={name} loading="lazy" />
+            <div className="hero-controls">
+              <div className="toggle-group">
+                <button
+                  type="button"
+                  className={`toggle-btn${animated ? " is-on" : ""}`}
+                  onClick={() => setAnimated((v) => !v)}
+                  aria-pressed={animated}
+                  title={animated ? "Use HD static sprite" : "Use animated sprite"}
+                >
+                  Animate
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn${shiny ? " is-on" : ""}`}
+                  onClick={() => setShiny((v) => !v)}
+                  aria-pressed={shiny}
+                  title={shiny ? "Show default variant" : "Show shiny variant"}
+                >
+                  Shiny
+                </button>
+              </div>
+            </div>
+            <section className="about single-col">
+			<section className="about single-col">
+            <section className="about single-col">
+              <h3 className="section-title">About</h3>
+              <div className="about-list">
+                <div className="about-row">
+                  <span className="label">Types</span>
+                  <div className="value">
+                    {(details.types || [])
+                      .slice()
+                      .sort((a, b) => a.slot - b.slot)
+                      .map((t) => (
+                        <span key={t.type.name} className={`type-chip type-${t.type.name}`}>
+                          {t.type.name}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+                <div className="about-row">
+                  <span className="label">Species</span>
+                  <span className="value text-capitalize">
+                    {species?.genera?.find?.((g) => g.language?.name === "en")?.genus || species?.name || "—"}
+                  </span>
+                </div>
+                <div className="about-row">
+                  <span className="label">Abilities</span>
+                  <div className="value">
+                    {(details.abilities || []).map((a) => (
+                      <span key={a.ability.name} className="ability-chip">
+                        <span className="text-capitalize">{a.ability.name}</span>
+                        {a.is_hidden && <span className="ability-tag">Hidden</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="about-row">
+                  <span className="label">Height</span>
+                  <span className="value">{(details.height ?? 0) / 10} m</span>
+                </div>
+                <div className="about-row">
+                  <span className="label">Weight</span>
+                  <span className="value">{(details.weight ?? 0) / 10} kg</span>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div className="hero-right">
+            <div className="detail-title">
+              <span className="dexno">#{String(id).padStart(4, "0")}</span>
+              <h2>{name}</h2>
+            </div>
+            <section className="stats hero-stats">
+              <div className="stats-list">
+                {(details.stats || []).map((s) => (
+                  <div className="stat-row" key={s.stat.name}>
+                    <div className="stat-label">{s.stat.name.replace("-", " ")}</div>
+                    <div className="stat-bar">
+                      <div
+                        className="stat-fill"
+                        style={{ width: `${Math.min(100, (s.base_stat / 180) * 100)}%` }}
+                        title={`${s.base_stat}`}
+                      />
+                    </div>
+                    <div className="stat-value">{s.base_stat}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+            {evoPaths.length > 0 && (
+              <div className="evo-inline">
+                {evoPaths.map((path, idx) => (
+                  <div className="evo-path" key={idx}>
+                    {path.map((n, i) => (
+                      <div className="evo-node-wrap" key={n.id + i}>
+                        <button
+                          className={`evo-node${String(n.id) === String(id) ? " is-current" : ""}`}
+                          title={n.name}
+                          onClick={() => onSelectPokemon?.(String(n.id), n.name, `https://pokeapi.co/api/v2/pokemon/${n.id}`)}
+                          type="button"
+                        >
+                          <img
+                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${n.id}.png`}
+                            alt={n.name}
+                            width={44}
+                            height={44}
+                            loading="lazy"
+                          />
+                          <div className="evo-name">{n.name}</div>
+                        </button>
+                        {i < path.length - 1 && (
+                          <div className="evo-connector">
+                            {n.toNext?.itemSprite && (
+                              <img
+                                className="evo-item"
+                                src={n.toNext.itemSprite}
+                                alt={n.toNext.text}
+                                width={32}
+                                height={32}
+                                loading="lazy"
+                              />
+                            <div className="evo-arrow">→</div>
+                            {n.toNext?.text && <div className="evo-cond">{n.toNext.text}</div>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="weak-resist">
+              <div className="inline-block">
+                <div className="inline-label">Weak To</div>
+                <div className="types">
+                  {weaknesses.length === 0 ? (
+                    <span className="type-chip skeleton" />
+                  ) : (
+                    weaknesses.map((w) => (
+                      <span key={w.type} className={`type-chip type-${w.type}`} title={`x${w.mult}`}>
+                        {w.type}
+                        {w.mult >= 4 ? " x4" : w.mult > 1 ? " x2" : ""}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="inline-block">
+                <div className="inline-label">Resists</div>
+                <div className="types">
+                  {resistances.length === 0 ? (
+                    <span className="type-chip skeleton" />
+                  ) : (
+                    resistances.map((r) => (
+                      <span key={r.type} className={`type-chip type-${r.type}`} title={`x${r.mult}`}>
+                        {r.type}
+                        {r.mult === 0 ? " x0" : r.mult <= 0.25 ? " x0.25" : " x0.5"}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {details && (
+          <>
+
+            {/* detail-body no longer used since about moved under sprite */}
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+
