@@ -25,10 +25,6 @@
 :root {
   --card-size: 180px;
   --gap: 16px;
-  --evo-thumb: 44px;
-  --evo-branch-color: rgba(226, 232, 240, 0.35);
-  --evo-branch-row-height: 72px;
-  --evo-branch-row-gap: 16px;
   --pill-radius: 10px;
 }
 
@@ -513,7 +509,6 @@
 .inline-label { font-size: 0.8rem; color: #a1a1aa; margin-bottom: 4px; text-align: center; }
 
 .hero-right { display: flex; flex-direction: column; gap: 20px; }
-.evo-inline { display: flex; flex-direction: column; gap: 12px; align-items: center; margin-bottom: 24px; }
 .forms-section { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
 .forms-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
 .form-card {
@@ -708,6 +703,13 @@
 .nature-value { min-height: 24px; }
 .nature-chip { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: var(--pill-radius); border: 1px solid rgba(74,222,128,0.35); background: rgba(34,197,94,0.16); color: #bbf7d0; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; }
 .nature-placeholder { color: #64748b; font-style: italic; }
+.nature-loading { display: inline-flex; align-items: center; gap: 8px; color: #38bdf8; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.01em; }
+.nature-spinner { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(56,189,248,0.25); border-top-color: #38bdf8; animation: nature-spin 0.8s linear infinite; }
+
+@keyframes nature-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .special-tag { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--pill-radius); border: 1px solid rgba(59,130,246,0.35); background: rgba(59,130,246,0.18); color: #bfdbfe; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.01em; }
 .ability-tag { font-size: 0.7rem; font-weight: 700; color: #fde68a; background: rgba(250,204,21,0.12); border: 1px solid rgba(250,204,21,0.35); padding: 2px 6px; border-radius: var(--pill-radius); }
 .ability-title-tag { display: inline-flex; align-items: center; line-height: 1; }
@@ -1161,104 +1163,143 @@
 
 .weak-section { padding: 6px 0 12px; }
 
-.evo-section { padding: 6px 16px 16px; }
-.evo-paths { display: flex; flex-direction: column; gap: 18px; }
-.evo-path { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 18px; }
-.evo-node-wrap { display: flex; align-items: center; gap: 18px; }
-.evo-node { position: relative; overflow: visible; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 18px rgba(8, 12, 24, 0.35); }
-.evo-node img { width: var(--evo-thumb); height: var(--evo-thumb); transform: scale(1.8); transform-origin: center; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.45)); }
-.evo-node.is-current { outline: 2px solid rgba(124, 140, 255, 0.6); box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.15); }
-.evo-node-wrap.has-forms { align-items: flex-start; gap: 20px; }
-.evo-node-wrap.has-compact-forms { align-items: center; }
-.evo-node-wrap.has-stacked-forms { align-items: flex-start; gap: 20px; }
-.evo-name { text-transform: capitalize; font-size: 0.82rem; color: #f1f5f9; font-weight: 600; letter-spacing: 0.01em; }
-.evo-form-branches { position: relative; display: flex; align-items: stretch; gap: 20px; margin-left: 6px; padding-left: 6px; min-height: var(--branch-height, auto); }
-.evo-form-branches.is-compact { align-items: center; gap: 16px; margin-left: 0; padding-left: 0; min-height: auto; }
-.evo-form-branches.is-stacked { flex-direction: column; align-items: center; gap: 12px; margin-left: 0; padding-left: 0; min-height: auto; }
-.evo-form-spline { flex: 0 0 96px; height: var(--branch-height, auto); pointer-events: none; }
-.evo-form-spline.is-compact { flex: 0 0 84px; height: 64px; }
-.evo-form-path { fill: none; stroke: var(--evo-branch-color); stroke-width: 2.35px; opacity: 0.9; stroke-linecap: round; }
-.evo-form-origin { fill: var(--evo-branch-color); opacity: 0.85; }
-.evo-form-list { display: flex; flex-direction: column; justify-content: center; gap: var(--branch-gap, var(--evo-branch-row-gap)); min-height: var(--branch-height, auto); }
-.evo-form-branches.is-compact .evo-form-list { flex-direction: row; align-items: center; gap: 20px; min-height: auto; }
-.evo-form-list.stacked { position: relative; flex-direction: column; align-items: stretch; gap: 14px; padding-left: 28px; min-height: auto; }
-.evo-form-list.stacked::before { content: ""; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.55), rgba(148, 163, 184, 0.12)); border-radius: 1px; }
-.evo-form-stack { width: 2px; height: 28px; display: flex; align-items: center; justify-content: center; }
-.evo-form-stack-line { display: block; width: 2px; height: 100%; background: var(--evo-branch-color); border-radius: 1px; opacity: 0.85; }
-.evo-form-entry { display: flex; align-items: center; gap: 16px; height: var(--evo-branch-row-height); }
-.evo-form-branches.is-compact .evo-form-entry { height: auto; }
-.evo-form-entry.is-stacked { height: auto; gap: 12px; }
-.evo-form-arrow { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; background: rgba(148, 163, 184, 0.18); color: #f8fafc; font-size: 16px; box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28); }
-.evo-form-arrow.is-compact { width: 22px; height: 22px; font-size: 14px; }
-.evo-form-arrow.is-stacked { width: 22px; height: 22px; font-size: 13px; background: rgba(148, 163, 184, 0.22); box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.32), 0 4px 10px rgba(15, 19, 36, 0.35); }
-.evo-form-node { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 16px; background: rgba(13, 18, 32, 0.82); border: 1px solid rgba(148, 163, 184, 0.22); color: #f1f5f9; font-size: 0.8rem; text-transform: capitalize; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; min-width: 124px; box-shadow: 0 8px 20px rgba(11, 16, 32, 0.4); }
-.evo-form-node:hover { transform: translateY(-2px); border-color: rgba(124, 140, 255, 0.55); box-shadow: 0 12px 26px rgba(15, 19, 36, 0.5); }
-.evo-form-node.is-current { outline: 2px solid rgba(124, 140, 255, 0.55); }
-.evo-form-node img { width: 48px; height: 48px; transform: scale(1.45); transform-origin: center; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.45)); }
-.evo-form-name { font-size: 0.78rem; color: #f8fafc; text-align: center; text-transform: capitalize; max-width: 150px; }
-.evo-connector {
-  position: relative;
+.evo-section { padding: 0 16px 16px; }
+.evo-tree {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.62);
+  border-radius: 12px;
+  padding: 10px 14px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  min-width: 160px;
-  padding: 12px 28px;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 10px 24px rgba(8, 12, 24, 0.28);
 }
-.evo-connector::before {
-  content: "";
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  top: 50%;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.55), rgba(148, 163, 184, 0.12));
-  border-radius: 999px;
-  transform: translateY(-50%);
-}
-.evo-arrow {
-  position: relative;
-  z-index: 1;
+.evo-tree-roots,
+.evo-tree-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 28px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.85);
-  color: #e0e7ff;
-  font-size: 18px;
-  letter-spacing: -0.4px;
-  box-shadow: 0 4px 10px rgba(8, 11, 24, 0.45);
+  flex-direction: column;
+  gap: 4px;
 }
-.evo-cond {
-  position: relative;
-  z-index: 1;
-  font-size: 0.78rem;
-  color: #e2e8f0;
+.evo-tree-node { display: flex; flex-direction: column; gap: 4px; }
+.evo-tree-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: calc(var(--level, 0) * 18px);
+  min-height: 32px;
+}
+.evo-tree-cond {
+  font-size: 0.75rem;
+  color: #9aa8d6;
+  white-space: nowrap;
+}
+.evo-tree-item {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(14, 22, 43, 0.85);
+  padding: 2px;
+  box-shadow: 0 4px 10px rgba(8, 12, 24, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+.evo-tree-arrow {
+  color: #7dd3fc;
+  font-size: 0.9rem;
+}
+.evo-tree-pokemon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: #cbd5f5;
+  padding: 3px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.evo-tree-pokemon.is-root {
+  font-weight: 600;
+  font-size: 0.96rem;
+}
+.evo-tree-pokemon.is-current { color: #93c5fd; }
+.evo-tree-pokemon:hover,
+.evo-tree-pokemon:focus-visible {
+  background: rgba(59, 130, 246, 0.12);
+  color: #bfdbfe;
+  outline: none;
+}
+.evo-tree-pokemon:active { transform: translateY(1px); }
+.evo-tree-icon { display: inline-flex; }
+.evo-tree-icon img {
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 4px 8px rgba(8, 12, 24, 0.45));
+}
+.evo-tree-pokemon.is-root .evo-tree-icon img {
+  width: 38px;
+  height: 38px;
+}
+.evo-tree-name { letter-spacing: 0.01em; }
+.evo-tree-forms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: calc(var(--level, 0) * 18px + 24px);
+}
+.evo-tree-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5f5;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.evo-tree-form:hover,
+.evo-tree-form:focus-visible {
+  border-color: rgba(124, 140, 255, 0.55);
+  color: #bfdbfe;
+  outline: none;
+}
+.evo-tree-form.is-current {
+  border-color: rgba(124, 140, 255, 0.7);
+  color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(124, 140, 255, 0.25);
+}
+.evo-tree-form img {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 4px 8px rgba(8, 12, 24, 0.35));
+}
+.evo-tree-form-name { text-transform: capitalize; }
+
+.evo-empty {
   text-align: center;
-  max-width: 220px;
-  padding: 6px 14px;
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.76);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 4px 12px rgba(8, 11, 24, 0.4);
+  color: #94a3b8;
+  font-size: 0.82rem;
+  padding: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.32);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.45);
 }
-.evo-item {
-  position: relative;
-  z-index: 1;
-  padding: 6px;
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.85);
-  box-shadow: 0 4px 12px rgba(8, 11, 24, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+
+@media (max-width: 768px) {
+  .evo-tree { padding: 10px 12px; gap: 5px; }
+  .evo-tree-row { gap: 4px; }
+  .evo-tree-pokemon { font-size: 0.88rem; }
+  .evo-tree-pokemon.is-root { font-size: 0.93rem; }
+  .evo-tree-forms { margin-left: calc(var(--level, 0) * 16px + 20px); }
 }
-.evo-item img {
-  display: block;
-  width: 32px;
-  height: 32px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
-}
+
 
 .card {
   position: relative;
