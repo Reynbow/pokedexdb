@@ -102,17 +102,95 @@ const ALL_TYPES = [
 ];
 
 const DEX_FILTERS = [
-  { key: "national", label: "National", apiNames: ["national"], pad: 4 },
-  { key: "kanto", label: "Kanto", apiNames: ["kanto"], pad: 3 },
-  { key: "hoenn", label: "Hoenn", apiNames: ["hoenn"], pad: 3 },
-  { key: "sinnoh", label: "Sinnoh", apiNames: ["original-sinnoh", "extended-sinnoh"], pad: 3 },
-  { key: "unova", label: "Unova", apiNames: ["original-unova", "updated-unova"], pad: 3 },
-  { key: "kalos", label: "Kalos", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"], pad: 3 },
-  { key: "alola", label: "Alola", apiNames: ["updated-alola"], pad: 3 },
-  { key: "galar", label: "Galar", apiNames: ["galar"], pad: 3 },
-  { key: "hisui", label: "Hisui", apiNames: ["hisui"], pad: 3 },
-  { key: "paldea", label: "Paldea", apiNames: ["paldea"], pad: 3 },
-  { key: "lumiose", label: "Lumiose", apiNames: ["kalos-central"], pad: 3 },
+  { key: "national", label: "National", apiNames: ["national"], pad: 4, games: [] },
+  {
+    key: "kanto",
+    label: "Kanto",
+    apiNames: ["kanto"],
+    pad: 3,
+    games: [
+      { key: "red-blue", label: "Red & Blue", apiNames: ["kanto"] },
+      { key: "yellow", label: "Yellow", apiNames: ["kanto"] },
+      { key: "firered-leafgreen", label: "FireRed & LeafGreen", apiNames: ["kanto"] },
+      { key: "lets-go", label: "Let's Go", apiNames: ["letsgo-kanto"] },
+    ],
+  },
+  {
+    key: "hoenn",
+    label: "Hoenn",
+    apiNames: ["hoenn"],
+    pad: 3,
+    games: [
+      { key: "ruby-sapphire", label: "Ruby & Sapphire", apiNames: ["hoenn"] },
+      { key: "emerald", label: "Emerald", apiNames: ["hoenn"] },
+      { key: "omega-ruby-alpha-sapphire", label: "Omega Ruby & Alpha Sapphire", apiNames: ["updated-hoenn"] },
+    ],
+  },
+  {
+    key: "sinnoh",
+    label: "Sinnoh",
+    apiNames: ["original-sinnoh", "extended-sinnoh"],
+    pad: 3,
+    games: [
+      { key: "diamond-pearl", label: "Diamond & Pearl", apiNames: ["original-sinnoh"] },
+      { key: "platinum", label: "Platinum", apiNames: ["extended-sinnoh"] },
+    ],
+  },
+  {
+    key: "unova",
+    label: "Unova",
+    apiNames: ["original-unova", "updated-unova"],
+    pad: 3,
+    games: [
+      { key: "black-white", label: "Black & White", apiNames: ["original-unova"] },
+      { key: "black-2-white-2", label: "Black 2 & White 2", apiNames: ["updated-unova"] },
+    ],
+  },
+  {
+    key: "kalos",
+    label: "Kalos",
+    apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
+    pad: 3,
+    games: [{ key: "x-y", label: "X & Y", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] }],
+  },
+  {
+    key: "alola",
+    label: "Alola",
+    apiNames: ["updated-alola"],
+    pad: 3,
+    games: [
+      { key: "sun-moon", label: "Sun & Moon", apiNames: ["original-alola"] },
+      { key: "ultra-sun-ultra-moon", label: "Ultra Sun & Ultra Moon", apiNames: ["updated-alola"] },
+    ],
+  },
+  {
+    key: "galar",
+    label: "Galar",
+    apiNames: ["galar"],
+    pad: 3,
+    games: [{ key: "sword-shield", label: "Sword & Shield", apiNames: ["galar"] }],
+  },
+  {
+    key: "hisui",
+    label: "Hisui",
+    apiNames: ["hisui"],
+    pad: 3,
+    games: [{ key: "legends-arceus", label: "Legends: Arceus", apiNames: ["hisui"] }],
+  },
+  {
+    key: "paldea",
+    label: "Paldea",
+    apiNames: ["paldea"],
+    pad: 3,
+    games: [{ key: "scarlet-violet", label: "Scarlet & Violet", apiNames: ["paldea"] }],
+  },
+  {
+    key: "lumiose",
+    label: "Lumiose",
+    apiNames: ["kalos-central"],
+    pad: 3,
+    games: [{ key: "x-y", label: "X & Y", apiNames: ["kalos-central"] }],
+  },
 ];
 
 const DEX_LOOKUP = new Map(DEX_FILTERS.map((cfg) => [cfg.key, cfg]));
@@ -348,6 +426,7 @@ function App() {
   const [selectedTypes, setSelectedTypes] = useState(() => new Set());
   const [selectedTags, setSelectedTags] = useState(() => new Set());
   const [selectedDex, setSelectedDex] = useState("national");
+  const [selectedGame, setSelectedGame] = useState(null);
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
   const typeIndexRef = useRef(new Map()); // type -> Set(names)
   const specialTagCacheRef = useRef(new Map()); // name -> cached tag array
@@ -374,38 +453,87 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (selectedDex === "national") {
+      setSelectedGame(null);
+      return;
+    }
     const cfg = DEX_LOOKUP.get(selectedDex);
-    if (!cfg) return;
-    if (selectedDex === "national") return;
+    if (!cfg?.games || cfg.games.length === 0) {
+      setSelectedGame(null);
+      return;
+    }
+    setSelectedGame((prev) => {
+      if (prev && cfg.games.some((game) => game.key === prev)) {
+        return prev;
+      }
+      return cfg.games[0]?.key ?? null;
+    });
+  }, [selectedDex]);
+
+  useEffect(() => {
+    const cfg = DEX_LOOKUP.get(selectedDex);
+    if (!cfg || selectedDex === "national") return;
     if (dexIndexes.has(selectedDex) || dexLoadingRef.current.has(selectedDex)) return;
+    const gameApiNames = (cfg.games || []).flatMap((game) => game.apiNames || []);
+    const allApiNames = Array.from(new Set([...(cfg.apiNames || []), ...gameApiNames]));
+    if (allApiNames.length === 0) return;
     dexLoadingRef.current.add(selectedDex);
     let ignore = false;
     const loadDex = async () => {
       try {
-        const combined = new Map();
-        let counter = 1;
-        for (const apiName of cfg.apiNames) {
+        const sources = new Map();
+        for (const apiName of allApiNames) {
           const response = await queuedFetch(`https://pokeapi.co/api/v2/pokedex/${apiName}`);
           if (!response?.ok) {
             throw new Error(`Failed to load pokedex/${apiName}: ${response?.status} ${response?.statusText}`);
           }
           const data = await response.json();
           if (ignore) return;
-          const entries = data.pokemon_entries || [];
-          for (const entry of entries) {
-            const idNum = getIdNumberFromUrl(entry.pokemon_species?.url);
-            if (idNum == null || combined.has(idNum)) continue;
-            const number = cfg.apiNames.length > 1 ? counter++ : entry.entry_number;
-            combined.set(idNum, number);
-            if (cfg.apiNames.length === 1) {
-              counter = Math.max(counter, number + 1);
-            }
-          }
+          sources.set(apiName, data);
         }
         if (ignore) return;
+
+        const buildEntryMap = (apiList = []) => {
+          const finalMap = new Map();
+          const seen = new Set();
+          let counter = 1;
+          const multipleLists = apiList.length > 1;
+          for (const apiName of apiList) {
+            const data = sources.get(apiName);
+            if (!data) continue;
+            const entries = data.pokemon_entries || [];
+            for (const entry of entries) {
+              const idNum = getIdNumberFromUrl(entry.pokemon_species?.url);
+              if (idNum == null || seen.has(idNum)) continue;
+              seen.add(idNum);
+              let number;
+              if (multipleLists) {
+                number = counter++;
+              } else {
+                number = entry.entry_number;
+                counter = Math.max(counter, number + 1);
+              }
+              finalMap.set(idNum, number);
+            }
+          }
+          return finalMap;
+        };
+
+        const primaryApiList = (cfg.apiNames && cfg.apiNames.length > 0) ? cfg.apiNames : allApiNames;
+        const combined = buildEntryMap(primaryApiList);
+        const games = new Map();
+        for (const game of cfg.games || []) {
+          const apiList = (game.apiNames && game.apiNames.length > 0) ? game.apiNames : primaryApiList;
+          games.set(game.key, {
+            key: game.key,
+            label: game.label,
+            entryMap: buildEntryMap(apiList),
+          });
+        }
+
         setDexIndexes((prev) => {
           const next = new Map(prev);
-          next.set(selectedDex, combined);
+          next.set(selectedDex, { combined, games });
           return next;
         });
       } catch (err) {
@@ -471,8 +599,16 @@ function App() {
     const hasTypeFilter = selectedTypes.size > 0;
     const requiredTags = Array.from(selectedTags);
     const hasTagFilter = requiredTags.length > 0;
-    const dexMap = selectedDex === "national" ? null : dexIndexes.get(selectedDex);
-    if (selectedDex !== "national" && !dexMap) {
+    const dexData = selectedDex === "national" ? null : dexIndexes.get(selectedDex);
+    if (selectedDex !== "national" && !dexData) {
+      return [];
+    }
+    const gameData =
+      selectedDex === "national" || !selectedGame ? null : dexData?.games?.get(selectedGame) ?? null;
+    const combinedMap = selectedDex === "national" ? null : dexData?.combined ?? null;
+    const activeEntryMap =
+      selectedDex === "national" ? null : gameData?.entryMap ?? combinedMap;
+    if (selectedDex !== "national" && !activeEntryMap) {
       return [];
     }
 
@@ -505,7 +641,7 @@ function App() {
       const tags = getTagsForName(p.name);
       const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
       if (idNum >= 10000 && !hasSpecialTag) continue; // keep alternate forms that carry special tags
-      if (dexMap && !dexMap.has(idNum) && !hasSpecialTag) continue;
+      if (activeEntryMap && !activeEntryMap.has(idNum) && !hasSpecialTag) continue;
       if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
         continue;
       }
@@ -538,15 +674,22 @@ function App() {
       matches.push({ entry: p, idNum });
     }
 
-    if (dexMap) {
+    if (activeEntryMap) {
       matches.sort((a, b) => {
-        const aEntry = dexMap.get(a.idNum);
-        const bEntry = dexMap.get(b.idNum);
+        const aEntry = activeEntryMap.get(a.idNum);
+        const bEntry = activeEntryMap.get(b.idNum);
         if (aEntry != null && bEntry != null && aEntry !== bEntry) {
           return aEntry - bEntry;
         }
         if (aEntry != null && bEntry == null) return -1;
         if (aEntry == null && bEntry != null) return 1;
+        const combinedA = combinedMap?.get(a.idNum);
+        const combinedB = combinedMap?.get(b.idNum);
+        if (combinedA != null && combinedB != null && combinedA !== combinedB) {
+          return combinedA - combinedB;
+        }
+        if (combinedA != null && combinedB == null) return -1;
+        if (combinedA == null && combinedB != null) return 1;
         return a.idNum - b.idNum;
       });
     } else {
@@ -554,7 +697,7 @@ function App() {
     }
 
     return matches.map((item) => item.entry);
-  }, [pokemon, query, selectedTypes, selectedTags, selectedDex, dexIndexes]);
+  }, [pokemon, query, selectedTypes, selectedTags, selectedDex, selectedGame, dexIndexes]);
 
   const formatDexNumber = useCallback(
     (value) => {
@@ -568,13 +711,16 @@ function App() {
       if (selectedDex === "national") {
         return `#${String(idNum).padStart(pad, "0")}`;
       }
-      const dexMap = dexIndexes.get(selectedDex);
-      if (!dexMap) return "-";
-      const entry = dexMap.get(idNum);
+      const dexData = dexIndexes.get(selectedDex);
+      if (!dexData) return "-";
+      const gameEntry = selectedGame ? dexData.games?.get(selectedGame) : null;
+      const entryMap = gameEntry?.entryMap ?? dexData.combined;
+      if (!entryMap) return "-";
+      const entry = entryMap.get(idNum);
       if (entry == null) return "-";
       return `#${String(entry).padStart(pad, "0")}`;
     },
-    [dexIndexes, selectedDex]
+    [dexIndexes, selectedDex, selectedGame]
   );
 
   const selectedDexNumber = useMemo(() => {
@@ -622,6 +768,10 @@ function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const selectedDexConfig = DEX_LOOKUP.get(selectedDex);
+  const availableGames = selectedDexConfig?.games || [];
+  const showGameFilters = selectedDex !== "national" && availableGames.length > 0;
 
   return (
     <div className="app-shell">
@@ -677,6 +827,7 @@ function App() {
                   setSelectedTypes(new Set());
                   setSelectedTags(new Set());
                   setSelectedDex("national");
+                  setSelectedGame(null);
                   setQuery("");
                   clearSelection();
                 }}
@@ -723,6 +874,7 @@ function App() {
                       type="button"
                       className={`type-chip neutral-chip${isActive ? " is-on" : ""}`}
                       onClick={() => {
+                        setSelectedGame(dex.games?.[0]?.key ?? null);
                         setSelectedDex(dex.key);
                         clearSelection();
                       }}
@@ -740,6 +892,31 @@ function App() {
       </header>
 
       <main className="container">
+        {showGameFilters && (
+          <div className="game-filters-row">
+            <span className="game-filters-label">Games</span>
+            <div className="game-filters">
+              {availableGames.map((game) => {
+                const isOn = game.key === selectedGame;
+                return (
+                  <button
+                    key={game.key}
+                    type="button"
+                    className={`filter-chip${isOn ? " is-on" : ""}`}
+                    onClick={() => {
+                      if (selectedGame === game.key) return;
+                      setSelectedGame(game.key);
+                      clearSelection();
+                    }}
+                    aria-pressed={isOn}
+                  >
+                    {game.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {selected ? (
           <section className="content split">
             <div className="list-panel">
