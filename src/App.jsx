@@ -463,6 +463,7 @@ function App() {
       if (!idStr) continue;
       const idNum = Number(idStr);
       if (Number.isNaN(idNum)) continue;
+      if (idNum >= 10000) continue; // skip alternate-form entries
       if (dexMap && !dexMap.has(idNum)) continue;
       if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
         continue;
@@ -1277,7 +1278,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         <button className="close" onClick={onClose} aria-label="Close">x</button>
         <div className="detail-hero">
           <div className="hero-left">
-            <img className="detail-art" src={detailImg} alt={name} loading="lazy" />
+            <div className="detail-art-wrap">
+              <img className="detail-art" src={detailImg} alt={name} loading="lazy" />
+            </div>
             <div className="hero-controls">
               <div className="toggle-group">
                 <button
@@ -1287,7 +1290,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   aria-pressed={animated}
                   title={animated ? "Use HD static sprite" : "Use animated sprite"}
                 >
-                  Animate
+                  🎞️ Animate
                 </button>
                 <button
                   type="button"
@@ -1296,7 +1299,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   aria-pressed={shiny}
                   title={shiny ? "Show default variant" : "Show shiny variant"}
                 >
-                  Shiny
+                  ✨ Shiny
                 </button>
               </div>
             </div>
