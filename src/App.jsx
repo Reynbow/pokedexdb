@@ -2015,8 +2015,20 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
   }, [flavorEntry]);
 
   const generationLabel = useMemo(() => {
-    if (!data?.generation?.name) return null;
-    return humanizeName(data.generation.name);
+    const name = data?.generation?.name;
+    if (!name) return null;
+
+    if (/^generation-/i.test(name)) {
+      const romanNumeral = name.replace(/^generation-/i, "");
+      return `Generation ${romanNumeral.toUpperCase()}`;
+    }
+
+    const humanized = humanizeName(name);
+    if (!humanized) return null;
+
+    return humanized
+      .replace(/\bgeneration\b/i, "Generation")
+      .replace(/\b([ivxlcdm]+)\b/gi, (match) => match.toUpperCase());
   }, [data]);
 
   const learners = useMemo(() => {
@@ -2137,8 +2149,8 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
           <div className="ability-modal-header">
             <h2 className="ability-modal-title" id={abilityTitleId}>
               <span className="text-capitalize">{abilityLabel}</span>
+              {ability?.isHiddenForSelected && <span className="ability-tag ability-title-tag">Hidden on this Pokemon</span>}
             </h2>
-            {ability?.isHiddenForSelected && <span className="ability-tag">Hidden on this Pokemon</span>}
             {generationLabel && <div className="ability-modal-subtle">Introduced in {generationLabel}</div>}
           </div>
           <div className="ability-modal-body">
@@ -2155,10 +2167,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
               </div>
             ) : (
               <>
-                {effectEntry?.short_effect && (
-                  <p className="ability-short-effect">{effectEntry.short_effect}</p>
-                )}
-                {effectEntry?.effect && effectEntry.effect !== effectEntry.short_effect && (
+                {effectEntry?.effect && (
                   <p className="ability-effect">{effectEntry.effect}</p>
                 )}
                 {flavorText && (
