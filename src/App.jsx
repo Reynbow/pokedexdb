@@ -109,21 +109,29 @@ const DEX_FILTERS = [
     apiNames: ["kanto"],
     pad: 3,
     games: [
-      { key: "red-blue", label: "Red & Blue", apiNames: ["kanto"] },
-      { key: "yellow", label: "Yellow", apiNames: ["kanto"] },
+      { key: "lets-go", label: "Let's Go Pikachu & Let's Go Eevee", apiNames: ["letsgo-kanto"] },
       { key: "firered-leafgreen", label: "FireRed & LeafGreen", apiNames: ["kanto"] },
-      { key: "lets-go", label: "Let's Go", apiNames: ["letsgo-kanto"] },
+      { key: "red-blue-yellow", label: "Red, Blue & Yellow", apiNames: ["kanto"] },
+    ],
+  },
+  {
+    key: "johto",
+    label: "Johto",
+    apiNames: ["original-johto", "updated-johto"],
+    pad: 3,
+    games: [
+      { key: "heartgold-soulsilver", label: "HeartGold & SoulSilver", apiNames: ["updated-johto"] },
+      { key: "gold-silver-crystal", label: "Gold, Silver & Crystal", apiNames: ["original-johto"] },
     ],
   },
   {
     key: "hoenn",
     label: "Hoenn",
-    apiNames: ["hoenn"],
+    apiNames: ["hoenn", "updated-hoenn"],
     pad: 3,
     games: [
-      { key: "ruby-sapphire", label: "Ruby & Sapphire", apiNames: ["hoenn"] },
-      { key: "emerald", label: "Emerald", apiNames: ["hoenn"] },
       { key: "omega-ruby-alpha-sapphire", label: "Omega Ruby & Alpha Sapphire", apiNames: ["updated-hoenn"] },
+      { key: "ruby-sapphire-emerald", label: "Ruby, Sapphire & Emerald", apiNames: ["hoenn"] },
     ],
   },
   {
@@ -132,8 +140,9 @@ const DEX_FILTERS = [
     apiNames: ["original-sinnoh", "extended-sinnoh"],
     pad: 3,
     games: [
-      { key: "diamond-pearl", label: "Diamond & Pearl", apiNames: ["original-sinnoh"] },
+      { key: "brilliant-diamond-shining-pearl", label: "Brilliant Diamond & Shining Pearl", apiNames: ["original-sinnoh"] },
       { key: "platinum", label: "Platinum", apiNames: ["extended-sinnoh"] },
+      { key: "diamond-pearl", label: "Diamond & Pearl", apiNames: ["original-sinnoh"] },
     ],
   },
   {
@@ -142,8 +151,8 @@ const DEX_FILTERS = [
     apiNames: ["original-unova", "updated-unova"],
     pad: 3,
     games: [
-      { key: "black-white", label: "Black & White", apiNames: ["original-unova"] },
       { key: "black-2-white-2", label: "Black 2 & White 2", apiNames: ["updated-unova"] },
+      { key: "black-white", label: "Black & White", apiNames: ["original-unova"] },
     ],
   },
   {
@@ -151,16 +160,19 @@ const DEX_FILTERS = [
     label: "Kalos",
     apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
     pad: 3,
-    games: [{ key: "x-y", label: "X & Y", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] }],
+    games: [
+      { key: "legends-za", label: "Legends: Z-A", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] },
+      { key: "x-y", label: "X & Y", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"] },
+    ],
   },
   {
     key: "alola",
     label: "Alola",
-    apiNames: ["updated-alola"],
+    apiNames: ["original-alola", "updated-alola"],
     pad: 3,
     games: [
-      { key: "sun-moon", label: "Sun & Moon", apiNames: ["original-alola"] },
       { key: "ultra-sun-ultra-moon", label: "Ultra Sun & Ultra Moon", apiNames: ["updated-alola"] },
+      { key: "sun-moon", label: "Sun & Moon", apiNames: ["original-alola"] },
     ],
   },
   {
@@ -183,13 +195,6 @@ const DEX_FILTERS = [
     apiNames: ["paldea"],
     pad: 3,
     games: [{ key: "scarlet-violet", label: "Scarlet & Violet", apiNames: ["paldea"] }],
-  },
-  {
-    key: "lumiose",
-    label: "Lumiose",
-    apiNames: ["kalos-central"],
-    pad: 3,
-    games: [{ key: "x-y", label: "X & Y", apiNames: ["kalos-central"] }],
   },
 ];
 
@@ -639,9 +644,12 @@ function App() {
       const idNum = Number(idStr);
       if (Number.isNaN(idNum)) continue;
       const tags = getTagsForName(p.name);
-      const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
-      if (idNum >= 10000 && !hasSpecialTag) continue; // keep alternate forms that carry special tags
-      if (activeEntryMap && !activeEntryMap.has(idNum) && !hasSpecialTag) continue;
+      if (idNum >= 10000) {
+        if (selectedDex !== "national") continue;
+        const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
+        if (!hasSpecialTag) continue;
+      }
+      if (activeEntryMap && !activeEntryMap.has(idNum)) continue;
       if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
         continue;
       }
