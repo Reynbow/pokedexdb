@@ -302,6 +302,41 @@ const getIdNumberFromUrl = (url) => {
   return Number.isNaN(id) ? null : id;
 };
 
+const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = true } = {}) => {
+  if (!speciesData) return [];
+  const currentIdStr = currentId != null && currentId !== "" ? String(currentId) : null;
+  const baseSpeciesId = speciesData?.id != null ? String(speciesData.id) : null;
+  const entries =
+    (speciesData?.varieties || [])
+      .map((variant) => {
+        const formName = variant?.pokemon?.name;
+        const formUrl = variant?.pokemon?.url;
+        if (!formName || !formUrl) return null;
+        const formId = getIdFromUrl(formUrl);
+        if (!formId) return null;
+        const tags = new Set(deriveSpecialTags(formName));
+        if (isRegionalFormName(formName)) tags.add("Regional");
+        if (variant.is_default) tags.add("Default");
+        const orderedTags = Array.from(tags).sort((a, b) => a.localeCompare(b));
+        return {
+          id: formId,
+          name: formName,
+          displayName: humanizeName(formName),
+          isDefault: Boolean(variant.is_default),
+          tags: orderedTags,
+          isCurrent: currentIdStr != null && String(formId) === currentIdStr,
+          baseSpeciesId,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+        if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+        return a.displayName.localeCompare(b.displayName);
+      }) || [];
+  return includeDefault ? entries : entries.filter((entry) => !entry.isDefault);
+};
+
 function App() {
   const [pokemon, setPokemon] = useState([]);
   const [query, setQuery] = useState("");
@@ -1097,8 +1132,17 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     };
 
     // Build evolution paths from chain, attaching condition to the edge to next node
-    const buildPaths = (node, prefix = []) => {
-      const current = [...prefix, { name: node.species.name, id: getId(node.species.url) }];
+    const buildPaths = (node, prefix = [], formsMap) => {
+      const speciesId = getId(node.species.url);
+      const rawForms = speciesId && formsMap ? formsMap.get(String(speciesId)) : null;
+      const formBranches = rawForms && rawForms.length ? rawForms.map((form) => ({ ...form })) : [];
+      const currentNode = {
+        name: node.species.name,
+        displayName: humanizeName(node.species.name),
+        id: speciesId,
+        forms: formBranches,
+      };
+      const current = [...prefix, currentNode];
       if (!node.evolves_to || node.evolves_to.length === 0) return [current];
       let paths = [];
       for (const child of node.evolves_to) {
@@ -1108,7 +1152,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           ...withCond[withCond.length - 1],
           toNext: cond,
         };
-        paths = paths.concat(buildPaths(child, withCond));
+        paths = paths.concat(buildPaths(child, withCond, formsMap));
       }
       return paths;
     };
@@ -1122,33 +1166,8 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         if (ignore) return;
         setSpecies(sp);
 
-        const currentId = String(details.id ?? "");
-        const formList = (sp.varieties || [])
-          .map((variant) => {
-            const formName = variant?.pokemon?.name;
-            const formUrl = variant?.pokemon?.url;
-            if (!formName || !formUrl) return null;
-            const formId = getId(formUrl);
-            if (!formId) return null;
-            const tags = new Set(deriveSpecialTags(formName));
-            if (isRegionalFormName(formName)) tags.add("Regional");
-            if (variant.is_default) tags.add("Default");
-            const orderedTags = Array.from(tags).sort((a, b) => a.localeCompare(b));
-            return {
-              id: formId,
-              name: formName,
-              displayName: humanizeName(formName),
-              isDefault: Boolean(variant.is_default),
-              tags: orderedTags,
-              isCurrent: currentId && String(formId) === currentId,
-            };
-          })
-          .filter(Boolean)
-          .sort((a, b) => {
-            if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
-            if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
-            return a.displayName.localeCompare(b.displayName);
-          });
+        const currentId = details?.id != null ? String(details.id) : "";
+        const formList = mapVarietiesToForms(sp, { currentId });
         setForms(formList);
 
         const evoUrl = sp.evolution_chain?.url;
@@ -1156,7 +1175,56 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         addLog('Fetching evolution chain', { evoUrl });
         const chain = await queuedFetch(evoUrl).then((r) => r.json());
         if (ignore) return;
-        const paths = buildPaths(chain.chain);
+        const collectSpeciesIds = (node, acc) => {
+          if (!node) return;
+          const sid = getId(node.species?.url);
+          if (sid) acc.add(String(sid));
+          (node.evolves_to || []).forEach((child) => collectSpeciesIds(child, acc));
+        };
+        const speciesIds = new Set();
+        collectSpeciesIds(chain?.chain, speciesIds);
+        const speciesMap = new Map();
+        if (sp?.id != null) {
+          speciesMap.set(String(sp.id), sp);
+        }
+        const missingIds = Array.from(speciesIds).filter((sid) => sid && !speciesMap.has(sid));
+        if (missingIds.length > 0) {
+          const siblingSpecies = await Promise.all(
+            missingIds.map(async (sid) => {
+              try {
+                const response = await queuedFetch(`https://pokeapi.co/api/v2/pokemon-species/${sid}/`);
+                if (!response?.ok) return null;
+                const data = await response.json();
+                return data;
+              } catch {
+                return null;
+              }
+            })
+          );
+          if (ignore) return;
+          for (const sibling of siblingSpecies) {
+            if (!sibling || sibling?.id == null) continue;
+            speciesMap.set(String(sibling.id), sibling);
+          }
+        }
+        if (ignore) return;
+        const formsBySpeciesId = new Map();
+        const currentSpeciesId = sp?.id != null ? String(sp.id) : null;
+        if (currentSpeciesId) {
+          const altForms = formList.filter((form) => !form.isDefault);
+          if (altForms.length) {
+            formsBySpeciesId.set(currentSpeciesId, altForms);
+          }
+        }
+        speciesMap.forEach((data, speciesId) => {
+          if (speciesId === currentSpeciesId) return;
+          const altForms = mapVarietiesToForms(data, { includeDefault: false });
+          if (altForms.length) {
+            formsBySpeciesId.set(speciesId, altForms);
+          }
+        });
+        if (!chain?.chain) return;
+        const paths = buildPaths(chain.chain, [], formsBySpeciesId);
         setEvoPaths(paths);
         addLog('Evolution paths built', { paths: paths.length });
       } catch {}
@@ -1424,17 +1492,53 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               <div className="evo-inline">
                 {evoPaths.map((path, idx) => (
                   <div className="evo-path" key={idx}>
-                    {path.map((n, i) => (
-                      <div className="evo-node-wrap" key={n.id + i}>
+                    {path.map((n, i) => {
+                      const isBaseActive = String(n.id) === String(id);
+                      const baseDisplay = n.displayName || humanizeName(n.name);
+                      const hasForms = Array.isArray(n.forms) && n.forms.length > 0;
+                      return (
+                        <div className={`evo-node-wrap${hasForms ? " has-forms" : ""}`} key={`${n.id}-${i}`}>
                         <button
-                          className={`evo-node${String(n.id) === String(id) ? " is-current" : ""}`}
-                          title={n.name}
+                          className={`evo-node${isBaseActive ? " is-current" : ""}`}
+                          title={baseDisplay}
                           onClick={() => onSelectPokemon?.(String(n.id), n.name, `https://pokeapi.co/api/v2/pokemon/${n.id}`)}
                           type="button"
                         >
                           <SpriteImage id={n.id} alt={n.name} width={44} height={44} loading="lazy" />
-                          <div className="evo-name">{n.name}</div>
+                          <div className="evo-name">{baseDisplay}</div>
                         </button>
+                        {hasForms && (
+                          <div className="evo-form-branches">
+                            <span className="evo-form-spine" aria-hidden="true" />
+                            <div className="evo-form-list">
+                              {n.forms.map((form) => {
+                                const isFormActive = form.isCurrent || String(form.id) === String(id);
+                                const formDisplay = form.displayName || humanizeName(form.name);
+                                return (
+                                  <div className="evo-form-entry" key={form.id}>
+                                    <span className="evo-form-branch-line" aria-hidden="true" />
+                                    <button
+                                      type="button"
+                                      className={`evo-form-node${isFormActive ? " is-current" : ""}`}
+                                      onClick={() =>
+                                        onSelectPokemon?.(
+                                          String(form.id),
+                                          form.name,
+                                          `https://pokeapi.co/api/v2/pokemon/${form.id}`
+                                        )
+                                      }
+                                      title={formDisplay}
+                                      aria-pressed={isFormActive}
+                                    >
+                                      <SpriteImage id={form.id} alt={form.name} width={36} height={36} loading="lazy" />
+                                      <div className="evo-form-name">{formDisplay}</div>
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                         {i < path.length - 1 && (
                           <div className="evo-connector">
                             {n.toNext?.itemSprite && (
@@ -1452,7 +1556,8 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </div>
