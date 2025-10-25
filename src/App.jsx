@@ -339,6 +339,7 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
 
 const BRANCH_ROW_HEIGHT = 72;
 const BRANCH_ROW_GAP = 16;
+const COMPACT_BRANCH_HEIGHT = 64;
 
 function App() {
   const [pokemon, setPokemon] = useState([]);
@@ -1289,58 +1290,91 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   }, [details, species]);
   // Fetch recommended nature from Smogon (SV), preferring OU sets when available.
   useEffect(() => {
-    const alias = (name || '').toLowerCase();
+    const alias = (name || "").toLowerCase();
     if (!alias) return;
+    const controller = new AbortController();
     let cancelled = false;
-    const url = `https://www.smogon.com/dex/sv/pokemon/${encodeURIComponent(alias)}`;
-    setSmogonError(null);
-    setSmogonNature(null);
-    addLog('Fetching Smogon dex', { url });
-    fetch(url)
-      .then((r) => r.text())
-      .then((html) => {
-        if (cancelled) return;
-        const flag = 'dexSettings = ';
-        const idx = html.indexOf(flag);
-        if (idx < 0) throw new Error('dexSettings not found (page structure/CORS)');
-        const rest = html.substring(idx + flag.length);
-        const end = rest.indexOf('</script>');
-        const blob = rest.substring(0, end);
-        const m = blob.match(/"injectRpcs":(\[[\s\S]*\])/);
-        if (!m) throw new Error('injectRpcs not found');
-        const parsed = JSON.parse('{"injectRpcs":' + m[1] + '}');
-        const pair = parsed.injectRpcs.find((p) => (p?.[0] || '').includes('dump-pokemon'));
-        const resp = pair?.[1] || {};
-        const strategies = Array.isArray(resp.strategies) ? resp.strategies : [];
-        const formats = strategies.map((s) => s.format);
-        const ouFirst = [
-          ...strategies.filter((s) => (s.format || '').toUpperCase() === 'OU'),
-          ...strategies.filter((s) => (s.format || '').toUpperCase() !== 'OU'),
-        ];
-        let found = null;
-        for (const strat of ouFirst) {
-          if (!strat?.movesets) continue;
-          for (const ms of strat.movesets) {
-            if (Array.isArray(ms?.natures) && ms.natures.length > 0) { found = ms.natures[0]; break; }
+    const smogonUrl = `https://www.smogon.com/dex/sv/pokemon/${encodeURIComponent(alias)}/`;
+    const sources = [
+      { label: "direct", url: smogonUrl },
+      { label: "allorigins", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(smogonUrl)}` },
+    ];
+
+    const extractNature = (html) => {
+      const flag = "dexSettings = ";
+      const idx = html.indexOf(flag);
+      if (idx < 0) throw new Error("dexSettings not found (page structure/CORS)");
+      const rest = html.substring(idx + flag.length);
+      const end = rest.indexOf("</script>");
+      const blob = rest.substring(0, end);
+      const m = blob.match(/"injectRpcs":(\[[\s\S]*\])/);
+      if (!m) throw new Error("injectRpcs not found");
+      const parsed = JSON.parse('{"injectRpcs":' + m[1] + "}");
+      const pair = parsed.injectRpcs.find((p) => (p?.[0] || "").includes("dump-pokemon"));
+      const resp = pair?.[1] || {};
+      const strategies = Array.isArray(resp.strategies) ? resp.strategies : [];
+      const formats = strategies.map((s) => s.format);
+      const ouFirst = [
+        ...strategies.filter((s) => (s.format || "").toUpperCase() === "OU"),
+        ...strategies.filter((s) => (s.format || "").toUpperCase() !== "OU"),
+      ];
+      let found = null;
+      for (const strat of ouFirst) {
+        if (!strat?.movesets) continue;
+        for (const ms of strat.movesets) {
+          if (Array.isArray(ms?.natures) && ms.natures.length > 0) {
+            found = ms.natures[0];
+            break;
           }
-          if (found) break;
         }
-        if (!found) {
-          const msg = `No natures found for ${name} in SV. Formats: ${formats.join(', ')}`;
-          setSmogonError(msg);
-          addLog('Smogon nature not found', msg);
+        if (found) break;
+      }
+      return { nature: found, formats };
+    };
+
+    const run = async () => {
+      setSmogonError(null);
+      setSmogonNature(null);
+      let lastError = null;
+
+      for (const source of sources) {
+        try {
+          addLog("Fetching Smogon dex", { via: source.label, url: source.url });
+          const resp = await fetch(source.url, { signal: controller.signal });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const html = await resp.text();
+          if (cancelled) return;
+          const { nature, formats } = extractNature(html);
+          if (!nature) {
+            const msg = `No natures found for ${name} in SV. Formats: ${formats.join(", ")}`;
+            setSmogonError(msg);
+            setSmogonNature(null);
+            addLog("Smogon nature not found", msg);
+            return;
+          }
+          setSmogonNature(nature);
+          addLog("Smogon nature", { nature, via: source.label });
           return;
+        } catch (err) {
+          if (controller.signal.aborted || cancelled) return;
+          lastError = new Error(`[${source.label}] ${String(err)}`);
+          addLog("Smogon fetch failed", { via: source.label, error: String(err) });
         }
-        setSmogonNature(found);
-        addLog('Smogon nature', { nature: found });
-      })
-      .catch((err) => {
-        const msg = `Smogon fetch failed for ${name}: ${String(err)} (likely CORS in browser).`;
+      }
+
+      if (!cancelled && lastError) {
+        const msg = `Smogon fetch failed for ${name}: ${lastError.message || String(lastError)}`;
         setSmogonError(msg);
         setSmogonNature(null);
-        addLog('Smogon fetch failed', msg);
-      });
-    return () => { cancelled = true };
+        addLog("Smogon fetch failed", msg);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [name]);
 
   return (
@@ -1425,7 +1459,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   </div>
                 )}
                 <div className="about-row">
-                  <span className="label">Recommended Nature</span>
+                  <span className="label">Smogon Nature</span>
                   <span className="value">{smogonNature || '-'}</span>
                 </div>
                 {smogonError && (
@@ -1499,13 +1533,25 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                       const isBaseActive = String(n.id) === String(id);
                       const baseDisplay = n.displayName || humanizeName(n.name);
                       const hasForms = Array.isArray(n.forms) && n.forms.length > 0;
+                      const isCompactForms = hasForms && n.forms.length > 0 && n.forms.length <= 2;
+                      const isStackedForms = hasForms && n.forms.length > 2;
                       const branchHeight = hasForms
-                        ? Math.max(1, n.forms.length) * BRANCH_ROW_HEIGHT + Math.max(0, n.forms.length - 1) * BRANCH_ROW_GAP
+                        ? isStackedForms
+                          ? 0
+                          : isCompactForms
+                          ? COMPACT_BRANCH_HEIGHT
+                          : Math.max(1, n.forms.length) * BRANCH_ROW_HEIGHT +
+                            Math.max(0, n.forms.length - 1) * BRANCH_ROW_GAP
                         : 0;
                       const branchSpacing = BRANCH_ROW_HEIGHT + BRANCH_ROW_GAP;
                       const branchCenterY = branchHeight / 2;
                       return (
-                        <div className={`evo-node-wrap${hasForms ? " has-forms" : ""}`} key={`${n.id}-${i}`}>
+                        <div
+                          className={`evo-node-wrap${hasForms ? " has-forms" : ""}${
+                            isCompactForms ? " has-compact-forms" : ""
+                          }${isStackedForms ? " has-stacked-forms" : ""}`}
+                          key={`${n.id}-${i}`}
+                        >
                         <button
                           className={`evo-node${isBaseActive ? " is-current" : ""}`}
                           title={baseDisplay}
@@ -1517,43 +1563,111 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                         </button>
                         {hasForms && (
                           <div
-                            className="evo-form-branches"
-                            style={{
-                              minHeight: `${branchHeight}px`,
-                              "--branch-height": `${branchHeight}px`,
-                              "--branch-gap": `${BRANCH_ROW_GAP}px`,
-                            }}
+                            className={`evo-form-branches${isCompactForms ? " is-compact" : ""}${
+                              isStackedForms ? " is-stacked" : ""
+                            }`}
+                            style={
+                              isStackedForms
+                                ? {
+                                    "--branch-gap": `${BRANCH_ROW_GAP}px`,
+                                  }
+                                : {
+                                    minHeight: `${branchHeight}px`,
+                                    "--branch-height": `${branchHeight}px`,
+                                    "--branch-gap": `${BRANCH_ROW_GAP}px`,
+                                  }
+                            }
                           >
-                            <svg
-                              className="evo-form-spline"
-                              width="104"
-                              height={branchHeight}
-                              viewBox={`0 0 104 ${branchHeight}`}
-                              preserveAspectRatio="none"
-                              aria-hidden="true"
+                            {!isCompactForms && !isStackedForms && (
+                              <svg
+                                className="evo-form-spline"
+                                width="104"
+                                height={branchHeight}
+                                viewBox={`0 0 104 ${branchHeight}`}
+                                preserveAspectRatio="none"
+                                aria-hidden="true"
+                              >
+                                {branchHeight > 0 && (
+                                  <circle className="evo-form-origin" cx="10" cy={branchCenterY} r="3.5" />
+                                )}
+                                {n.forms.map((form, formIdx) => {
+                                  const targetY = formIdx * branchSpacing + BRANCH_ROW_HEIGHT / 2;
+                                  const controlY = (branchCenterY + targetY) / 2;
+                                  return (
+                                    <path
+                                      key={`branch-${n.id}-${form.id}`}
+                                      className="evo-form-path"
+                                      d={`M 10 ${branchCenterY} C 46 ${controlY} 62 ${targetY} 100 ${targetY}`}
+                                    />
+                                  );
+                                })}
+                              </svg>
+                            )}
+                            {isCompactForms && !isStackedForms && (
+                              <svg
+                                className="evo-form-spline is-compact"
+                                width="96"
+                                height={branchHeight}
+                                viewBox={`0 0 96 ${branchHeight}`}
+                                preserveAspectRatio="none"
+                                aria-hidden="true"
+                              >
+                                {branchHeight > 0 && (
+                                  <circle className="evo-form-origin" cx="10" cy={branchCenterY} r="3.5" />
+                                )}
+                                {n.forms.map((form, formIdx) => {
+                                  const offset =
+                                    n.forms.length === 2
+                                      ? formIdx === 0
+                                        ? -18
+                                        : 18
+                                      : 0;
+                                  const targetY = Math.max(12, Math.min(branchHeight - 12, branchCenterY + offset));
+                                  const controlY = (branchCenterY + targetY) / 2;
+                                  return (
+                                    <path
+                                      key={`branch-${n.id}-${form.id}`}
+                                      className="evo-form-path"
+                                      d={`M 10 ${branchCenterY} C 48 ${controlY} 64 ${targetY} 94 ${targetY}`}
+                                    />
+                                  );
+                                })}
+                              </svg>
+                            )}
+                            {isStackedForms && (
+                              <div className="evo-form-stack" aria-hidden="true">
+                                <span className="evo-form-stack-line" />
+                              </div>
+                            )}
+                            <div
+                              className={`evo-form-list${isStackedForms ? " stacked" : ""}`}
+                              style={!isStackedForms && !isCompactForms ? { minHeight: `${branchHeight}px` } : undefined}
                             >
-                              {branchHeight > 0 && (
-                                <circle className="evo-form-origin" cx="10" cy={branchCenterY} r="3.5" />
-                              )}
-                              {n.forms.map((form, formIdx) => {
-                                const targetY = formIdx * branchSpacing + BRANCH_ROW_HEIGHT / 2;
-                                const controlY = (branchCenterY + targetY) / 2;
-                                return (
-                                  <path
-                                    key={`branch-${n.id}-${form.id}`}
-                                    className="evo-form-path"
-                                    d={`M 10 ${branchCenterY} C 46 ${controlY} 62 ${targetY} 100 ${targetY}`}
-                                  />
-                                );
-                              })}
-                            </svg>
-                            <div className="evo-form-list" style={{ minHeight: `${branchHeight}px` }}>
                               {n.forms.map((form, formIdx) => {
                                 const isFormActive = form.isCurrent || String(form.id) === String(id);
                                 const formDisplay = form.displayName || humanizeName(form.name);
+                                const entryStyle =
+                                  !isStackedForms && !isCompactForms ? { height: `${BRANCH_ROW_HEIGHT}px` } : undefined;
+                                const arrowSymbol = isStackedForms ? "▼" : "➤";
+                                const arrowClasses = [
+                                  "evo-form-arrow",
+                                  isCompactForms ? "is-compact" : "",
+                                  isStackedForms ? "is-stacked" : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ");
+                                const entryClasses = [
+                                  "evo-form-entry",
+                                  isCompactForms ? "is-compact" : "",
+                                  isStackedForms ? "is-stacked" : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ");
                                 return (
-                                  <div className="evo-form-entry" key={form.id} style={{ height: `${BRANCH_ROW_HEIGHT}px` }}>
-                                    <span className="evo-form-arrow" aria-hidden="true">➤</span>
+                                  <div className={entryClasses} key={form.id} style={entryStyle}>
+                                    <span className={arrowClasses} aria-hidden="true">
+                                      {arrowSymbol}
+                                    </span>
                                     <button
                                       type="button"
                                       className={`evo-form-node${isFormActive ? " is-current" : ""}`}

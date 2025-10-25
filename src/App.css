@@ -569,14 +569,28 @@
 .evo-node img { width: var(--evo-thumb); height: var(--evo-thumb); transform: scale(1.8); transform-origin: center; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.45)); }
 .evo-node.is-current { outline: 2px solid rgba(124, 140, 255, 0.6); box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.15); }
 .evo-node-wrap.has-forms { align-items: flex-start; gap: 20px; }
+.evo-node-wrap.has-compact-forms { align-items: center; }
+.evo-node-wrap.has-stacked-forms { align-items: flex-start; gap: 20px; }
 .evo-name { text-transform: capitalize; font-size: 0.82rem; color: #f1f5f9; font-weight: 600; letter-spacing: 0.01em; }
 .evo-form-branches { position: relative; display: flex; align-items: stretch; gap: 20px; margin-left: 6px; padding-left: 6px; min-height: var(--branch-height, auto); }
+.evo-form-branches.is-compact { align-items: center; gap: 16px; margin-left: 0; padding-left: 0; min-height: auto; }
+.evo-form-branches.is-stacked { flex-direction: column; align-items: center; gap: 12px; margin-left: 0; padding-left: 0; min-height: auto; }
 .evo-form-spline { flex: 0 0 96px; height: var(--branch-height, auto); pointer-events: none; }
+.evo-form-spline.is-compact { flex: 0 0 84px; height: 64px; }
 .evo-form-path { fill: none; stroke: var(--evo-branch-color); stroke-width: 2.35px; opacity: 0.9; stroke-linecap: round; }
 .evo-form-origin { fill: var(--evo-branch-color); opacity: 0.85; }
 .evo-form-list { display: flex; flex-direction: column; justify-content: center; gap: var(--branch-gap, var(--evo-branch-row-gap)); min-height: var(--branch-height, auto); }
+.evo-form-branches.is-compact .evo-form-list { flex-direction: row; align-items: center; gap: 20px; min-height: auto; }
+.evo-form-list.stacked { position: relative; flex-direction: column; align-items: stretch; gap: 14px; padding-left: 28px; min-height: auto; }
+.evo-form-list.stacked::before { content: ""; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.55), rgba(148, 163, 184, 0.12)); border-radius: 1px; }
+.evo-form-stack { width: 2px; height: 28px; display: flex; align-items: center; justify-content: center; }
+.evo-form-stack-line { display: block; width: 2px; height: 100%; background: var(--evo-branch-color); border-radius: 1px; opacity: 0.85; }
 .evo-form-entry { display: flex; align-items: center; gap: 16px; height: var(--evo-branch-row-height); }
+.evo-form-branches.is-compact .evo-form-entry { height: auto; }
+.evo-form-entry.is-stacked { height: auto; gap: 12px; }
 .evo-form-arrow { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; background: rgba(148, 163, 184, 0.18); color: #f8fafc; font-size: 16px; box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28); }
+.evo-form-arrow.is-compact { width: 22px; height: 22px; font-size: 14px; }
+.evo-form-arrow.is-stacked { width: 22px; height: 22px; font-size: 13px; background: rgba(148, 163, 184, 0.22); box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.32), 0 4px 10px rgba(15, 19, 36, 0.35); }
 .evo-form-node { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 16px; background: rgba(13, 18, 32, 0.82); border: 1px solid rgba(148, 163, 184, 0.22); color: #f1f5f9; font-size: 0.8rem; text-transform: capitalize; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; min-width: 124px; box-shadow: 0 8px 20px rgba(11, 16, 32, 0.4); }
 .evo-form-node:hover { transform: translateY(-2px); border-color: rgba(124, 140, 255, 0.55); box-shadow: 0 12px 26px rgba(15, 19, 36, 0.5); }
 .evo-form-node.is-current { outline: 2px solid rgba(124, 140, 255, 0.55); }
