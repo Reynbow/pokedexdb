@@ -2189,7 +2189,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                     <button
                       key={type}
                       type="button"
-                      className={`type-chip ability-type-chip type-${type}${isActive ? " is-active" : ""}`}
+                      className={`type-chip ability-type-chip type-${type} ${isActive ? "is-active" : "off"}`}
                       onClick={() => toggleType(type)}
                       aria-pressed={isActive}
                     >
@@ -2219,29 +2219,31 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
               aria-label="Search Pokémon"
             />
           </div>
-          {loading ? (
-            <div className="ability-learners-loading">Loading Pokemon...</div>
-          ) : error ? (
-            <div className="ability-learners-error">Unable to load Pokemon list.</div>
-          ) : learners.length > 0 ? (
-            filteredLearners.length > 0 ? (
-              <ul className="ability-learners">
-                {filteredLearners.map((pokemon) => {
-                  const key = pokemon.id != null ? String(pokemon.id) : getIdFromUrl(pokemon.url);
-                  const typeList = (key && learnerTypes.get(key)) || [];
-                  return (
-                    <li key={pokemon.url}>
-                      <button
-                        type="button"
-                        className="ability-learner"
-                        onClick={() => handleLearnerClick(pokemon)}
-                        title={humanizeName(pokemon.name)}
-                      >
-                        <SpriteImage id={pokemon.id} alt={pokemon.name} width={44} height={44} loading="lazy" />
-                        <div className="ability-learner-meta">
-                          <div className="ability-learner-top">
-                            <span className="ability-learner-name text-capitalize">{pokemon.name}</span>
-                            {pokemon.isHidden && <span className="ability-learner-tag">Hidden</span>}
+          <div className="ability-learners-scroll">
+            {loading ? (
+              <div className="ability-learners-loading">Loading Pokemon...</div>
+            ) : error ? (
+              <div className="ability-learners-error">Unable to load Pokemon list.</div>
+            ) : learners.length > 0 ? (
+              filteredLearners.length > 0 ? (
+                <ul className="ability-learners">
+                  {filteredLearners.map((pokemon) => {
+                    const key = pokemon.id != null ? String(pokemon.id) : getIdFromUrl(pokemon.url);
+                    const typeList = (key && learnerTypes.get(key)) || [];
+                    return (
+                      <li key={pokemon.url}>
+                        <button
+                          type="button"
+                          className="ability-learner"
+                          onClick={() => handleLearnerClick(pokemon)}
+                          title={humanizeName(pokemon.name)}
+                        >
+                          <SpriteImage id={pokemon.id} alt={pokemon.name} width={44} height={44} loading="lazy" />
+                          <div className="ability-learner-meta">
+                            <div className="ability-learner-top">
+                              <span className="ability-learner-name text-capitalize">{pokemon.name}</span>
+                              {pokemon.isHidden && <span className="ability-learner-tag">Hidden</span>}
+                            </div>
                           </div>
                           {typeList.length > 0 && (
                             <div className="ability-learner-types">
@@ -2252,18 +2254,18 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                               ))}
                             </div>
                           )}
-                        </div>
-                      </button>
-                    </li>
+                        </button>
+                      </li>
                   );
                 })}
               </ul>
+              ) : (
+                <div className="ability-learners-empty">No Pokémon match your filters.</div>
+              )
             ) : (
-              <div className="ability-learners-empty">No Pokémon match your filters.</div>
-            )
-          ) : (
-            <div className="ability-learners-empty">No other Pokemon learn this ability in the main series.</div>
-          )}
+              <div className="ability-learners-empty">No other Pokemon learn this ability in the main series.</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
