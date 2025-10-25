@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://reynbow.github.io/pokedexdb",
+  "homepage": "https://pokedexdb.com",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
