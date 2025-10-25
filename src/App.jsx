@@ -337,6 +337,9 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
   return includeDefault ? entries : entries.filter((entry) => !entry.isDefault);
 };
 
+const BRANCH_ROW_HEIGHT = 72;
+const BRANCH_ROW_GAP = 16;
+
 function App() {
   const [pokemon, setPokemon] = useState([]);
   const [query, setQuery] = useState("");
@@ -1496,6 +1499,11 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                       const isBaseActive = String(n.id) === String(id);
                       const baseDisplay = n.displayName || humanizeName(n.name);
                       const hasForms = Array.isArray(n.forms) && n.forms.length > 0;
+                      const branchHeight = hasForms
+                        ? Math.max(1, n.forms.length) * BRANCH_ROW_HEIGHT + Math.max(0, n.forms.length - 1) * BRANCH_ROW_GAP
+                        : 0;
+                      const branchSpacing = BRANCH_ROW_HEIGHT + BRANCH_ROW_GAP;
+                      const branchCenterY = branchHeight / 2;
                       return (
                         <div className={`evo-node-wrap${hasForms ? " has-forms" : ""}`} key={`${n.id}-${i}`}>
                         <button
@@ -1508,15 +1516,44 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                           <div className="evo-name">{baseDisplay}</div>
                         </button>
                         {hasForms && (
-                          <div className="evo-form-branches">
-                            <span className="evo-form-spine" aria-hidden="true" />
-                            <div className="evo-form-list">
-                              {n.forms.map((form) => {
+                          <div
+                            className="evo-form-branches"
+                            style={{
+                              minHeight: `${branchHeight}px`,
+                              "--branch-height": `${branchHeight}px`,
+                              "--branch-gap": `${BRANCH_ROW_GAP}px`,
+                            }}
+                          >
+                            <svg
+                              className="evo-form-spline"
+                              width="104"
+                              height={branchHeight}
+                              viewBox={`0 0 104 ${branchHeight}`}
+                              preserveAspectRatio="none"
+                              aria-hidden="true"
+                            >
+                              {branchHeight > 0 && (
+                                <circle className="evo-form-origin" cx="10" cy={branchCenterY} r="3.5" />
+                              )}
+                              {n.forms.map((form, formIdx) => {
+                                const targetY = formIdx * branchSpacing + BRANCH_ROW_HEIGHT / 2;
+                                const controlY = (branchCenterY + targetY) / 2;
+                                return (
+                                  <path
+                                    key={`branch-${n.id}-${form.id}`}
+                                    className="evo-form-path"
+                                    d={`M 10 ${branchCenterY} C 46 ${controlY} 62 ${targetY} 100 ${targetY}`}
+                                  />
+                                );
+                              })}
+                            </svg>
+                            <div className="evo-form-list" style={{ minHeight: `${branchHeight}px` }}>
+                              {n.forms.map((form, formIdx) => {
                                 const isFormActive = form.isCurrent || String(form.id) === String(id);
                                 const formDisplay = form.displayName || humanizeName(form.name);
                                 return (
-                                  <div className="evo-form-entry" key={form.id}>
-                                    <span className="evo-form-branch-line" aria-hidden="true" />
+                                  <div className="evo-form-entry" key={form.id} style={{ height: `${BRANCH_ROW_HEIGHT}px` }}>
+                                    <span className="evo-form-arrow" aria-hidden="true">➤</span>
                                     <button
                                       type="button"
                                       className={`evo-form-node${isFormActive ? " is-current" : ""}`}
@@ -1530,7 +1567,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                                       title={formDisplay}
                                       aria-pressed={isFormActive}
                                     >
-                                      <SpriteImage id={form.id} alt={form.name} width={36} height={36} loading="lazy" />
+                                      <SpriteImage id={form.id} alt={form.name} width={48} height={48} loading="lazy" />
                                       <div className="evo-form-name">{formDisplay}</div>
                                     </button>
                                   </div>
@@ -1541,17 +1578,18 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                         )}
                         {i < path.length - 1 && (
                           <div className="evo-connector">
-                            {n.toNext?.itemSprite && (
+                          {n.toNext?.itemSprite && (
+                            <div className="evo-item" aria-hidden="true">
                               <img
-                                className="evo-item"
                                 src={n.toNext.itemSprite}
                                 alt={n.toNext.text}
                                 width={32}
                                 height={32}
                                 loading="lazy"
                               />
-                            )}
-                            <div className="evo-arrow">→</div>
+                            </div>
+                          )}
+                            <div className="evo-arrow" aria-hidden="true">➜</div>
                             {n.toNext?.text && <div className="evo-cond">{n.toNext.text}</div>}
                           </div>
                         )}
