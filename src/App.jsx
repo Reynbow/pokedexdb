@@ -110,6 +110,12 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
+        key: "red-blue-yellow",
+        label: "Red, Blue & Yellow",
+        apiNames: ["kanto"],
+        logos: ["red.png", "blue.png", "yellow.png"],
+      },
+      {
         key: "lets-go",
         label: "Let's Go Pikachu & Let's Go Eevee",
         apiNames: ["letsgo-kanto"],
@@ -121,12 +127,6 @@ const DEX_FILTERS = [
         apiNames: ["kanto"],
         logos: ["firered.png", "leafgreen.png"],
       },
-      {
-        key: "red-blue-yellow",
-        label: "Red, Blue & Yellow",
-        apiNames: ["kanto"],
-        logos: ["red.png", "blue.png", "yellow.png"],
-      },
     ],
   },
   {
@@ -136,16 +136,16 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
-        key: "heartgold-soulsilver",
-        label: "HeartGold & SoulSilver",
-        apiNames: ["updated-johto"],
-        logos: ["heartgold.png", "soulsilver.png"],
-      },
-      {
         key: "gold-silver-crystal",
         label: "Gold, Silver & Crystal",
         apiNames: ["original-johto"],
         logos: ["gold.png", "silver.png", "crystal.png"],
+      },
+      {
+        key: "heartgold-soulsilver",
+        label: "HeartGold & SoulSilver",
+        apiNames: ["updated-johto"],
+        logos: ["heartgold.png", "soulsilver.png"],
       },
     ],
   },
@@ -156,16 +156,16 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
-        key: "omega-ruby-alpha-sapphire",
-        label: "Omega Ruby & Alpha Sapphire",
-        apiNames: ["updated-hoenn"],
-        logos: ["omegaruby.png", "alphasapphire.png"],
-      },
-      {
         key: "ruby-sapphire-emerald",
         label: "Ruby, Sapphire & Emerald",
         apiNames: ["hoenn"],
         logos: ["ruby.png", "sapphire.png", "emerald.png"],
+      },
+      {
+        key: "omega-ruby-alpha-sapphire",
+        label: "Omega Ruby & Alpha Sapphire",
+        apiNames: ["updated-hoenn"],
+        logos: ["omegaruby.png", "alphasapphire.png"],
       },
     ],
   },
@@ -176,10 +176,10 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
-        key: "brilliant-diamond-shining-pearl",
-        label: "Brilliant Diamond & Shining Pearl",
+        key: "diamond-pearl",
+        label: "Diamond & Pearl",
         apiNames: ["original-sinnoh"],
-        logos: ["brilliantdiamond.png", "shiningpearl.png"],
+        logos: ["diamond.png", "pearl.png"],
       },
       {
         key: "platinum",
@@ -188,10 +188,10 @@ const DEX_FILTERS = [
         logos: ["platinum.png"],
       },
       {
-        key: "diamond-pearl",
-        label: "Diamond & Pearl",
+        key: "brilliant-diamond-shining-pearl",
+        label: "Brilliant Diamond & Shining Pearl",
         apiNames: ["original-sinnoh"],
-        logos: ["diamond.png", "pearl.png"],
+        logos: ["brilliantdiamond.png", "shiningpearl.png"],
       },
     ],
   },
@@ -202,16 +202,16 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
-        key: "black-2-white-2",
-        label: "Black 2 & White 2",
-        apiNames: ["updated-unova"],
-        logos: ["black2.png", "white2.png"],
-      },
-      {
         key: "black-white",
         label: "Black & White",
         apiNames: ["original-unova"],
         logos: ["black.png", "white.png"],
+      },
+      {
+        key: "black-2-white-2",
+        label: "Black 2 & White 2",
+        apiNames: ["updated-unova"],
+        logos: ["black2.png", "white2.png"],
       },
     ],
   },
@@ -222,16 +222,16 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
-        key: "legends-za",
-        label: "Legends: Z-A",
-        apiNames: ["lumiose-city"],
-        logos: ["za.png"],
-      },
-      {
         key: "x-y",
         label: "X & Y",
         apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
         logos: ["x.png", "y.png"],
+      },
+      {
+        key: "legends-za",
+        label: "Legends: Z-A",
+        apiNames: ["lumiose-city"],
+        logos: ["za.png"],
       },
     ],
   },
@@ -242,16 +242,16 @@ const DEX_FILTERS = [
     pad: 3,
     games: [
       {
-        key: "ultra-sun-ultra-moon",
-        label: "Ultra Sun & Ultra Moon",
-        apiNames: ["updated-alola"],
-        logos: ["ultrasun.png", "ultramoon.png"],
-      },
-      {
         key: "sun-moon",
         label: "Sun & Moon",
         apiNames: ["original-alola"],
         logos: ["sun.png", "moon.png"],
+      },
+      {
+        key: "ultra-sun-ultra-moon",
+        label: "Ultra Sun & Ultra Moon",
+        apiNames: ["updated-alola"],
+        logos: ["ultrasun.png", "ultramoon.png"],
       },
     ],
   },
@@ -312,15 +312,49 @@ const GAME_LOGO_LOOKUP = new Map(
   })
 );
 
-const ALL_GAME_OPTIONS = DEX_FILTERS.flatMap((cfg) =>
-  (cfg.games || []).map((game) => ({
-    ...game,
-    dexKey: cfg.key,
-    pad: cfg.pad ?? 3,
-  }))
-);
+const NATIONAL_GAME_ORDER = [
+  "red-blue-yellow",
+  "gold-silver-crystal",
+  "ruby-sapphire-emerald",
+  "firered-leafgreen",
+  "diamond-pearl",
+  "platinum",
+  "heartgold-soulsilver",
+  "black-white",
+  "black-2-white-2",
+  "x-y",
+  "omega-ruby-alpha-sapphire",
+  "sun-moon",
+  "ultra-sun-ultra-moon",
+  "lets-go",
+  "sword-shield",
+  "brilliant-diamond-shining-pearl",
+  "legends-arceus",
+  "scarlet-violet",
+  "legends-za",
+];
 
-const GAME_LOOKUP = new Map(ALL_GAME_OPTIONS.map((game) => [game.key, game]));
+const GAME_METADATA = new Map();
+for (const cfg of DEX_FILTERS) {
+  for (const game of cfg.games || []) {
+    if (!GAME_METADATA.has(game.key)) {
+      GAME_METADATA.set(game.key, {
+        ...game,
+        dexKey: cfg.key,
+        pad: cfg.pad ?? 3,
+      });
+    }
+  }
+}
+
+const ALL_GAME_OPTIONS = Array.from(GAME_METADATA.values());
+
+const NATIONAL_GAME_OPTIONS = [
+  ...NATIONAL_GAME_ORDER.map((key) => GAME_METADATA.get(key)).filter(Boolean),
+  ...ALL_GAME_OPTIONS.filter((game) => !NATIONAL_GAME_ORDER.includes(game.key)),
+];
+
+const GAME_LOOKUP = new Map(GAME_METADATA);
 
 const DEX_LOOKUP = new Map(DEX_FILTERS.map((cfg) => [cfg.key, cfg]));
 const LEGENDARY_NAMES = new Set([
@@ -560,6 +594,7 @@ function App() {
   const [gameIndexes, setGameIndexes] = useState(() => new Map());
   const typeIndexRef = useRef(new Map()); // type -> Set(names)
   const specialTagCacheRef = useRef(new Map()); // name -> cached tag array
+  const gameFiltersRef = useRef(null);
   const pokedexCacheRef = useRef(new Map());
   const pokedexPromiseRef = useRef(new Map());
   const [bootParam, setBootParam] = useState(() => {
@@ -974,8 +1009,20 @@ function App() {
   }, []);
 
   const selectedDexConfig = DEX_LOOKUP.get(selectedDex);
-  const availableGames = selectedDex === "national" ? ALL_GAME_OPTIONS : selectedDexConfig?.games || [];
+  const availableGames = selectedDex === "national" ? NATIONAL_GAME_OPTIONS : selectedDexConfig?.games || [];
   const showGameFilters = availableGames.length > 0;
+
+  useEffect(() => {
+    const el = gameFiltersRef.current;
+    if (!el) return;
+    const onWheel = (event) => {
+      if (event.deltaY === 0) return;
+      event.preventDefault();
+      el.scrollBy({ left: event.deltaY * 2, behavior: "smooth" });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [selectedDex, availableGames.length]);
 
   return (
     <div className="app-shell">
@@ -1099,41 +1146,47 @@ function App() {
         {showGameFilters && (
           <div className="game-filters-row">
             <span className="game-filters-label">Games</span>
-            <div className="game-filters">
-              {availableGames.map((game) => {
-                const isOn = game.key === selectedGame;
-                const logoUrls = (game.logos || [])
-                  .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-                  .filter(Boolean);
-                return (
-                  <button
-                    key={game.key}
-                    type="button"
-                    className={`filter-chip game-chip${isOn ? " is-on" : ""}`}
-                    onClick={() => {
-                      if (selectedGame === game.key) {
-                        if (selectedDex === "national") {
-                          setSelectedGame(null);
-                          clearSelection();
+            <div className="game-filters-controls">
+              <div
+                className={`game-filters${selectedDex === "national" ? " game-filters--left" : ""}`}
+                ref={gameFiltersRef}
+              >
+                {availableGames.map((game) => {
+                  const isOn = game.key === selectedGame;
+                  const logoUrls = (game.logos || [])
+                    .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+                    .filter(Boolean);
+                  return (
+                    <button
+                      key={game.key}
+                      type="button"
+                      className={`filter-chip game-chip${isOn ? " is-on" : ""}`}
+                      onClick={() => {
+                        if (selectedGame === game.key) {
+                          if (selectedDex === "national") {
+                            setSelectedGame(null);
+                            clearSelection();
+                          }
+                          return;
                         }
-                        return;
-                      }
-                      setSelectedGame(game.key);
-                      clearSelection();
-                    }}
-                    aria-pressed={isOn}
-                  >
-                    {logoUrls.length > 0 && (
-                      <span className="game-chip-logos" aria-hidden="true">
-                        {logoUrls.map((src) => (
-                          <img key={src} src={src} alt="" className="game-chip-logo" />
-                        ))}
-                      </span>
-                    )}
-                    <span className="game-chip-label">{game.label}</span>
-                  </button>
-                );
-              })}
+                        setSelectedGame(game.key);
+                        clearSelection();
+                      }}
+                      aria-pressed={isOn}
+                      aria-label={game.label}
+                    >
+                      {logoUrls.length > 0 && (
+                        <span className="game-chip-logos" aria-hidden="true">
+                          {logoUrls.map((src) => (
+                            <img key={src} src={src} alt="" className="game-chip-logo" />
+                          ))}
+                        </span>
+                      )}
+                      <span className="game-chip-label">{game.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
