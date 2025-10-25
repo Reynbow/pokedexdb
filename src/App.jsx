@@ -1198,7 +1198,6 @@ function App() {
                   setSelectedDex("national");
                   setSelectedGame(null);
                   setQuery("");
-                  clearSelection();
                 }}
               >
                 Reset
@@ -2334,7 +2333,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   return (
     <aside className="detail-panel">
       <div className="detail-inner">
-        <button className="close" onClick={onClose} aria-label="Close">x</button>
+        <button className="close" onClick={onClose} aria-label="Close">
+          <span className="close-icon" aria-hidden="true" />
+        </button>
         <div className="detail-hero">
           <div className="hero-left">
             <div className="detail-art-wrap">
