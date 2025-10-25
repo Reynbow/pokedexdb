@@ -347,6 +347,20 @@
   align-items: start;
 }
 
+.grid-special {
+  margin-top: 12px;
+}
+
+.grid-subheading {
+  margin: 16px auto 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #cbd5f5;
+  text-align: center;
+}
+
 .content.split {
   display: grid;
   grid-template-columns: var(--card-size) calc(5 * var(--card-size) + 4 * var(--gap));
@@ -401,6 +415,39 @@
   grid-template-columns: 1fr;
   grid-auto-rows: var(--card-size);
   gap: var(--gap);
+}
+
+.list-special {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.list-divider {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0), rgba(148, 163, 184, 0.45), rgba(148, 163, 184, 0));
+}
+
+.list-subheading {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #cbd5f5;
+  padding-left: 4px;
+}
+
+.list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 16px;
 }
 
 .detail-panel {
@@ -1317,6 +1364,76 @@
   cursor: pointer;
   box-sizing: border-box;
   padding-bottom: 8px; /* fixed bottom gap */
+}
+
+.card-tags {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  max-width: calc(100% - 24px);
+  z-index: 3;
+}
+
+.card-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.75);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
+}
+
+.card-tag.legendary {
+  background: linear-gradient(135deg, #facc15, #f97316);
+  border-color: rgba(250, 204, 21, 0.65);
+  color: #1e1e1e;
+}
+
+.card-tag.mythical {
+  background: linear-gradient(135deg, #d946ef, #7c3aed);
+  border-color: rgba(192, 132, 252, 0.65);
+}
+
+.card-tag.mega {
+  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.card-tag.primal {
+  background: linear-gradient(135deg, #fb7185, #ef4444);
+  border-color: rgba(248, 113, 113, 0.65);
+}
+
+.card-tag.ultra-beast {
+  background: linear-gradient(135deg, #bef264, #22c55e);
+  border-color: rgba(74, 222, 128, 0.65);
+  color: #0f172a;
+}
+
+.card-tag.paradox {
+  background: linear-gradient(135deg, #6366f1, #14b8a6);
+  border-color: rgba(94, 234, 212, 0.55);
+}
+
+.card-tag.gigantamax {
+  background: linear-gradient(135deg, #f472b6, #f97316);
+  border-color: rgba(249, 115, 22, 0.55);
+}
+
+.card-tag.baby {
+  background: linear-gradient(135deg, #38bdf8, #a855f7);
+  border-color: rgba(129, 140, 248, 0.55);
 }
 
 .card:hover {

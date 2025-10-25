@@ -510,6 +510,16 @@ const MYTHICAL_NAMES = new Set([
 ]);
 
 const SPECIAL_FILTERS = ["Legendary", "Mythical", "Mega", "Primal", "Ultra Beast", "Paradox", "Gigantamax", "Baby"];
+const SPECIAL_TAG_META = new Map([
+  ["Legendary", { short: "LEG", className: "legendary" }],
+  ["Mythical", { short: "MYTH", className: "mythical" }],
+  ["Mega", { short: "MEGA", className: "mega" }],
+  ["Primal", { short: "PRIM", className: "primal" }],
+  ["Ultra Beast", { short: "UB", className: "ultra-beast" }],
+  ["Paradox", { short: "PDX", className: "paradox" }],
+  ["Gigantamax", { short: "GMAX", className: "gigantamax" }],
+  ["Baby", { short: "BABY", className: "baby" }],
+]);
 
 const humanizeName = (s) => String(s || "").replace(/-/g, " ");
 
@@ -880,7 +890,7 @@ function App() {
     setSelected(null);
   };
 
-  const filtered = useMemo(() => {
+  const filteredLists = useMemo(() => {
     const q = query.trim().toLowerCase();
     const qDigits = q.replace(/[^0-9]/g, "");
     const hasTypeFilter = selectedTypes.size > 0;
@@ -923,7 +933,8 @@ function App() {
       }
     }
 
-    const matches = [];
+    const regularMatches = [];
+    const megaGmaxMatches = [];
 
     for (const p of pokemon) {
       const idStr = getIdFromUrl(p.url);
@@ -934,6 +945,7 @@ function App() {
       const speciesId = resolveSpeciesId(p.name, idNum < 10000 ? idNum : null);
       const isSpecialForm = idNum >= 10000;
       const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
+      const isMegaOrGmax = tags.includes("Mega") || tags.includes("Gigantamax");
       if (isSpecialForm && !hasSpecialTag) {
         continue;
       }
@@ -978,43 +990,59 @@ function App() {
         if (!matchedQuery) continue;
       }
 
-      matches.push({ entry: p, idNum, speciesId });
+      if (isMegaOrGmax) {
+        megaGmaxMatches.push({ entry: p, idNum, speciesId });
+      } else {
+        regularMatches.push({ entry: p, idNum, speciesId });
+      }
     }
 
-    if (activeEntryMap) {
-      matches.sort((a, b) => {
-        const speciesA = a.speciesId ?? (a.idNum < 10000 ? a.idNum : null);
-        const speciesB = b.speciesId ?? (b.idNum < 10000 ? b.idNum : null);
-        const lookupA = speciesA ?? a.idNum;
-        const lookupB = speciesB ?? b.idNum;
-        const aEntry = activeEntryMap.get(lookupA);
-        const bEntry = activeEntryMap.get(lookupB);
-        if (aEntry != null && bEntry != null && aEntry !== bEntry) {
-          return aEntry - bEntry;
-        }
-        if (aEntry != null && bEntry == null) return -1;
-        if (aEntry == null && bEntry != null) return 1;
-        const combinedA = combinedMap?.get(lookupA);
-        const combinedB = combinedMap?.get(lookupB);
-        if (combinedA != null && combinedB != null && combinedA !== combinedB) {
-          return combinedA - combinedB;
-        }
-        if (combinedA != null && combinedB == null) return -1;
-        if (combinedA == null && combinedB != null) return 1;
-        if (lookupA !== lookupB) return lookupA - lookupB;
-        return a.idNum - b.idNum;
-      });
-    } else {
-      matches.sort((a, b) => {
-        const lookupA = (a.speciesId ?? (a.idNum < 10000 ? a.idNum : null)) ?? a.idNum;
-        const lookupB = (b.speciesId ?? (b.idNum < 10000 ? b.idNum : null)) ?? b.idNum;
-        if (lookupA !== lookupB) return lookupA - lookupB;
-        return a.idNum - b.idNum;
-      });
-    }
+    const sortMatches = (matches) => {
+      if (matches.length === 0) return;
+      if (activeEntryMap) {
+        matches.sort((a, b) => {
+          const speciesA = a.speciesId ?? (a.idNum < 10000 ? a.idNum : null);
+          const speciesB = b.speciesId ?? (b.idNum < 10000 ? b.idNum : null);
+          const lookupA = speciesA ?? a.idNum;
+          const lookupB = speciesB ?? b.idNum;
+          const aEntry = activeEntryMap.get(lookupA);
+          const bEntry = activeEntryMap.get(lookupB);
+          if (aEntry != null && bEntry != null && aEntry !== bEntry) {
+            return aEntry - bEntry;
+          }
+          if (aEntry != null && bEntry == null) return -1;
+          if (aEntry == null && bEntry != null) return 1;
+          const combinedA = combinedMap?.get(lookupA);
+          const combinedB = combinedMap?.get(lookupB);
+          if (combinedA != null && combinedB != null && combinedA !== combinedB) {
+            return combinedA - combinedB;
+          }
+          if (combinedA != null && combinedB == null) return -1;
+          if (combinedA == null && combinedB != null) return 1;
+          if (lookupA !== lookupB) return lookupA - lookupB;
+          return a.idNum - b.idNum;
+        });
+      } else {
+        matches.sort((a, b) => {
+          const lookupA = (a.speciesId ?? (a.idNum < 10000 ? a.idNum : null)) ?? a.idNum;
+          const lookupB = (b.speciesId ?? (b.idNum < 10000 ? b.idNum : null)) ?? b.idNum;
+          if (lookupA !== lookupB) return lookupA - lookupB;
+          return a.idNum - b.idNum;
+        });
+      }
+    };
 
-    return matches.map((item) => item.entry);
+    sortMatches(regularMatches);
+    sortMatches(megaGmaxMatches);
+
+    return {
+      primary: regularMatches.map((item) => item.entry),
+      megaGigantamax: megaGmaxMatches.map((item) => item.entry),
+    };
   }, [pokemon, query, selectedTypes, selectedTags, selectedDex, selectedGame, dexIndexes, gameIndexes, resolveSpeciesId]);
+
+  const regularFiltered = filteredLists.primary ?? [];
+  const megaGigantamaxFiltered = filteredLists.megaGigantamax ?? [];
 
   const formatDexNumber = useCallback(
     (value) => {
@@ -1283,25 +1311,55 @@ function App() {
           <section className="content split">
             <div className="list-panel">
               <div className="list-scroll">
-                <div className="list">
-                  {filtered.map((p) => {
-                    const parts = p.url.split("/").filter(Boolean);
-                    const id = parts[parts.length - 1];
-                    const idNum = Number(id);
-                    const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
-                    return (
-                      <PokemonCard
-                        key={p.name}
-                        id={id}
-                        name={p.name}
-                        url={p.url}
-                        onSelect={() => selectPokemon(id, p.name, p.url)}
-                        selected={String(selected.id) === String(id)}
-                        dexNumber={dexDisplay}
-                      />
-                    );
-                  })}
-                </div>
+                {regularFiltered.length > 0 && (
+                  <div className="list">
+                    {regularFiltered.map((p) => {
+                      const parts = p.url.split("/").filter(Boolean);
+                      const id = parts[parts.length - 1];
+                      const idNum = Number(id);
+                      const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                      return (
+                        <PokemonCard
+                          key={p.name}
+                          id={id}
+                          name={p.name}
+                          url={p.url}
+                          onSelect={() => selectPokemon(id, p.name, p.url)}
+                          selected={String(selected.id) === String(id)}
+                          dexNumber={dexDisplay}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                {megaGigantamaxFiltered.length > 0 && (
+                  <div className="list-special">
+                    {regularFiltered.length > 0 && <div className="list-divider" role="separator" />}
+                    <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
+                    <div className="list">
+                      {megaGigantamaxFiltered.map((p) => {
+                        const parts = p.url.split("/").filter(Boolean);
+                        const id = parts[parts.length - 1];
+                        const idNum = Number(id);
+                        const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                        return (
+                          <PokemonCard
+                            key={p.name}
+                            id={id}
+                            name={p.name}
+                            url={p.url}
+                            onSelect={() => selectPokemon(id, p.name, p.url)}
+                            selected={String(selected.id) === String(id)}
+                            dexNumber={dexDisplay}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {regularFiltered.length === 0 && megaGigantamaxFiltered.length === 0 && (
+                  <div className="list-empty">No Pokémon found.</div>
+                )}
               </div>
             </div>
             <ErrorBoundary fallback={<button className="toggle-btn" onClick={clearSelection}>Close</button>}>
@@ -1330,24 +1388,56 @@ function App() {
             </ErrorBoundary>
           </section>
         ) : (
-          <section className="grid">
-            {filtered.map((p) => {
-              const parts = p.url.split("/").filter(Boolean);
-              const id = parts[parts.length - 1];
-              const idNum = Number(id);
-              const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
-              return (
-                <PokemonCard
-                  key={p.name}
-                  id={id}
-                  name={p.name}
-                  url={p.url}
-                  onSelect={() => selectPokemon(id, p.name, p.url)}
-                  dexNumber={dexDisplay}
-                />
-              );
-            })}
-          </section>
+          <>
+            {regularFiltered.length > 0 && (
+              <section className="grid">
+                {regularFiltered.map((p) => {
+                  const parts = p.url.split("/").filter(Boolean);
+                  const id = parts[parts.length - 1];
+                  const idNum = Number(id);
+                  const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                  return (
+                    <PokemonCard
+                      key={p.name}
+                      id={id}
+                      name={p.name}
+                      url={p.url}
+                      onSelect={() => selectPokemon(id, p.name, p.url)}
+                      dexNumber={dexDisplay}
+                    />
+                  );
+                })}
+              </section>
+            )}
+            {megaGigantamaxFiltered.length > 0 && (
+              <>
+                <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
+                <section className="grid grid-special">
+                  {megaGigantamaxFiltered.map((p) => {
+                    const parts = p.url.split("/").filter(Boolean);
+                    const id = parts[parts.length - 1];
+                    const idNum = Number(id);
+                    const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                    return (
+                      <PokemonCard
+                        key={p.name}
+                        id={id}
+                        name={p.name}
+                        url={p.url}
+                        onSelect={() => selectPokemon(id, p.name, p.url)}
+                        dexNumber={dexDisplay}
+                      />
+                    );
+                  })}
+                </section>
+              </>
+            )}
+            {regularFiltered.length === 0 && megaGigantamaxFiltered.length === 0 && (
+              <section className="grid">
+                <div className="dex-loading">No Pokémon found.</div>
+              </section>
+            )}
+          </>
         )}
       </main>
     </div>
@@ -1440,6 +1530,27 @@ function useInView(options) {
 function PokemonCard({ name, id, url, onSelect, selected, dexNumber }) {
   const [types, setTypes] = useState(detailsCache.get(id)?.types || []);
   const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
+  const specialTags = useMemo(() => {
+    const tags = deriveSpecialTags(name) || [];
+    return tags
+      .map((tag) => {
+        const meta = SPECIAL_TAG_META.get(tag);
+        if (!meta) return null;
+        const order = SPECIAL_FILTERS.indexOf(tag);
+        return {
+          key: tag,
+          tag,
+          short: meta.short,
+          className: meta.className,
+          order: order >= 0 ? order : 99,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.order !== b.order) return a.order - b.order;
+        return a.tag.localeCompare(b.tag);
+      });
+  }, [name]);
 
   // Load types lazily when the card is near the viewport
   useEffect(() => {
@@ -1487,6 +1598,20 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber }) {
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.()}
       ref={cardRef}
     >
+      {specialTags.length > 0 && (
+        <div className="card-tags">
+          {specialTags.map((tag) => (
+            <span
+              key={tag.key}
+              className={`card-tag ${tag.className}`}
+              title={tag.tag}
+              aria-label={tag.tag}
+            >
+              {tag.short}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="dexno">{dexNo}</div>
       {inView ? (
         <SpriteImage className="sprite" id={id} alt={name} width={144} height={144} loading="lazy" />
