@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import { findRecommendedNature } from "./smogonApi";
 
 const ULTRA_BEASTS = new Set([
   "nihilego",
@@ -2274,100 +2275,61 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
     return Array.from(tags);
   }, [details, species]);
-  // Fetch recommended nature from Smogon (SV), preferring OU sets when available.
+  // Fetch recommended nature from Smogon datasets.
   useEffect(() => {
     const alias = (name || "").toLowerCase();
     setSmogonNature(null);
     setSmogonError(null);
     setSmogonLoading(false);
     if (!alias) return;
-    const controller = new AbortController();
     let cancelled = false;
-    const smogonUrl = `https://www.smogon.com/dex/sv/pokemon/${encodeURIComponent(alias)}/`;
-    const sources = [
-      { label: "direct", url: smogonUrl },
-      { label: "allorigins", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(smogonUrl)}` },
-    ];
-
-    const extractNature = (html) => {
-      const flag = "dexSettings = ";
-      const idx = html.indexOf(flag);
-      if (idx < 0) throw new Error("dexSettings not found (page structure/CORS)");
-      const rest = html.substring(idx + flag.length);
-      const end = rest.indexOf("</script>");
-      const blob = rest.substring(0, end);
-      const m = blob.match(/"injectRpcs":(\[[\s\S]*\])/);
-      if (!m) throw new Error("injectRpcs not found");
-      const parsed = JSON.parse('{"injectRpcs":' + m[1] + "}");
-      const pair = parsed.injectRpcs.find((p) => (p?.[0] || "").includes("dump-pokemon"));
-      const resp = pair?.[1] || {};
-      const strategies = Array.isArray(resp.strategies) ? resp.strategies : [];
-      const formats = strategies.map((s) => s.format);
-      const ouFirst = [
-        ...strategies.filter((s) => (s.format || "").toUpperCase() === "OU"),
-        ...strategies.filter((s) => (s.format || "").toUpperCase() !== "OU"),
-      ];
-      let found = null;
-      for (const strat of ouFirst) {
-        if (!strat?.movesets) continue;
-        for (const ms of strat.movesets) {
-          if (Array.isArray(ms?.natures) && ms.natures.length > 0) {
-            found = ms.natures[0];
-            break;
-          }
-        }
-        if (found) break;
-      }
-      return { nature: found, formats };
-    };
+    const generationHint = species?.generation?.name || null;
 
     const run = async () => {
       setSmogonLoading(true);
-      let lastError = null;
-
-      for (const source of sources) {
-        try {
-          addLog("Fetching Smogon dex", { via: source.label, url: source.url });
-          const resp = await fetch(source.url, { signal: controller.signal });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const html = await resp.text();
-          if (cancelled) return;
-          const { nature, formats } = extractNature(html);
-          if (!nature) {
-            if (cancelled) return;
-            const msg = `No natures found for ${name} in SV. Formats: ${formats.join(", ")}`;
-            setSmogonLoading(false);
-            setSmogonError(msg);
-            setSmogonNature(null);
-            addLog("Smogon nature not found", msg);
-            return;
-          }
-          setSmogonLoading(false);
-          setSmogonNature(nature);
-          addLog("Smogon nature", { nature, via: source.label });
-          return;
-        } catch (err) {
-          if (controller.signal.aborted || cancelled) return;
-          lastError = new Error(`[${source.label}] ${String(err)}`);
-          addLog("Smogon fetch failed", { via: source.label, error: String(err) });
+      addLog("Fetching Smogon sets", { alias, generationHint });
+      try {
+        const result = await findRecommendedNature(alias, { generationHint });
+        if (cancelled) return;
+        if (result?.nature) {
+          setSmogonNature(result.nature);
+          setSmogonError(null);
+          addLog("Smogon nature", {
+            nature: result.nature,
+            generation: result.generation,
+            format: result.format,
+            set: result.setName,
+            species: result.speciesKey,
+          });
+        } else {
+          const msg = `No Smogon nature found for ${name}.`;
+          setSmogonNature(null);
+          setSmogonError(msg);
+          addLog("Smogon nature not found", {
+            alias,
+            generation: result?.generation,
+            species: result?.speciesKey,
+            searched: result?.searched,
+          });
         }
-      }
-
-      if (!cancelled && lastError) {
-        const msg = `Smogon fetch failed for ${name}: ${lastError.message || String(lastError)}`;
-        setSmogonLoading(false);
-        setSmogonError(msg);
+      } catch (error) {
+        if (cancelled) return;
+        const msg = `Smogon data unavailable for ${name}.`;
         setSmogonNature(null);
-        addLog("Smogon fetch failed", msg);
+        setSmogonError(msg);
+        addLog("Smogon fetch failed", { alias, error: String(error) });
+      } finally {
+        if (!cancelled) {
+          setSmogonLoading(false);
+        }
       }
     };
 
     run();
     return () => {
       cancelled = true;
-      controller.abort();
     };
-  }, [name]);
+  }, [name, species?.generation?.name]);
 
   return (
     <aside className="detail-panel">
