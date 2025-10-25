@@ -1459,8 +1459,16 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   </div>
                 )}
                 <div className="about-row">
-                  <span className="label">Smogon Nature</span>
-                  <span className="value">{smogonNature || '-'}</span>
+                  <span className="label">Recommended Nature</span>
+                  <div className="value nature-value">
+                    {smogonNature ? (
+                      <span className="nature-chip">
+                        <span className="text-capitalize">{smogonNature}</span>
+                      </span>
+                    ) : (
+                      <span className="nature-placeholder">-</span>
+                    )}
+                  </div>
                 </div>
                 {smogonError && (
                   <div className="about-row">
