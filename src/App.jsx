@@ -105,8 +105,8 @@ const DEX_FILTERS = [
   { key: "national", label: "National", apiNames: ["national"], pad: 4 },
   { key: "kanto", label: "Kanto", apiNames: ["kanto"], pad: 3 },
   { key: "hoenn", label: "Hoenn", apiNames: ["hoenn"], pad: 3 },
-  { key: "sinnoh", label: "Sinnoh", apiNames: ["sinnoh"], pad: 3 },
-  { key: "unova", label: "Unova", apiNames: ["unova"], pad: 3 },
+  { key: "sinnoh", label: "Sinnoh", apiNames: ["original-sinnoh", "extended-sinnoh"], pad: 3 },
+  { key: "unova", label: "Unova", apiNames: ["original-unova", "updated-unova"], pad: 3 },
   { key: "kalos", label: "Kalos", apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"], pad: 3 },
   { key: "alola", label: "Alola", apiNames: ["updated-alola"], pad: 3 },
   { key: "galar", label: "Galar", apiNames: ["galar"], pad: 3 },
@@ -346,7 +346,11 @@ function App() {
         const combined = new Map();
         let counter = 1;
         for (const apiName of cfg.apiNames) {
-          const data = await queuedFetch(`https://pokeapi.co/api/v2/Pokedex/${apiName}`).then((r) => r.json());
+          const response = await queuedFetch(`https://pokeapi.co/api/v2/pokedex/${apiName}`);
+          if (!response?.ok) {
+            throw new Error(`Failed to load pokedex/${apiName}: ${response?.status} ${response?.statusText}`);
+          }
+          const data = await response.json();
           if (ignore) return;
           const entries = data.pokemon_entries || [];
           for (const entry of entries) {
@@ -516,14 +520,18 @@ function App() {
       const idNum = Number(value);
       if (!Number.isFinite(idNum)) return "-";
       const cfg = DEX_LOOKUP.get(selectedDex);
-      if (selectedDex === "national" || !cfg) {
+      if (!cfg) {
         return `#${idNum}`;
+      }
+      const pad = Math.max(1, cfg.pad ?? 3);
+      if (selectedDex === "national") {
+        return `#${String(idNum).padStart(pad, "0")}`;
       }
       const dexMap = dexIndexes.get(selectedDex);
       if (!dexMap) return "-";
       const entry = dexMap.get(idNum);
       if (entry == null) return "-";
-      return `#${entry}`;
+      return `#${String(entry).padStart(pad, "0")}`;
     },
     [dexIndexes, selectedDex]
   );
