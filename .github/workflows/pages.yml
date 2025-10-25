@@ -33,6 +33,10 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Copy SPA fallback (serve index.html for unknown routes)
+        run: cp dist/index.html dist/404.html
+      - name: Add CNAME for custom domain
+        run: echo "pokedexdb.com" > dist/CNAME
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
