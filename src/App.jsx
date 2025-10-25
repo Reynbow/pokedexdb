@@ -815,6 +815,7 @@ function App() {
 }
 
 const detailsCache = new Map();
+const abilityCache = new Map();
 
 // Simple global fetch queue to limit concurrent requests
 let IN_FLIGHT = 0;
@@ -1023,6 +1024,10 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [debugLog, setDebugLog] = useState([]);
   const [smogonNature, setSmogonNature] = useState(null);
   const [smogonError, setSmogonError] = useState(null);
+  const [activeAbility, setActiveAbility] = useState(null);
+  const [abilityData, setAbilityData] = useState(null);
+  const [abilityLoading, setAbilityLoading] = useState(false);
+  const [abilityError, setAbilityError] = useState(null);
   const addLog = (msg, data) => {
     const line = `[${new Date().toISOString()}] ${msg}` + (data !== undefined ? ` :: ${typeof data === 'string' ? data : JSON.stringify(data)}` : '');
     setDebugLog((d) => d.concat(line).slice(-200));
@@ -1240,6 +1245,98 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     return () => { ignore = true; };
   }, [details]);
 
+  useEffect(() => {
+    setActiveAbility(null);
+    setAbilityData(null);
+    setAbilityError(null);
+    setAbilityLoading(false);
+  }, [id]);
+
+  const handleAbilityClick = useCallback((entry) => {
+    const abilityInfo = entry?.ability;
+    if (!abilityInfo?.url) return;
+    const abilityName = abilityInfo.name;
+    const abilityUrl = abilityInfo.url;
+    const cached =
+      abilityCache.get(abilityUrl) || (abilityName ? abilityCache.get(abilityName) : null);
+    setAbilityError(null);
+    if (cached) {
+      setAbilityData(cached);
+      setAbilityLoading(false);
+    } else {
+      setAbilityData(null);
+      setAbilityLoading(true);
+    }
+    setActiveAbility({
+      name: abilityName,
+      url: abilityUrl,
+      isHiddenForSelected: !!entry.is_hidden,
+      retryToken: 0,
+    });
+  }, []);
+
+  const handleAbilityRetry = useCallback(() => {
+    setAbilityError(null);
+    setAbilityData(null);
+    setAbilityLoading(true);
+    setActiveAbility((prev) => {
+      if (!prev) return prev;
+      return { ...prev, retryToken: (prev.retryToken || 0) + 1 };
+    });
+  }, []);
+
+  const closeAbilityOverlay = useCallback(() => {
+    setActiveAbility(null);
+    setAbilityData(null);
+    setAbilityError(null);
+    setAbilityLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!activeAbility) return;
+    const abilityUrl = activeAbility.url;
+    const abilityName = activeAbility.name;
+    const retryToken = activeAbility.retryToken || 0;
+    if (!abilityUrl) return;
+    const cacheKey = abilityUrl || abilityName;
+    if (retryToken === 0) {
+      const cached =
+        abilityCache.get(cacheKey) || (abilityName ? abilityCache.get(abilityName) : null);
+      if (cached) {
+        setAbilityData(cached);
+        setAbilityLoading(false);
+        return;
+      }
+    }
+    let ignore = false;
+    const controller = new AbortController();
+    setAbilityError(null);
+    setAbilityLoading(true);
+    queuedFetch(abilityUrl, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Request failed with status ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (ignore) return;
+        abilityCache.set(cacheKey, data);
+        if (abilityName) {
+          abilityCache.set(abilityName, data);
+        }
+        setAbilityData(data);
+        setAbilityLoading(false);
+      })
+      .catch((err) => {
+        if (ignore || err?.name === "AbortError") return;
+        setAbilityError("Unable to load ability details. Please try again.");
+        setAbilityLoading(false);
+      });
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, [activeAbility]);
+
   // Prefer higher quality sources. If animated is enabled, try Showdown; otherwise use HD static (HOME > official-artwork > dream_world if not shiny) before pixel fallback.
   const detailImg = (() => {
     const d = details?.sprites?.other || {};
@@ -1439,10 +1536,16 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   <span className="label">Abilities</span>
                   <div className="value">
                     {(details?.abilities || []).map((a) => (
-                      <span key={a.ability.name} className="ability-chip">
+                      <button
+                        key={a.ability.name}
+                        type="button"
+                        className={`ability-chip${a.is_hidden ? " is-hidden" : ""}`}
+                        onClick={() => handleAbilityClick(a)}
+                        aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
+                      >
                         <span className="text-capitalize">{a.ability.name}</span>
                         {a.is_hidden && <span className="ability-tag">Hidden</span>}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1765,6 +1868,18 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           </>
         )}
       </div>
+      {activeAbility && (
+        <AbilityOverlay
+          ability={activeAbility}
+          data={abilityData}
+          loading={abilityLoading}
+          error={abilityError}
+          onClose={closeAbilityOverlay}
+          onRetry={handleAbilityRetry}
+          onSelectPokemon={onSelectPokemon}
+          currentPokemonId={id}
+        />
+      )}
       <div style={{ maxHeight: 140, overflow: 'auto', background: 'rgba(0,0,0,0.25)', borderTop: '1px solid rgba(255,255,255,0.1)', padding: 8 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Debug</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8, marginBottom: 8 }}>
@@ -1782,8 +1897,171 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   );
 }
 
+function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSelectPokemon, currentPokemonId }) {
+  const abilityTitleId = ability?.name ? `ability-modal-title-${ability.name}` : undefined;
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
+  const effectEntry = useMemo(() => {
+    if (!data?.effect_entries) return null;
+    const english = data.effect_entries.find((entry) => entry?.language?.name === "en");
+    return english || data.effect_entries[0] || null;
+  }, [data]);
+
+  const flavorEntry = useMemo(() => {
+    if (!data?.flavor_text_entries) return null;
+    const englishEntries = data.flavor_text_entries.filter((entry) => entry?.language?.name === "en");
+    if (englishEntries.length === 0) return null;
+    return englishEntries[englishEntries.length - 1];
+  }, [data]);
+
+  const flavorText = useMemo(() => {
+    if (!flavorEntry?.flavor_text) return null;
+    return flavorEntry.flavor_text.replace(/[\n\f\r]+/g, " ");
+  }, [flavorEntry]);
+
+  const generationLabel = useMemo(() => {
+    if (!data?.generation?.name) return null;
+    return humanizeName(data.generation.name);
+  }, [data]);
+
+  const learners = useMemo(() => {
+    if (!data?.pokemon) return [];
+    const currentIdStr = currentPokemonId != null ? String(currentPokemonId) : null;
+    return data.pokemon
+      .map((entry) => {
+        const poke = entry?.pokemon;
+        if (!poke?.name || !poke?.url) return null;
+        const id = getIdNumberFromUrl(poke.url);
+        return {
+          id,
+          name: poke.name,
+          url: poke.url,
+          isHidden: !!entry.is_hidden,
+        };
+      })
+      .filter((p) => p && (!currentIdStr || String(p.id ?? "") !== currentIdStr))
+      .sort((a, b) => {
+        const aId = a.id ?? Number.POSITIVE_INFINITY;
+        const bId = b.id ?? Number.POSITIVE_INFINITY;
+        if (aId !== bId) return aId - bId;
+        return a.name.localeCompare(b.name);
+      });
+  }, [data, currentPokemonId]);
+
+  const handleLearnerClick = (pokemon) => {
+    if (!pokemon) return;
+    const idStr = pokemon.id != null ? String(pokemon.id) : getIdFromUrl(pokemon.url);
+    if (!idStr) return;
+    onSelectPokemon?.(idStr, pokemon.name, pokemon.url);
+    onClose();
+  };
+
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  const abilityLabel = ability?.name ? humanizeName(ability.name) : "Ability";
+
+  return (
+    <div className="ability-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="ability-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={abilityTitleId}
+        onMouseDown={handleModalMouseDown}
+      >
+        <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close ability details">
+          X
+        </button>
+        <div className="ability-modal-left">
+          <div className="ability-modal-header">
+            <h2 className="ability-modal-title" id={abilityTitleId}>
+              <span className="text-capitalize">{abilityLabel}</span>
+            </h2>
+            {ability?.isHiddenForSelected && <span className="ability-tag">Hidden on this Pokemon</span>}
+            {generationLabel && <div className="ability-modal-subtle">Introduced in {generationLabel}</div>}
+          </div>
+          <div className="ability-modal-body">
+            {loading ? (
+              <div className="ability-modal-loading">Loading ability details...</div>
+            ) : error ? (
+              <div className="ability-modal-error">
+                <p>{error}</p>
+                {onRetry && (
+                  <button type="button" className="ability-retry-btn" onClick={onRetry}>
+                    Retry
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {effectEntry?.short_effect && (
+                  <p className="ability-short-effect">{effectEntry.short_effect}</p>
+                )}
+                {effectEntry?.effect && effectEntry.effect !== effectEntry.short_effect && (
+                  <p className="ability-effect">{effectEntry.effect}</p>
+                )}
+                {flavorText && (
+                  <p className="ability-flavor">
+                    "{flavorText}"
+                    {flavorEntry?.version?.name && (
+                      <span className="ability-flavor-version"> - {humanizeName(flavorEntry.version.name)}</span>
+                    )}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        <div className="ability-modal-right">
+          <h3 className="ability-modal-subtitle">Also Learns</h3>
+          {loading ? (
+            <div className="ability-learners-loading">Loading Pokemon...</div>
+          ) : error ? (
+            <div className="ability-learners-error">Unable to load Pokemon list.</div>
+          ) : learners.length > 0 ? (
+            <ul className="ability-learners">
+              {learners.map((pokemon) => (
+                <li key={pokemon.url}>
+                  <button
+                    type="button"
+                    className="ability-learner"
+                    onClick={() => handleLearnerClick(pokemon)}
+                    title={humanizeName(pokemon.name)}
+                  >
+                    <SpriteImage id={pokemon.id} alt={pokemon.name} width={44} height={44} loading="lazy" />
+                    <div className="ability-learner-meta">
+                      <span className="ability-learner-name text-capitalize">{pokemon.name}</span>
+                      {pokemon.isHidden && <span className="ability-learner-tag">Hidden</span>}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="ability-learners-empty">No other Pokemon learn this ability in the main series.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default App;
 
