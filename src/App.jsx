@@ -502,13 +502,14 @@ function App() {
       if (!idStr) continue;
       const idNum = Number(idStr);
       if (Number.isNaN(idNum)) continue;
-      if (idNum >= 10000) continue; // skip alternate-form entries
-      if (dexMap && !dexMap.has(idNum)) continue;
+      const tags = getTagsForName(p.name);
+      const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
+      if (idNum >= 10000 && !hasSpecialTag) continue; // keep alternate forms that carry special tags
+      if (dexMap && !dexMap.has(idNum) && !hasSpecialTag) continue;
       if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
         continue;
       }
       if (hasTagFilter) {
-        const tags = getTagsForName(p.name);
         let hasAllTags = true;
         for (const tag of requiredTags) {
           if (!tags.includes(tag)) {
