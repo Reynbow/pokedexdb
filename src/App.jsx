@@ -1899,6 +1899,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
 function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSelectPokemon, currentPokemonId }) {
   const abilityTitleId = ability?.name ? `ability-modal-title-${ability.name}` : undefined;
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [learnerTypes, setLearnerTypes] = useState(() => new Map());
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -1910,6 +1913,88 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  useEffect(() => {
+    setSearchTerm("");
+    setSelectedTypes([]);
+    setLearnerTypes(new Map());
+  }, [ability?.url]);
+
+  const upsertLearnerTypes = useCallback((key, types) => {
+    if (!types || types.length === 0) return;
+    const normalized = types.filter(Boolean);
+    if (normalized.length === 0) return;
+    setLearnerTypes((prev) => {
+      const existing = prev.get(key);
+      if (existing && existing.length === normalized.length && existing.every((val, idx) => val === normalized[idx])) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.set(key, normalized);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!data?.pokemon || data.pokemon.length === 0) return;
+    let ignore = false;
+    const entries = data.pokemon.slice(0, 140);
+
+    const loadTypes = async () => {
+      for (const entry of entries) {
+        if (ignore) break;
+        const poke = entry?.pokemon;
+        if (!poke?.url) continue;
+        const id = getIdNumberFromUrl(poke.url);
+        if (id == null) continue;
+        const key = String(id);
+
+        if (ignore) break;
+        const cached = detailsCache.get(key);
+        if (cached?.types && cached.types.length > 0) {
+          upsertLearnerTypes(key, cached.types.slice());
+          continue;
+        }
+
+        let storedTypes = null;
+        try {
+          const stored = localStorage.getItem(`types:${key}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              storedTypes = parsed.filter(Boolean);
+            }
+          }
+        } catch {}
+        if (storedTypes && storedTypes.length > 0) {
+          detailsCache.set(key, { ...(detailsCache.get(key) || {}), types: storedTypes });
+          upsertLearnerTypes(key, storedTypes);
+          continue;
+        }
+
+        try {
+          const response = await queuedFetch(poke.url);
+          if (!response?.ok) continue;
+          const json = await response.json();
+          if (ignore) break;
+          const types = (json?.types || [])
+            .slice()
+            .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
+            .map((t) => t?.type?.name)
+            .filter(Boolean);
+          if (types.length > 0) {
+            const existing = detailsCache.get(key) || {};
+            detailsCache.set(key, { ...existing, types });
+            try { localStorage.setItem(`types:${key}`, JSON.stringify(types)); } catch {}
+            upsertLearnerTypes(key, types);
+          }
+        } catch {}
+      }
+    };
+
+    loadTypes();
+    return () => { ignore = true; };
+  }, [data, upsertLearnerTypes]);
 
   const effectEntry = useMemo(() => {
     if (!data?.effect_entries) return null;
@@ -1958,12 +2043,70 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
       });
   }, [data, currentPokemonId]);
 
+  const availableTypes = useMemo(() => {
+    if (learners.length === 0) return [];
+    const present = new Set();
+    for (const learner of learners) {
+      const key = learner.id != null ? String(learner.id) : getIdFromUrl(learner.url);
+      if (!key) continue;
+      const types = learnerTypes.get(key);
+      if (!types) continue;
+      types.forEach((t) => present.add(t));
+    }
+    return ALL_TYPES.filter((type) => present.has(type));
+  }, [learners, learnerTypes]);
+
+  const filteredLearners = useMemo(() => {
+    if (learners.length === 0) return [];
+    const query = searchTerm.trim().toLowerCase();
+    const hasQuery = query.length > 0;
+    const hasTypeFilters = selectedTypes.length > 0;
+
+    return learners.filter((pokemon) => {
+      const key = pokemon.id != null ? String(pokemon.id) : getIdFromUrl(pokemon.url);
+      const types = (key && learnerTypes.get(key)) || [];
+      if (hasQuery) {
+        const nameMatch = humanizeName(pokemon.name).toLowerCase().includes(query);
+        const idMatch = pokemon.id != null ? String(pokemon.id).includes(query) : false;
+        if (!nameMatch && !idMatch) {
+          return false;
+        }
+      }
+      if (hasTypeFilters) {
+        if (types.length === 0) return false;
+        for (const type of selectedTypes) {
+          if (!types.includes(type)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  }, [learners, searchTerm, selectedTypes, learnerTypes]);
+
   const handleLearnerClick = (pokemon) => {
     if (!pokemon) return;
     const idStr = pokemon.id != null ? String(pokemon.id) : getIdFromUrl(pokemon.url);
     if (!idStr) return;
     onSelectPokemon?.(idStr, pokemon.name, pokemon.url);
     onClose();
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  const toggleType = (type) => {
+    setSelectedTypes((prev) => {
+      if (prev.includes(type)) {
+        return prev.filter((t) => t !== type);
+      }
+      return prev.concat(type);
+    });
+  };
+
+  const handleTypeClear = () => {
+    setSelectedTypes([]);
   };
 
   const handleBackdropMouseDown = (event) => {
@@ -1976,6 +2119,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
   };
 
   const abilityLabel = ability?.name ? humanizeName(ability.name) : "Ability";
+  const hasTypeFilters = selectedTypes.length > 0;
 
   return (
     <div className="ability-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
@@ -2028,32 +2172,95 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
               </>
             )}
           </div>
+          <div className="ability-type-filter-shell">
+            <div className="ability-type-filter-header">
+              <span className="ability-modal-subtle">Filter by type</span>
+              {hasTypeFilters && (
+                <button type="button" className="ability-type-clear" onClick={handleTypeClear}>
+                  Clear
+                </button>
+              )}
+            </div>
+            {availableTypes.length > 0 ? (
+              <div className="ability-type-filters">
+                {availableTypes.map((type) => {
+                  const isActive = selectedTypes.includes(type);
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`type-chip ability-type-chip type-${type}${isActive ? " is-active" : ""}`}
+                      onClick={() => toggleType(type)}
+                      aria-pressed={isActive}
+                    >
+                      {type}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : loading ? (
+              <div className="ability-type-filters-empty">Loading type data...</div>
+            ) : learners.length > 0 ? (
+              <div className="ability-type-filters-empty">Loading type data...</div>
+            ) : (
+              <div className="ability-type-filters-empty">No other Pokemon to filter.</div>
+            )}
+          </div>
         </div>
         <div className="ability-modal-right">
           <h3 className="ability-modal-subtitle">Also Learns</h3>
+          <div className="ability-learners-header">
+            <input
+              type="search"
+              className="ability-search-input"
+              placeholder="Search by name or number..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              aria-label="Search Pokémon"
+            />
+          </div>
           {loading ? (
             <div className="ability-learners-loading">Loading Pokemon...</div>
           ) : error ? (
             <div className="ability-learners-error">Unable to load Pokemon list.</div>
           ) : learners.length > 0 ? (
-            <ul className="ability-learners">
-              {learners.map((pokemon) => (
-                <li key={pokemon.url}>
-                  <button
-                    type="button"
-                    className="ability-learner"
-                    onClick={() => handleLearnerClick(pokemon)}
-                    title={humanizeName(pokemon.name)}
-                  >
-                    <SpriteImage id={pokemon.id} alt={pokemon.name} width={44} height={44} loading="lazy" />
-                    <div className="ability-learner-meta">
-                      <span className="ability-learner-name text-capitalize">{pokemon.name}</span>
-                      {pokemon.isHidden && <span className="ability-learner-tag">Hidden</span>}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            filteredLearners.length > 0 ? (
+              <ul className="ability-learners">
+                {filteredLearners.map((pokemon) => {
+                  const key = pokemon.id != null ? String(pokemon.id) : getIdFromUrl(pokemon.url);
+                  const typeList = (key && learnerTypes.get(key)) || [];
+                  return (
+                    <li key={pokemon.url}>
+                      <button
+                        type="button"
+                        className="ability-learner"
+                        onClick={() => handleLearnerClick(pokemon)}
+                        title={humanizeName(pokemon.name)}
+                      >
+                        <SpriteImage id={pokemon.id} alt={pokemon.name} width={44} height={44} loading="lazy" />
+                        <div className="ability-learner-meta">
+                          <div className="ability-learner-top">
+                            <span className="ability-learner-name text-capitalize">{pokemon.name}</span>
+                            {pokemon.isHidden && <span className="ability-learner-tag">Hidden</span>}
+                          </div>
+                          {typeList.length > 0 && (
+                            <div className="ability-learner-types">
+                              {typeList.map((type) => (
+                                <span key={`${pokemon.url}-${type}`} className={`ability-learner-type type-${type}`}>
+                                  {type}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="ability-learners-empty">No Pokémon match your filters.</div>
+            )
           ) : (
             <div className="ability-learners-empty">No other Pokemon learn this ability in the main series.</div>
           )}
