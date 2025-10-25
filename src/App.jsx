@@ -1586,6 +1586,20 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber }) {
     return () => { ignore = true; };
   }, [id, url, inView]);
 
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!selected || !node || !node.isConnected) return;
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [selected]);
+
   const dexNo = dexNumber || `#${id}`;
 
   return (
@@ -1597,6 +1611,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber }) {
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.()}
       ref={cardRef}
+      aria-current={selected ? "true" : undefined}
     >
       {specialTags.length > 0 && (
         <div className="card-tags">
