@@ -102,6 +102,15 @@ const ALL_TYPES = [
   "fairy",
 ];
 
+const STAT_TO_EVS_KEY = {
+  hp: "hp",
+  attack: "atk",
+  defense: "def",
+  "special-attack": "spa",
+  "special-defense": "spd",
+  speed: "spe",
+};
+
 const DEX_FILTERS = [
   { key: "national", label: "National", apiNames: ["national"], pad: 4, games: [] },
   {
@@ -1805,6 +1814,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [smogonNature, setSmogonNature] = useState(null);
   const [smogonError, setSmogonError] = useState(null);
   const [smogonLoading, setSmogonLoading] = useState(false);
+  const [smogonEvs, setSmogonEvs] = useState(null);
   const [activeAbility, setActiveAbility] = useState(null);
   const [abilityData, setAbilityData] = useState(null);
   const [abilityLoading, setAbilityLoading] = useState(false);
@@ -2392,6 +2402,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   useEffect(() => {
     const alias = (name || "").toLowerCase();
     setSmogonNature(null);
+    setSmogonEvs(null);
     setSmogonError(null);
     setSmogonLoading(false);
     if (!alias) return;
@@ -2404,11 +2415,18 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       try {
         const result = await findRecommendedNature(alias, { generationHint });
         if (cancelled) return;
-        if (result?.nature) {
-          setSmogonNature(result.nature);
+        const hasNature = Boolean(result?.nature);
+        const evs =
+          result?.evs && typeof result.evs === "object" && Object.keys(result.evs).length > 0
+            ? result.evs
+            : null;
+        setSmogonNature(hasNature ? result.nature : null);
+        setSmogonEvs(evs);
+        if (hasNature || evs) {
           setSmogonError(null);
-          addLog("Smogon nature", {
-            nature: result.nature,
+          addLog("Smogon recommendations", {
+            nature: result?.nature || null,
+            evs,
             generation: result.generation,
             format: result.format,
             set: result.setName,
@@ -2416,7 +2434,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           });
         } else {
           const msg = `No Smogon nature found for ${name}.`;
-          setSmogonNature(null);
           setSmogonError(msg);
           addLog("Smogon nature not found", {
             alias,
@@ -2429,6 +2446,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         if (cancelled) return;
         const msg = `Smogon data unavailable for ${name}.`;
         setSmogonNature(null);
+        setSmogonEvs(null);
         setSmogonError(msg);
         addLog("Smogon fetch failed", { alias, error: String(error) });
       } finally {
@@ -2599,19 +2617,45 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             </div>
             <section className="stats hero-stats">
               <div className="stats-list">
-                {(details?.stats || []).map((s) => (
-                  <div className="stat-row" key={s.stat.name}>
-                    <div className="stat-label">{s.stat.name.replace("-", " ")}</div>
-                    <div className="stat-bar">
-                      <div
-                        className="stat-fill"
-                        style={{ width: `${Math.min(100, (s.base_stat / 180) * 100)}%` }}
-                        title={`${s.base_stat}`}
-                      />
+                {(details?.stats || []).map((s) => {
+                  const statName = s?.stat?.name || "";
+                  const evKey = STAT_TO_EVS_KEY[statName];
+                  const recommendedEv =
+                    evKey && smogonEvs && typeof smogonEvs[evKey] === "number"
+                      ? smogonEvs[evKey]
+                      : null;
+                  const showRecommended = typeof recommendedEv === "number" && recommendedEv > 0;
+                  const statLabel = humanizeName(statName);
+                  return (
+                    <div className="stat-row" key={statName}>
+                      <div className="stat-label">{statLabel}</div>
+                      <div className="stat-bar-wrap">
+                        <div className="stat-bar">
+                          <div
+                            className="stat-fill"
+                            style={{ width: `${Math.min(100, (s.base_stat / 180) * 100)}%` }}
+                            title={`${s.base_stat}`}
+                          />
+                        </div>
+                        <span className="stat-base">{s.base_stat}</span>
+                      </div>
+                      <div className="stat-value">
+                        {showRecommended ? (
+                          <span
+                            className="stat-recommend"
+                            title={`Recommended ${statLabel} EVs: ${recommendedEv}`}
+                          >
+                            <span className="stat-recommend-icon" aria-hidden="true" />
+                            <span className="stat-recommend-text">{recommendedEv}</span>
+                            <span className="stat-recommend-suffix" aria-hidden="true">
+                              EVs
+                            </span>
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="stat-value">{s.base_stat}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
             {evoPaths.length > 0 && (

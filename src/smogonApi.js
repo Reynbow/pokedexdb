@@ -92,6 +92,89 @@ const parseSpreadNature = (spread) => {
   return null;
 };
 
+const EV_ALIAS_MAP = {
+  hp: "hp",
+  health: "hp",
+  atk: "atk",
+  attack: "atk",
+  att: "atk",
+  offense: "atk",
+  def: "def",
+  defense: "def",
+  df: "def",
+  spa: "spa",
+  spatk: "spa",
+  spattack: "spa",
+  specialattack: "spa",
+  spc: "spa",
+  spd: "spd",
+  spdef: "spd",
+  specialdefense: "spd",
+  spe: "spe",
+  speed: "spe",
+};
+
+const normalizeEvKey = (rawKey) => {
+  if (!rawKey) return null;
+  const cleaned = String(rawKey).toLowerCase().replace(/[^a-z]/g, "");
+  return EV_ALIAS_MAP[cleaned] || null;
+};
+
+const normalizeEvs = (evs) => {
+  if (!evs || typeof evs !== "object") return null;
+  const result = {};
+  Object.entries(evs).forEach(([key, value]) => {
+    const mappedKey = normalizeEvKey(key);
+    const numericValue = Number(value);
+    if (!mappedKey || Number.isNaN(numericValue)) {
+      return;
+    }
+    result[mappedKey] = numericValue;
+  });
+  return Object.keys(result).length > 0 ? result : null;
+};
+
+const parseSpreadEvsString = (value) => {
+  if (!value) return null;
+  const chunks = String(value)
+    .split("/")
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+  if (chunks.length === 0) return null;
+  const evs = {};
+  chunks.forEach((chunk) => {
+    const match = chunk.match(/(\d+)\s*([A-Za-z]+)/);
+    if (!match) return;
+    const mappedKey = normalizeEvKey(match[2]);
+    if (!mappedKey) return;
+    evs[mappedKey] = Number(match[1]);
+  });
+  return normalizeEvs(evs);
+};
+
+const parseSpreadEvs = (spreads) => {
+  if (!spreads) return null;
+  if (typeof spreads === "string") {
+    return parseSpreadEvsString(spreads);
+  }
+  if (Array.isArray(spreads)) {
+    for (const entry of spreads) {
+      const parsed = parseSpreadEvs(entry);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+  if (typeof spreads === "object") {
+    for (const [key, value] of Object.entries(spreads)) {
+      const fromKey = parseSpreadEvs(key);
+      if (fromKey) return fromKey;
+      const nested = parseSpreadEvs(value);
+      if (nested) return nested;
+    }
+  }
+  return null;
+};
+
 const extractNatureFromSpreads = (spreads) => {
   if (!spreads) return null;
   if (Array.isArray(spreads)) {
@@ -135,11 +218,30 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
       const set = sets[setName];
       const direct = extractNatureValue(set?.nature);
       if (direct) {
-        return { nature: direct, format: formatKey, setName };
+        return {
+          nature: direct,
+          format: formatKey,
+          setName,
+          evs: normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads),
+        };
       }
       const fromSpreads = extractNatureFromSpreads(set?.spreads);
       if (fromSpreads) {
-        return { nature: fromSpreads, format: formatKey, setName };
+        return {
+          nature: fromSpreads,
+          format: formatKey,
+          setName,
+          evs: normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads),
+        };
+      }
+      const evs = normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads);
+      if (evs) {
+        return {
+          nature: null,
+          format: formatKey,
+          setName,
+          evs,
+        };
       }
     }
   }
@@ -274,9 +376,10 @@ export const findRecommendedNature = async (alias, options = {}) => {
         continue;
       }
       const selection = selectNatureFromSpeciesSets(dataset[speciesKey]);
-      if (selection?.nature) {
+      if (selection) {
         return {
-          nature: selection.nature,
+          nature: selection.nature || null,
+          evs: selection.evs || null,
           generation,
           format: selection.format,
           setName: selection.setName,
@@ -286,6 +389,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
       }
       return {
         nature: null,
+        evs: null,
         generation,
         format: null,
         setName: null,
@@ -301,6 +405,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
   }
   return {
     nature: null,
+    evs: null,
     generation: null,
     format: null,
     setName: null,
@@ -308,4 +413,3 @@ export const findRecommendedNature = async (alias, options = {}) => {
     searched,
   };
 };
-
