@@ -450,6 +450,86 @@ const NATIONAL_GAME_OPTIONS = [
 
 const GAME_LOOKUP = new Map(GAME_METADATA);
 
+const GENERATION_NAME_LOOKUP = new Map([
+  ["generation-i", 1],
+  ["generation-ii", 2],
+  ["generation-iii", 3],
+  ["generation-iv", 4],
+  ["generation-v", 5],
+  ["generation-vi", 6],
+  ["generation-vii", 7],
+  ["generation-viii", 8],
+  ["generation-ix", 9],
+]);
+
+const REGION_GENERATION_LOOKUP = new Map([
+  ["kanto", 1],
+  ["johto", 2],
+  ["hoenn", 3],
+  ["sinnoh", 4],
+  ["unova", 5],
+  ["kalos", 6],
+  ["alola", 7],
+  ["galar", 8],
+  ["hisui", 8],
+  ["paldea", 9],
+  ["kitakami", 9],
+  ["blueberry-academy", 9],
+]);
+
+const DEX_GENERATION_LOOKUP = new Map([
+  ["national", null],
+  ["kanto", 1],
+  ["johto", 2],
+  ["hoenn", 3],
+  ["sinnoh", 4],
+  ["unova", 5],
+  ["kalos", 6],
+  ["alola", 7],
+  ["galar", 8],
+  ["hisui", 8],
+  ["paldea", 9],
+]);
+
+const GAME_GENERATION_LOOKUP = new Map([
+  ["red-blue-yellow", 1],
+  ["firered-leafgreen", 3],
+  ["lets-go", 7],
+  ["gold-silver-crystal", 2],
+  ["heartgold-soulsilver", 4],
+  ["ruby-sapphire-emerald", 3],
+  ["omega-ruby-alpha-sapphire", 6],
+  ["diamond-pearl", 4],
+  ["platinum", 4],
+  ["brilliant-diamond-shining-pearl", 8],
+  ["black-white", 5],
+  ["black-2-white-2", 5],
+  ["x-y", 6],
+  ["sun-moon", 7],
+  ["ultra-sun-ultra-moon", 7],
+  ["sword-shield", 8],
+  ["legends-arceus", 8],
+  ["scarlet-violet", 9],
+  ["legends-za", 9],
+]);
+
+const itemGenerationCache = new Map();
+const locationGenerationCache = new Map();
+const moveGenerationCache = new Map();
+const speciesGenerationCache = new Map();
+
+const getGenerationNumber = (name) => {
+  if (!name) return null;
+  const value = GENERATION_NAME_LOOKUP.get(name);
+  return value != null ? value : null;
+};
+
+const getRegionGeneration = (regionName) => {
+  if (!regionName) return null;
+  const normalized = String(regionName).toLowerCase();
+  return REGION_GENERATION_LOOKUP.get(normalized) ?? null;
+};
+
 const DEX_LOOKUP = new Map(DEX_FILTERS.map((cfg) => [cfg.key, cfg]));
 const LEGENDARY_NAMES = new Set([
   "articuno",
@@ -1709,6 +1789,8 @@ function App() {
                 clearSelection();
               }}
               dexNumber={selectedDexNumber}
+              selectedDex={selectedDex}
+              selectedGame={selectedGame}
             />
             </ErrorBoundary>
           </section>
@@ -2099,7 +2181,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNumber }) {
+function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNumber, selectedDex, selectedGame }) {
   const { id, name, url } = selected || {};
   const [details, setDetails] = useState(null);
   const [shiny, setShiny] = useState(() => {
@@ -2119,6 +2201,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [species, setSpecies] = useState(null);
   const [forms, setForms] = useState([]);
   const [evoPaths, setEvoPaths] = useState([]);
+  const [evolutionChainData, setEvolutionChainData] = useState(null);
   const [weaknesses, setWeaknesses] = useState([]); // [{type, mult}]
   const [resistances, setResistances] = useState([]); // [{type, mult}]
   const [debugLog, setDebugLog] = useState([]);
@@ -2147,6 +2230,16 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       .map((logo) => GAME_LOGO_LOOKUP.get(logo))
       .filter(Boolean);
   }, [latestCatchGame]);
+  const targetEvolutionGeneration = useMemo(() => {
+    if (selectedGame) {
+      return GAME_GENERATION_LOOKUP.get(selectedGame) ?? null;
+    }
+    if (selectedDex && selectedDex !== "national") {
+      return DEX_GENERATION_LOOKUP.get(selectedDex) ?? null;
+    }
+    return null;
+  }, [selectedDex, selectedGame]);
+  const preferLatestEvolution = selectedDex === "national" && !selectedGame;
   useEffect(() => {
     setNatureOverlayName(null);
   }, [id]);
@@ -2368,6 +2461,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     setSpecies(null);
     setForms([]);
     setEvoPaths([]);
+    setEvolutionChainData(null);
     setWeaknesses([]);
     addLog('Fetching details', { url });
     queuedFetch(url)
@@ -2400,12 +2494,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       setGameAvailabilityError(null);
       setActiveGame(null);
     }
-
-    // Helper to extract id from a PokeAPI URL
-    const getId = (u) => {
-      const parts = (u || "").split("/").filter(Boolean);
-      return parts[parts.length - 1];
-    };
 
     // Compute defensive multipliers by aggregating damage relations across all types
     const computeMultipliers = async () => {
@@ -2518,7 +2606,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
     // Build evolution paths from chain, attaching condition to the edge to next node
     const buildPaths = (node, prefix = [], formsMap) => {
-      const speciesId = getId(node.species.url);
+      const speciesId = getIdFromUrl(node.species?.url);
       const rawForms = speciesId && formsMap ? formsMap.get(String(speciesId)) : null;
       const formBranches = rawForms && rawForms.length ? rawForms.map((form) => ({ ...form })) : [];
       const currentNode = {
@@ -2562,7 +2650,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         if (ignore) return;
         const collectSpeciesIds = (node, acc) => {
           if (!node) return;
-          const sid = getId(node.species?.url);
+          const sid = getIdFromUrl(node.species?.url);
           if (sid) acc.add(String(sid));
           (node.evolves_to || []).forEach((child) => collectSpeciesIds(child, acc));
         };
@@ -2609,9 +2697,13 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           }
         });
         if (!chain?.chain) return;
-        const paths = buildPaths(chain.chain, [], formsBySpeciesId);
-        setEvoPaths(paths);
-        addLog('Evolution paths built', { paths: paths.length });
+        setEvoPaths([]);
+        setEvolutionChainData({
+          chain,
+          speciesEntries: Array.from(speciesMap.entries()),
+          formsBySpeciesEntries: Array.from(formsBySpeciesId.entries()),
+        });
+        addLog('Evolution chain cached', { species: speciesMap.size });
       } catch {}
     };
 
@@ -2623,6 +2715,353 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
     return () => { ignore = true; };
   }, [details]);
+
+  useEffect(() => {
+    if (!evolutionChainData) return;
+    let cancelled = false;
+
+    const ensureSpeciesGeneration = (speciesId, speciesData) => {
+      if (!speciesId || !speciesData) return;
+      const key = String(speciesId);
+      if (speciesGenerationCache.has(key)) return;
+      const genName = speciesData?.generation?.name;
+      if (genName) {
+        const genValue = getGenerationNumber(genName);
+        if (genValue != null) {
+          speciesGenerationCache.set(key, genValue);
+        }
+      }
+    };
+
+    const run = async () => {
+      try {
+        const { chain, speciesEntries, formsBySpeciesEntries } = evolutionChainData;
+        if (!chain?.chain) return;
+        const speciesMap = new Map(Array.isArray(speciesEntries) ? speciesEntries : []);
+        const formsMap = new Map(Array.isArray(formsBySpeciesEntries) ? formsBySpeciesEntries : []);
+
+        speciesMap.forEach((data, key) => ensureSpeciesGeneration(key, data));
+
+        const detailMetaMap = new WeakMap();
+        const detailRecords = [];
+        const itemUrls = new Set();
+        const locationUrls = new Set();
+        const moveUrls = new Set();
+        const extraSpeciesIds = new Set();
+
+        const traverse = (node) => {
+          if (!node) return;
+          const children = Array.isArray(node.evolves_to) ? node.evolves_to : [];
+          children.forEach((child) => {
+            const childSpeciesId = getIdFromUrl(child.species?.url);
+            const details = Array.isArray(child.evolution_details) ? child.evolution_details : [];
+            details.forEach((detail, index) => {
+              detailRecords.push({ detail, index, childSpeciesId });
+              if (detail.item?.url) itemUrls.add(detail.item.url);
+              if (detail.held_item?.url) itemUrls.add(detail.held_item.url);
+              if (detail.location?.url) locationUrls.add(detail.location.url);
+              if (detail.known_move?.url) moveUrls.add(detail.known_move.url);
+              if (detail.trade_species?.url) {
+                const sid = getIdFromUrl(detail.trade_species.url);
+                if (sid) extraSpeciesIds.add(sid);
+              }
+              if (detail.party_species?.url) {
+                const sid = getIdFromUrl(detail.party_species.url);
+                if (sid) extraSpeciesIds.add(sid);
+              }
+            });
+            traverse(child);
+          });
+        };
+
+        traverse(chain.chain);
+
+        const missingExtras = Array.from(extraSpeciesIds).filter(
+          (sid) => sid && !speciesMap.has(String(sid)),
+        );
+        if (missingExtras.length > 0) {
+          const fetched = await Promise.all(
+            missingExtras.map(async (sid) => {
+              try {
+                const response = await queuedFetch(`https://pokeapi.co/api/v2/pokemon-species/${sid}/`);
+                if (!response?.ok) return null;
+                return response.json();
+              } catch {
+                return null;
+              }
+            }),
+          );
+          if (cancelled) return;
+          for (const data of fetched) {
+            if (!data || data.id == null) continue;
+            speciesMap.set(String(data.id), data);
+            ensureSpeciesGeneration(data.id, data);
+          }
+        }
+
+        await Promise.all(
+          Array.from(itemUrls).map(async (url) => {
+            if (itemGenerationCache.has(url)) return;
+            try {
+              const response = await queuedFetch(url);
+              if (!response?.ok) throw new Error();
+              const data = await response.json();
+              const gen = getGenerationNumber(data?.generation?.name);
+              itemGenerationCache.set(url, gen ?? null);
+            } catch {
+              itemGenerationCache.set(url, null);
+            }
+          }),
+        );
+
+        await Promise.all(
+          Array.from(locationUrls).map(async (url) => {
+            if (locationGenerationCache.has(url)) return;
+            try {
+              const response = await queuedFetch(url);
+              if (!response?.ok) throw new Error();
+              const data = await response.json();
+              const regionName = data?.region?.name;
+              locationGenerationCache.set(url, getRegionGeneration(regionName));
+            } catch {
+              locationGenerationCache.set(url, null);
+            }
+          }),
+        );
+
+        await Promise.all(
+          Array.from(moveUrls).map(async (url) => {
+            if (moveGenerationCache.has(url)) return;
+            try {
+              const response = await queuedFetch(url);
+              if (!response?.ok) throw new Error();
+              const data = await response.json();
+              const gen = getGenerationNumber(data?.generation?.name);
+              moveGenerationCache.set(url, gen ?? null);
+            } catch {
+              moveGenerationCache.set(url, null);
+            }
+          }),
+        );
+
+        detailRecords.forEach(({ detail, index, childSpeciesId }) => {
+          const genCandidates = [];
+          const pushGen = (value) => {
+            if (typeof value === "number" && !Number.isNaN(value)) {
+              genCandidates.push(value);
+            }
+          };
+
+          if (detail.location?.url) pushGen(locationGenerationCache.get(detail.location.url));
+          if (detail.item?.url) pushGen(itemGenerationCache.get(detail.item.url));
+          if (detail.held_item?.url) pushGen(itemGenerationCache.get(detail.held_item.url));
+          if (detail.known_move?.url) pushGen(moveGenerationCache.get(detail.known_move.url));
+          if (detail.trade_species?.url) {
+            const sid = getIdFromUrl(detail.trade_species.url);
+            if (sid) pushGen(speciesGenerationCache.get(String(sid)));
+          }
+          if (detail.party_species?.url) {
+            const sid = getIdFromUrl(detail.party_species.url);
+            if (sid) pushGen(speciesGenerationCache.get(String(sid)));
+          }
+          if (detail.min_affection != null) pushGen(6);
+          if (detail.known_move_type?.name === "fairy") pushGen(6);
+          if (detail.turn_upside_down) pushGen(6);
+
+          const childGen = childSpeciesId != null ? speciesGenerationCache.get(String(childSpeciesId)) : null;
+          if (childGen != null) pushGen(childGen);
+
+          const generation = genCandidates.length > 0 ? Math.max(...genCandidates) : null;
+          let priority = index;
+          if (detail.trigger?.name === "use-item") priority += 50;
+          if (detail.held_item?.url || detail.item?.url) priority += 10;
+          if (detail.location?.url) {
+            const locGen = locationGenerationCache.get(detail.location.url);
+            if (locGen != null) priority += locGen;
+          }
+          if (detail.min_affection != null) priority += 5;
+          if (detail.known_move_type?.name === "fairy") priority += 3;
+          if (detail.trade_species?.url) priority += 2;
+
+          detailMetaMap.set(detail, {
+            generation,
+            priority,
+            index,
+          });
+        });
+
+        const humanize = (value) => String(value || "").replace(/-/g, " ");
+        const targetGen = targetEvolutionGeneration;
+        const preferLatest = preferLatestEvolution;
+
+        const selectEvolutionDetail = (eds, childSpeciesId) => {
+          if (!Array.isArray(eds) || eds.length === 0) return null;
+          const childGen = childSpeciesId != null ? speciesGenerationCache.get(String(childSpeciesId)) ?? null : null;
+          const entries = eds.map((detail, idx) => {
+            const meta = detailMetaMap.get(detail) || {};
+            const generation = meta.generation != null ? meta.generation : childGen;
+            const priority = meta.priority != null ? meta.priority : idx;
+            return { detail, generation, priority, index: idx };
+          });
+          const computeScore = (entry) => {
+            const base = entry.priority ?? entry.index ?? 0;
+            if (targetGen == null) return base;
+            const detail = entry.detail || {};
+            let score = base;
+            if (targetGen >= 8) {
+              if (detail.trigger?.name === "use-item") score += 120;
+              if (detail.item?.url || detail.held_item?.url) score += 60;
+              if (detail.location?.url) score -= 15;
+            }
+            if (targetGen <= 4 && detail.location?.url) {
+              score += 20;
+            }
+            if (targetGen <= 4 && detail.trigger?.name === "use-item") {
+              score -= 40;
+            }
+            if (targetGen >= 6 && detail.known_move_type?.name === "fairy") {
+              score += 10;
+            }
+            return score;
+          };
+
+          if (preferLatest) {
+            entries.sort((a, b) => {
+              if ((b.priority ?? 0) !== (a.priority ?? 0)) return (b.priority ?? 0) - (a.priority ?? 0);
+              if ((b.generation ?? -1) !== (a.generation ?? -1)) return (b.generation ?? -1) - (a.generation ?? -1);
+              return b.index - a.index;
+            });
+            return entries[0]?.detail ?? eds[eds.length - 1];
+          }
+
+          if (targetGen != null) {
+            const withGen = entries.filter((entry) => entry.generation != null);
+            const suitable = withGen.filter((entry) => entry.generation <= targetGen);
+            if (suitable.length > 0) {
+              suitable.sort((a, b) => {
+                const scoreA = computeScore(a);
+                const scoreB = computeScore(b);
+                if (scoreB !== scoreA) return scoreB - scoreA;
+                if ((b.generation ?? -1) !== (a.generation ?? -1)) return (b.generation ?? -1) - (a.generation ?? -1);
+                return b.index - a.index;
+              });
+              return suitable[0]?.detail ?? eds[0];
+            }
+            if (withGen.length > 0) {
+              withGen.sort((a, b) => {
+                const scoreA = computeScore(a);
+                const scoreB = computeScore(b);
+                if (scoreB !== scoreA) return scoreB - scoreA;
+                if ((a.generation ?? Infinity) !== (b.generation ?? Infinity)) {
+                  return (a.generation ?? Infinity) - (b.generation ?? Infinity);
+                }
+                return a.index - b.index;
+              });
+              return withGen[0]?.detail ?? eds[0];
+            }
+          }
+
+          entries.sort((a, b) => a.index - b.index);
+          return entries[0]?.detail ?? eds[0];
+        };
+
+        const describeEvolution = (eds, childSpeciesId) => {
+          if (!eds || eds.length === 0) return null;
+          const chosen = selectEvolutionDetail(eds, childSpeciesId) || eds[0];
+          const trig = chosen?.trigger?.name;
+          const parts = [];
+          const gender = chosen?.gender;
+          if (trig === "level-up") {
+            if (chosen.min_level != null) parts.push(`Lv. ${chosen.min_level}`);
+            if (chosen.min_happiness != null) parts.push(`Friendship ${chosen.min_happiness}`);
+            if (chosen.min_affection != null) parts.push(`Affection ${chosen.min_affection}`);
+            if (chosen.min_beauty != null) parts.push(`Beauty ${chosen.min_beauty}`);
+            if (gender === 1) parts.push("Female");
+            else if (gender === 2) parts.push("Male");
+            if (chosen.time_of_day) parts.push(chosen.time_of_day === "day" ? "Daytime" : humanize(chosen.time_of_day));
+            if (chosen.needs_overworld_rain) parts.push("Raining");
+            if (chosen.party_species?.name) parts.push(`With ${humanize(chosen.party_species.name)}`);
+            if (chosen.party_type?.name) parts.push(`With ${humanize(chosen.party_type.name)} ally`);
+            if (chosen.location?.name) parts.push(`At ${humanize(chosen.location.name)}`);
+            if (chosen.known_move?.name) parts.push(`Know ${humanize(chosen.known_move.name)}`);
+            if (chosen.known_move_type?.name) parts.push(`Know ${humanize(chosen.known_move_type.name)} move`);
+            if (parts.length === 0) parts.push("Level up");
+            return { text: parts.join("  ") };
+          }
+          if (trig === "use-item") {
+            if (chosen.item?.name) {
+              const name = chosen.item.name;
+              const isStone = name.includes("stone");
+              const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${name}.png`;
+              return {
+                text: `Use ${humanize(name)}`,
+                itemSprite: isStone ? sprite : undefined,
+              };
+            }
+            return { text: "Use item" };
+          }
+          if (trig === "trade") {
+            if (chosen.trade_species?.name) parts.push(`for ${humanize(chosen.trade_species.name)}`);
+            if (chosen.held_item?.name) parts.push(`holding ${humanize(chosen.held_item.name)}`);
+            return { text: parts.length ? `Trade ${parts.join(", ")}` : "Trade" };
+          }
+          if (trig === "shed") {
+            return { text: "Shed evolution" };
+          }
+          if (trig) return { text: humanize(trig) };
+          return null;
+        };
+
+        const buildPaths = (node, prefix = []) => {
+          if (!node) return [];
+          const speciesId = getIdFromUrl(node.species?.url);
+          const rawForms = speciesId && formsMap ? formsMap.get(String(speciesId)) : null;
+          const formBranches = rawForms && rawForms.length ? rawForms.map((form) => ({ ...form })) : [];
+          const currentNode = {
+            name: node.species.name,
+            displayName: humanizeName(node.species.name),
+            id: speciesId,
+            forms: formBranches,
+          };
+          const current = [...prefix, currentNode];
+          const children = Array.isArray(node.evolves_to) ? node.evolves_to : [];
+          if (children.length === 0) {
+            return [current];
+          }
+          let paths = [];
+          children.forEach((child) => {
+            const childSpeciesId = getIdFromUrl(child.species?.url);
+            const cond = describeEvolution(child.evolution_details, childSpeciesId);
+            const withCond = current.slice();
+            withCond[withCond.length - 1] = {
+              ...withCond[withCond.length - 1],
+              toNext: cond,
+            };
+            paths = paths.concat(buildPaths(child, withCond));
+          });
+          return paths;
+        };
+
+        const paths = buildPaths(chain.chain, []);
+        if (!cancelled) {
+          setEvoPaths(paths);
+          addLog('Evolution paths built', {
+            paths: paths.length,
+            targetGeneration: targetGen ?? (preferLatest ? "latest" : null),
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          addLog('Evolution processing failed', { message: error?.message || String(error) });
+        }
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [evolutionChainData, targetEvolutionGeneration, preferLatestEvolution]);
 
   useEffect(() => {
     setActiveAbility(null);
