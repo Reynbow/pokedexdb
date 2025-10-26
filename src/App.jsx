@@ -111,6 +111,138 @@ const STAT_TO_EVS_KEY = {
   speed: "spe",
 };
 
+const EV_ITEM_GUIDE = [
+  {
+    name: "HP Up",
+    stat: "HP",
+    description: "+10 HP EVs instantly",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hp-up.png",
+    statKeys: ["hp"],
+    category: "Consumables",
+    order: 0,
+  },
+  {
+    name: "Protein",
+    stat: "Attack",
+    description: "+10 Attack EVs instantly",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protein.png",
+    statKeys: ["attack"],
+    category: "Consumables",
+    order: 1,
+  },
+  {
+    name: "Iron",
+    stat: "Defense",
+    description: "+10 Defense EVs instantly",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron.png",
+    statKeys: ["defense"],
+    category: "Consumables",
+    order: 2,
+  },
+  {
+    name: "Calcium",
+    stat: "Special Attack",
+    description: "+10 Special Attack EVs instantly",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/calcium.png",
+    statKeys: ["special-attack"],
+    category: "Consumables",
+    order: 3,
+  },
+  {
+    name: "Zinc",
+    stat: "Special Defense",
+    description: "+10 Special Defense EVs instantly",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zinc.png",
+    statKeys: ["special-defense"],
+    category: "Consumables",
+    order: 4,
+  },
+  {
+    name: "Carbos",
+    stat: "Speed",
+    description: "+10 Speed EVs instantly",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png",
+    statKeys: ["speed"],
+    category: "Consumables",
+    order: 5,
+  },
+  {
+    name: "Macho Brace",
+    stat: "All stats",
+    description: "Doubles EVs gained from battles while halving battle Speed",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/macho-brace.png",
+    statKeys: ["*"],
+    category: "Held Items",
+    order: 100,
+  },
+];
+
+const FEATHER_VARIANTS = {
+  hp: {
+    name: "Health Feather",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/health-feather.png",
+    order: 10,
+  },
+  attack: {
+    name: "Muscle Feather",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-feather.png",
+    order: 11,
+  },
+  defense: {
+    name: "Resist Feather",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/resist-feather.png",
+    order: 12,
+  },
+  "special-attack": {
+    name: "Genius Feather",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/genius-feather.png",
+    order: 13,
+  },
+  "special-defense": {
+    name: "Clever Feather",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/clever-feather.png",
+    order: 14,
+  },
+  speed: {
+    name: "Swift Feather",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/swift-feather.png",
+    order: 15,
+  },
+};
+
+const POWER_ITEM_VARIANTS = {
+  hp: {
+    name: "Power Weight",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-weight.png",
+    order: 0,
+  },
+  attack: {
+    name: "Power Bracer",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png",
+    order: 1,
+  },
+  defense: {
+    name: "Power Belt",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-belt.png",
+    order: 2,
+  },
+  "special-attack": {
+    name: "Power Lens",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-lens.png",
+    order: 3,
+  },
+  "special-defense": {
+    name: "Power Band",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-band.png",
+    order: 4,
+  },
+  speed: {
+    name: "Power Anklet",
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-anklet.png",
+    order: 5,
+  },
+};
+
 const DEX_FILTERS = [
   { key: "national", label: "National", apiNames: ["national"], pad: 4, games: [] },
   {
@@ -2209,6 +2341,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [smogonError, setSmogonError] = useState(null);
   const [smogonLoading, setSmogonLoading] = useState(false);
   const [smogonEvs, setSmogonEvs] = useState(null);
+  const [isEvModalOpen, setIsEvModalOpen] = useState(false);
   const [activeAbility, setActiveAbility] = useState(null);
   const [abilityData, setAbilityData] = useState(null);
   const [abilityLoading, setAbilityLoading] = useState(false);
@@ -2218,6 +2351,10 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [gameAvailabilityLoading, setGameAvailabilityLoading] = useState(false);
   const [gameAvailabilityError, setGameAvailabilityError] = useState(null);
   const [activeGame, setActiveGame] = useState(null);
+  const hasRecommendedEvs = useMemo(() => {
+    if (!smogonEvs || typeof smogonEvs !== "object") return false;
+    return Object.values(smogonEvs).some((value) => typeof value === "number" && value > 0);
+  }, [smogonEvs]);
   const latestCatchGame = useMemo(() => {
     if (!Array.isArray(gameAvailability) || gameAvailability.length === 0) {
       return null;
@@ -2243,6 +2380,11 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   useEffect(() => {
     setNatureOverlayName(null);
   }, [id]);
+  useEffect(() => {
+    if (!hasRecommendedEvs) {
+      setIsEvModalOpen(false);
+    }
+  }, [hasRecommendedEvs]);
 
   useEffect(() => {
     setGameAvailability([]);
@@ -3111,6 +3253,12 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const closeNatureOverlay = useCallback(() => {
     setNatureOverlayName(null);
   }, []);
+  const openEvInfoModal = useCallback(() => {
+    setIsEvModalOpen(true);
+  }, []);
+  const closeEvInfoModal = useCallback(() => {
+    setIsEvModalOpen(false);
+  }, []);
 
   const closeAbilityOverlay = useCallback(() => {
     setActiveAbility(null);
@@ -3444,6 +3592,17 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               <h2>{name}</h2>
             </div>
             <section className="stats hero-stats">
+              {hasRecommendedEvs && (
+                <div className="ev-info-cta">
+                  <button
+                    type="button"
+                    className="ev-info-button"
+                    onClick={openEvInfoModal}
+                  >
+                    Recommended EV Information
+                  </button>
+                </div>
+              )}
               <div className="stats-list">
                 {(details?.stats || []).map((s) => {
                   const statName = s?.stat?.name || "";
@@ -3561,6 +3720,13 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           onSelectGame={handleGameSelection}
         />
       )}
+      {isEvModalOpen && hasRecommendedEvs && (
+        <RecommendedEvModal
+          evs={smogonEvs}
+          stats={details?.stats || []}
+          onClose={closeEvInfoModal}
+        />
+      )}
       {activeAbility && (
         <AbilityOverlay
           ability={activeAbility}
@@ -3587,6 +3753,171 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, lineHeight: 1.2 }}>{debugLog.join('\n')}</pre>
       </div>
     </aside>
+  );
+}
+
+function RecommendedEvModal({ evs, stats, onClose }) {
+  const modalTitleId = "recommended-ev-modal-title";
+  const evEntries = useMemo(() => {
+    if (!evs || typeof evs !== "object") return [];
+    const statList = Array.isArray(stats) ? stats : [];
+    return statList
+      .map((entry) => {
+        const statName = entry?.stat?.name;
+        if (!statName) return null;
+        const evKey = STAT_TO_EVS_KEY[statName];
+        const value = evKey ? evs[evKey] : null;
+        if (typeof value !== "number" || value <= 0) return null;
+        return {
+          stat: statName,
+          label: humanizeName(statName),
+          value,
+          baseStat: typeof entry?.base_stat === "number" ? entry.base_stat : null,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.value - a.value);
+  }, [evs, stats]);
+  const totalRecommended = useMemo(
+    () => evEntries.reduce((sum, entry) => sum + entry.value, 0),
+    [evEntries],
+  );
+  const recommendedStatKeys = useMemo(() => {
+    const set = new Set();
+    for (const entry of evEntries) {
+      if (entry?.stat) {
+        set.add(entry.stat);
+      }
+    }
+    return set;
+  }, [evEntries]);
+  const relevantItems = useMemo(() => {
+    const hasEntries = evEntries.length > 0;
+    if (!hasEntries) return [];
+
+    const baseItems = [];
+    const generalItems = [];
+
+    EV_ITEM_GUIDE.forEach((item) => {
+      if (!item) return;
+      const { statKeys = [] } = item;
+      const matches =
+        statKeys.includes("*") || statKeys.some((key) => recommendedStatKeys.has(key));
+      if (!matches) return;
+      if (statKeys.includes("*")) {
+        generalItems.push(item);
+      } else {
+        baseItems.push(item);
+      }
+    });
+
+    const powerItems = Array.from(recommendedStatKeys)
+      .map((stat) => {
+        const variant = POWER_ITEM_VARIANTS[stat];
+        if (!variant) return null;
+        const statLabel = humanizeName(stat);
+        return {
+          name: variant.name,
+          stat: statLabel,
+          description: `+8 ${statLabel} EVs per battle while held (halves Speed in battle)`,
+          icon: variant.icon,
+          order: variant.order ?? 0,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.order - b.order);
+
+    return [...baseItems, ...powerItems, ...generalItems];
+  }, [recommendedStatKeys, evEntries]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose?.();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose?.();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  if (evEntries.length === 0) return null;
+
+  return (
+    <div className="ev-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="ev-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
+        onMouseDown={handleModalMouseDown}
+      >
+        <button
+          type="button"
+          className="ev-modal-close"
+          onClick={onClose}
+          aria-label="Close recommended EV information"
+        >
+          Close
+        </button>
+        <h3 id={modalTitleId} className="ev-modal-title">
+          Recommended EV Information
+        </h3>
+        <p className="ev-modal-intro">
+          Smogon recommended EV spreads focus on maximizing the stats that matter most. Use the spread summary and
+          training items below to reach the suggested build quickly.
+        </p>
+        <div className="ev-modal-columns">
+          <section className="ev-modal-column">
+            <h4 className="ev-modal-subtitle">Recommended Spread</h4>
+            <ul className="ev-modal-spread">
+              {evEntries.map((entry) => (
+                <li key={entry.stat} className="ev-spread-row">
+                  <span className="ev-spread-stat text-capitalize">{entry.label}</span>
+                  <span className="ev-spread-value">{entry.value} EVs</span>
+                  {entry.baseStat != null && <span className="ev-spread-base">Base {entry.baseStat}</span>}
+                </li>
+              ))}
+            </ul>
+            <div className="ev-modal-total">Total recommended EVs: {totalRecommended}</div>
+          </section>
+          <section className="ev-modal-column ev-modal-column-items">
+            <h4 className="ev-modal-subtitle">Items To Boost EVs</h4>
+            {relevantItems.length > 0 ? (
+              <ul className="ev-modal-items">
+                {relevantItems.map((item) => (
+                  <li key={item.name} className="ev-item-row">
+                    <div className="ev-item-header">
+                      {item.icon && (
+                        <span className="ev-item-icon">
+                          <img src={item.icon} alt={`${item.name} icon`} loading="lazy" />
+                        </span>
+                      )}
+                      <div className="ev-item-title">
+                        <span className="ev-item-name">{item.name}</span>
+                        <span className="ev-item-stat">{item.stat}</span>
+                      </div>
+                    </div>
+                    <div className="ev-item-description">{item.description}</div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="ev-modal-empty">No EV training items match this spread.</div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }
 
