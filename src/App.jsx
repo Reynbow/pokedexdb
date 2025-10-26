@@ -322,6 +322,90 @@ const GAME_LOGO_LOOKUP = new Map(
   })
 );
 
+const VERSION_LOGO_FILES = new Map([
+  ["red", "red.png"],
+  ["blue", "blue.png"],
+  ["yellow", "yellow.png"],
+  ["gold", "gold.png"],
+  ["silver", "silver.png"],
+  ["crystal", "crystal.png"],
+  ["ruby", "ruby.png"],
+  ["sapphire", "sapphire.png"],
+  ["firered", "firered.png"],
+  ["leafgreen", "leafgreen.png"],
+  ["emerald", "emerald.png"],
+  ["diamond", "diamond.png"],
+  ["pearl", "pearl.png"],
+  ["platinum", "platinum.png"],
+  ["heartgold", "heartgold.png"],
+  ["soulsilver", "soulsilver.png"],
+  ["black", "black.png"],
+  ["white", "white.png"],
+  ["black-2", "black2.png"],
+  ["white-2", "white2.png"],
+  ["x", "x.png"],
+  ["y", "y.png"],
+  ["omega-ruby", "omegaruby.png"],
+  ["alpha-sapphire", "alphasapphire.png"],
+  ["sun", "sun.png"],
+  ["moon", "moon.png"],
+  ["ultra-sun", "ultrasun.png"],
+  ["ultra-moon", "ultramoon.png"],
+  ["sword", "sword.png"],
+  ["shield", "shield.png"],
+  ["brilliant-diamond", "brilliantdiamond.png"],
+  ["shining-pearl", "shiningpearl.png"],
+  ["legends-arceus", "arceus.png"],
+  ["scarlet", "scarlet.png"],
+  ["violet", "violet.png"],
+  ["lets-go-pikachu", "letsgopikachu.png"],
+  ["lets-go-eevee", "letsgoeevee.png"],
+]);
+
+const VERSION_RELEASE_SEQUENCE = [
+  "red",
+  "blue",
+  "yellow",
+  "gold",
+  "silver",
+  "crystal",
+  "ruby",
+  "sapphire",
+  "firered",
+  "leafgreen",
+  "emerald",
+  "diamond",
+  "pearl",
+  "platinum",
+  "heartgold",
+  "soulsilver",
+  "black",
+  "white",
+  "black-2",
+  "white-2",
+  "x",
+  "y",
+  "omega-ruby",
+  "alpha-sapphire",
+  "sun",
+  "moon",
+  "ultra-sun",
+  "ultra-moon",
+  "lets-go-pikachu",
+  "lets-go-eevee",
+  "sword",
+  "shield",
+  "brilliant-diamond",
+  "shining-pearl",
+  "legends-arceus",
+  "scarlet",
+  "violet",
+];
+
+const VERSION_ORDER_LOOKUP = new Map(
+  VERSION_RELEASE_SEQUENCE.map((name, index) => [name, index])
+);
+
 const NATIONAL_GAME_ORDER = [
   "red-blue-yellow",
   "gold-silver-crystal",
@@ -561,6 +645,233 @@ const getIdFromUrl = (url) => {
 const getIdNumberFromUrl = (url) => {
   const id = Number(getIdFromUrl(url));
   return Number.isNaN(id) ? null : id;
+};
+
+const toTitleCase = (value) => {
+  const base = humanizeName(value);
+  return base.replace(/\b\w/g, (char) => char.toUpperCase()).trim();
+};
+
+const CONDITION_LABEL_OVERRIDES = {
+  "time-morning": "Morning",
+  "time-day": "Daytime",
+  "time-night": "Nighttime",
+  "time-dusk": "Dusk",
+  "time-dawn": "Dawn",
+};
+
+const TIME_OF_DAY_LABELS = {
+  dawn: "Dawn",
+  day: "Daytime",
+  dusk: "Dusk",
+  evening: "Evening",
+  midnight: "Midnight",
+  morning: "Morning",
+  night: "Nighttime",
+};
+
+const METHOD_LABEL_OVERRIDES = {
+  "sos-encounter": "SOS Encounter",
+  "special-spot": "Special Spot",
+};
+
+const formatEncounterDescriptor = (name) => {
+  if (!name) return null;
+  const override = CONDITION_LABEL_OVERRIDES[name];
+  if (override) return override;
+  return toTitleCase(name);
+};
+
+const formatTimeOfDay = (value) => {
+  if (!value) return null;
+  const normalized = String(value).toLowerCase();
+  return TIME_OF_DAY_LABELS[normalized] || toTitleCase(normalized);
+};
+
+const normalizeEncounterData = (entries) => {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  const versionMap = new Map();
+
+  for (const entry of entries) {
+    const areaName = entry?.location_area?.name;
+    if (!areaName) continue;
+    const versionDetails = Array.isArray(entry?.version_details) ? entry.version_details : [];
+    if (versionDetails.length === 0) continue;
+
+    for (const detail of versionDetails) {
+      const versionName = detail?.version?.name;
+      if (!versionName) continue;
+
+      const rawDetails = Array.isArray(detail?.encounter_details) ? detail.encounter_details : [];
+      if (rawDetails.length === 0) continue;
+
+      let versionEntry = versionMap.get(versionName);
+      if (!versionEntry) {
+        const logoFile = VERSION_LOGO_FILES.get(versionName);
+        versionEntry = {
+          version: versionName,
+          label: toTitleCase(versionName),
+          areas: new Map(),
+          logos: logoFile ? [logoFile] : [],
+        };
+        versionMap.set(versionName, versionEntry);
+      }
+
+      const methodMap = new Map();
+      for (const info of rawDetails) {
+        const methodName = info?.method?.name || null;
+        const descriptors = [];
+        const timeLabel = formatTimeOfDay(info?.time_of_day);
+        if (timeLabel) descriptors.push(timeLabel);
+        const conditions = Array.isArray(info?.condition_values) ? info.condition_values : [];
+        for (const condition of conditions) {
+          const label = formatEncounterDescriptor(condition?.name);
+          if (label) descriptors.push(label);
+        }
+        const uniqueDescriptors = Array.from(new Set(descriptors));
+        const minLevel = info?.min_level ?? null;
+        const maxLevel = info?.max_level ?? null;
+        const chance = info?.chance ?? detail?.max_chance ?? null;
+        const descriptorKey = uniqueDescriptors.slice().sort((a, b) => a.localeCompare(b)).join("|");
+        const methodKey = [methodName || "", descriptorKey].join("::");
+        const label =
+          methodName && METHOD_LABEL_OVERRIDES[methodName]
+            ? METHOD_LABEL_OVERRIDES[methodName]
+            : methodName
+            ? toTitleCase(methodName)
+            : null;
+        const existing = methodMap.get(methodKey);
+        if (existing) {
+          if (chance != null) {
+            existing.chance =
+              existing.chance != null ? Math.max(existing.chance, chance) : chance;
+          }
+          if (minLevel != null) {
+            existing.minLevel =
+              existing.minLevel != null ? Math.min(existing.minLevel, minLevel) : minLevel;
+          }
+          if (maxLevel != null) {
+            existing.maxLevel =
+              existing.maxLevel != null ? Math.max(existing.maxLevel, maxLevel) : maxLevel;
+          }
+          existing.descriptors = Array.from(
+            new Set([...existing.descriptors, ...uniqueDescriptors])
+          );
+        } else {
+          methodMap.set(methodKey, {
+            key: methodKey,
+            method: methodName,
+            label,
+            chance: chance != null ? chance : null,
+            minLevel,
+            maxLevel,
+            descriptors: uniqueDescriptors,
+          });
+        }
+      }
+
+      if (methodMap.size === 0) continue;
+
+      let versionArea = versionEntry.areas.get(areaName);
+      if (!versionArea) {
+        versionArea = {
+          name: areaName,
+          label: toTitleCase(areaName),
+          methods: new Map(),
+        };
+        versionEntry.areas.set(areaName, versionArea);
+      }
+
+      methodMap.forEach((method) => {
+        const existing = versionArea.methods.get(method.key);
+        if (existing) {
+          if (method.chance != null) {
+            existing.chance =
+              existing.chance != null ? Math.max(existing.chance, method.chance) : method.chance;
+          }
+          if (method.minLevel != null) {
+            existing.minLevel =
+              existing.minLevel != null
+                ? Math.min(existing.minLevel, method.minLevel)
+                : method.minLevel;
+          }
+          if (method.maxLevel != null) {
+            existing.maxLevel =
+              existing.maxLevel != null
+                ? Math.max(existing.maxLevel, method.maxLevel)
+                : method.maxLevel;
+          }
+          if (method.label && !existing.label) {
+            existing.label = method.label;
+          }
+          existing.descriptors = Array.from(
+            new Set([...existing.descriptors, ...method.descriptors])
+          );
+        } else {
+          versionArea.methods.set(method.key, { ...method });
+        }
+      });
+    }
+  }
+
+  const result = Array.from(versionMap.values()).map((versionEntry) => {
+    const areas = Array.from(versionEntry.areas.values()).map((area) => {
+      const methods = Array.from(area.methods.values()).map(({ key, ...rest }) => rest);
+      methods.sort((a, b) => {
+        const chanceA = a.chance ?? -1;
+        const chanceB = b.chance ?? -1;
+        if (chanceA !== chanceB) return chanceB - chanceA;
+        const labelA = a.label || "";
+        const labelB = b.label || "";
+        if (labelA !== labelB) return labelA.localeCompare(labelB);
+        return a.descriptors.join(", ").localeCompare(b.descriptors.join(", "));
+      });
+      return {
+        name: area.name,
+        label: area.label,
+        methods,
+      };
+    });
+    areas.sort((a, b) => a.label.localeCompare(b.label));
+
+    let maxChance = 0;
+    let totalMethods = 0;
+    areas.forEach((area) => {
+      area.methods.forEach((method) => {
+        if (method.chance != null) {
+          maxChance = Math.max(maxChance, method.chance);
+        }
+      });
+      totalMethods += area.methods.length;
+    });
+
+    const totalLocations = areas.length;
+    return {
+      version: versionEntry.version,
+      label: versionEntry.label,
+      logos: Array.isArray(versionEntry.logos) ? versionEntry.logos.slice() : [],
+      areas,
+      totalLocations,
+      totalMethods,
+      maxChance,
+      summary:
+        totalLocations > 0 && totalMethods > 0
+          ? `${totalLocations} ${totalLocations === 1 ? "location" : "locations"}`
+          : "No wild encounters",
+    };
+  });
+
+  result.sort((a, b) => {
+    const orderA = VERSION_ORDER_LOOKUP.has(a.version)
+      ? VERSION_ORDER_LOOKUP.get(a.version)
+      : Number.POSITIVE_INFINITY;
+    const orderB = VERSION_ORDER_LOOKUP.has(b.version)
+      ? VERSION_ORDER_LOOKUP.get(b.version)
+      : Number.POSITIVE_INFINITY;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.label.localeCompare(b.label);
+  });
+  return result;
 };
 
 const FORM_ORDER = new Map([
@@ -1820,9 +2131,20 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [abilityLoading, setAbilityLoading] = useState(false);
   const [abilityError, setAbilityError] = useState(null);
   const [natureOverlayName, setNatureOverlayName] = useState(null);
+  const [gameAvailability, setGameAvailability] = useState([]);
+  const [gameAvailabilityLoading, setGameAvailabilityLoading] = useState(false);
+  const [gameAvailabilityError, setGameAvailabilityError] = useState(null);
+  const [activeGame, setActiveGame] = useState(null);
   useEffect(() => {
     setNatureOverlayName(null);
   }, [id]);
+
+  useEffect(() => {
+    setGameAvailability([]);
+    setGameAvailabilityError(null);
+    setActiveGame(null);
+    setGameAvailabilityLoading(Boolean(url));
+  }, [url]);
 
   useEffect(() => {
     if (!smogonNature) {
@@ -2054,6 +2376,19 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     if (!details) return;
     let ignore = false;
 
+    const encounterUrl = details?.location_area_encounters;
+    if (encounterUrl) {
+      setGameAvailability([]);
+      setGameAvailabilityLoading(true);
+      setGameAvailabilityError(null);
+      setActiveGame(null);
+    } else {
+      setGameAvailability([]);
+      setGameAvailabilityLoading(false);
+      setGameAvailabilityError(null);
+      setActiveGame(null);
+    }
+
     // Helper to extract id from a PokeAPI URL
     const getId = (u) => {
       const parts = (u || "").split("/").filter(Boolean);
@@ -2094,6 +2429,31 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         }
         addLog('Computed matchups', { weak: weak.length, resist: resist.length });
       } catch {}
+    };
+
+    const fetchEncounters = async () => {
+      if (!encounterUrl) return;
+      try {
+        addLog('Fetching encounters', { encounterUrl });
+        const response = await queuedFetch(encounterUrl);
+        if (ignore) return;
+        if (!response?.ok) {
+          throw new Error(`Request failed with status ${response?.status ?? "unknown"}`);
+        }
+        const data = await response.json();
+        if (ignore) return;
+        const normalized = normalizeEncounterData(data);
+        setGameAvailability(normalized);
+        setGameAvailabilityError(null);
+        setGameAvailabilityLoading(false);
+        addLog('Encounters loaded', { games: normalized.length });
+      } catch (error) {
+        if (ignore) return;
+        setGameAvailability([]);
+        setGameAvailabilityError("Unable to load encounter data.");
+        setGameAvailabilityLoading(false);
+        addLog('Encounter fetch failed', { message: error?.message || String(error) });
+      }
     };
 
     const humanize = (s) => String(s || "").replace(/-/g, " ");
@@ -2245,6 +2605,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
     computeMultipliers();
     fetchEvolution();
+    if (encounterUrl) {
+      fetchEncounters();
+    }
 
     return () => { ignore = true; };
   }, [details]);
@@ -2303,6 +2666,15 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     setAbilityData(null);
     setAbilityError(null);
     setAbilityLoading(false);
+  }, []);
+
+  const handleGameSelection = useCallback((game) => {
+    if (!game) return;
+    setActiveGame(game);
+  }, []);
+
+  const closeGameModal = useCallback(() => {
+    setActiveGame(null);
   }, []);
 
   useEffect(() => {
@@ -2674,6 +3046,45 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 </div>
               </section>
             )}
+            <section className="catch-section single-col">
+              <h3 className="section-title">Catch Locations</h3>
+              {gameAvailabilityLoading ? (
+                <div className="catch-loading">Loading encounter data...</div>
+              ) : gameAvailabilityError ? (
+                <div className="catch-error">{gameAvailabilityError}</div>
+              ) : gameAvailability.length > 0 ? (
+                <div className="catch-pill-grid">
+                  {gameAvailability.map((game) => {
+                    const logoUrls = (game.logos || [])
+                      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+                      .filter(Boolean);
+                    return (
+                      <button
+                        key={game.version}
+                        type="button"
+                        className="catch-pill"
+                        onClick={() => handleGameSelection(game)}
+                        aria-label={`View catch locations for ${name} in ${game.label}`}
+                      >
+                        {logoUrls.length > 0 && (
+                          <span className="catch-pill-logos" aria-hidden="true">
+                            {logoUrls.map((src) => (
+                              <img key={src} src={src} alt="" className="catch-pill-logo" />
+                            ))}
+                          </span>
+                        )}
+                        <span className="catch-pill-text">
+                          <span className="catch-pill-label">{game.label}</span>
+                          <span className="catch-pill-summary">{game.summary}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="catch-empty">No wild encounter data for this Pokemon.</div>
+              )}
+            </section>
   </div>
         </div>
         {details && (
@@ -2689,6 +3100,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           recommendedNature={smogonNature}
           onClose={closeNatureOverlay}
         />
+      )}
+      {activeGame && (
+        <GameAvailabilityModal game={activeGame} pokemonName={name} onClose={closeGameModal} />
       )}
       {activeAbility && (
         <AbilityOverlay
@@ -3106,6 +3520,130 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
               <div className="ability-learners-empty">No natures match your search.</div>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GameAvailabilityModal({ game, pokemonName, onClose }) {
+  const titleId = game?.version ? `game-modal-title-${game.version}` : undefined;
+  const displayPokemonName = pokemonName ? toTitleCase(pokemonName) : "";
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose?.();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  if (!game) return null;
+
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose?.();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  const logoUrls = useMemo(() => {
+    if (!Array.isArray(game?.logos)) return [];
+    return game.logos
+      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+      .filter(Boolean);
+  }, [game?.logos]);
+
+  const areaList = Array.isArray(game.areas) ? game.areas : [];
+  const locationSummary =
+    game.totalLocations > 0 && game.totalMethods > 0
+      ? `${game.totalLocations} ${game.totalLocations === 1 ? "location" : "locations"}`
+      : "No wild encounters";
+
+  return (
+    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="game-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onMouseDown={handleModalMouseDown}
+      >
+        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close catch locations">
+          X
+        </button>
+        <header className="game-modal-header">
+          <h2 className="game-modal-title" id={titleId}>
+            {displayPokemonName && (
+              <>
+                <span className="game-modal-title-name">{displayPokemonName}</span>
+                <span className="game-modal-title-sep"> in </span>
+              </>
+            )}
+            <span className="game-modal-title-game">{game.label}</span>
+          </h2>
+          {logoUrls.length > 0 && (
+            <span className="game-modal-logos" aria-hidden="true">
+              {logoUrls.map((src) => (
+                <img key={src} src={src} alt="" className="game-modal-logo" />
+              ))}
+            </span>
+          )}
+          <p className="game-modal-subtitle">{locationSummary}</p>
+        </header>
+        <div className="game-modal-body">
+          {areaList.length > 0 ? (
+            <ul className="game-modal-area-list">
+              {areaList.map((area) => (
+                <li key={area.name} className="game-modal-area">
+                  <h3 className="game-modal-area-name">{area.label}</h3>
+                  {Array.isArray(area.methods) && area.methods.length > 0 ? (
+                    <ul className="game-modal-methods">
+                      {area.methods.map((method, idx) => {
+                        const methodLabel = method.label || "Encounter";
+                        const descriptors = Array.isArray(method.descriptors) ? method.descriptors : [];
+                        const minLevel = method.minLevel ?? null;
+                        const maxLevel = method.maxLevel ?? null;
+                        const metaParts = [];
+                        if (minLevel != null || maxLevel != null) {
+                          if (minLevel != null && maxLevel != null) {
+                            metaParts.push(minLevel === maxLevel ? `Lv. ${minLevel}` : `Lv. ${minLevel}-${maxLevel}`);
+                          } else if (minLevel != null) {
+                            metaParts.push(`Lv. ${minLevel}+`);
+                          } else if (maxLevel != null) {
+                            metaParts.push(`Up to Lv. ${maxLevel}`);
+                          }
+                        }
+                        if (method.chance != null) {
+                          metaParts.push(`${method.chance}%`);
+                        }
+                        if (descriptors.length > 0) {
+                          metaParts.push(descriptors.join(", "));
+                        }
+                        return (
+                          <li key={`${area.name}-${methodLabel}-${idx}`} className="game-modal-method">
+                            <span className="game-modal-method-label">{methodLabel}</span>
+                            {metaParts.length > 0 && (
+                              <span className="game-modal-method-meta">{metaParts.join(" • ")}</span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="game-modal-methods-empty">Encounter details unavailable.</div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="game-modal-empty">No wild encounter data for this game.</div>
+          )}
         </div>
       </div>
     </div>
