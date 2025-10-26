@@ -2135,6 +2135,18 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [gameAvailabilityLoading, setGameAvailabilityLoading] = useState(false);
   const [gameAvailabilityError, setGameAvailabilityError] = useState(null);
   const [activeGame, setActiveGame] = useState(null);
+  const latestCatchGame = useMemo(() => {
+    if (!Array.isArray(gameAvailability) || gameAvailability.length === 0) {
+      return null;
+    }
+    return gameAvailability[gameAvailability.length - 1];
+  }, [gameAvailability]);
+  const latestCatchLogos = useMemo(() => {
+    if (!latestCatchGame) return [];
+    return (latestCatchGame.logos || [])
+      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+      .filter(Boolean);
+  }, [latestCatchGame]);
   useEffect(() => {
     setNatureOverlayName(null);
   }, [id]);
@@ -2668,6 +2680,11 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     setAbilityLoading(false);
   }, []);
 
+  const handleCatchModalOpen = useCallback(() => {
+    if (!latestCatchGame) return;
+    setActiveGame(latestCatchGame);
+  }, [latestCatchGame]);
+
   const handleGameSelection = useCallback((game) => {
     if (!game) return;
     setActiveGame(game);
@@ -2950,7 +2967,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               </div>
             </section>
             <div className="weak-resist">
-                      <div className="matchup-box weak-matchup">
+              <div className="matchup-box weak-matchup">
                 <div className="matchup-title">Weak To</div>
                 <div className="types">
                   {weaknesses.length === 0 ? (
@@ -2966,7 +2983,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 </div>
               </div>
               <div className="matchup-box resist-matchup">
-        <div className="matchup-title">Resists</div>
+                <div className="matchup-title">Resists</div>
                 <div className="types">
                   {resistances.length === 0 ? (
                     <span className="type-chip skeleton" />
@@ -3032,7 +3049,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             </section>
             {evoPaths.length > 0 && (
               <section className="evo-section">
-                <h3 className="section-title">Evolution</h3>
                 <div className="evo-tree">
                   {evolutionTree.length > 0 ? (
                     <ul className="evo-tree-roots">
@@ -3046,46 +3062,42 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 </div>
               </section>
             )}
-            <section className="catch-section single-col">
-              <h3 className="section-title">Catch Locations</h3>
+            <section className="catch-section single-col catch-section-inline">
               {gameAvailabilityLoading ? (
                 <div className="catch-loading">Loading encounter data...</div>
               ) : gameAvailabilityError ? (
                 <div className="catch-error">{gameAvailabilityError}</div>
-              ) : gameAvailability.length > 0 ? (
-                <div className="catch-pill-grid">
-                  {gameAvailability.map((game) => {
-                    const logoUrls = (game.logos || [])
-                      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-                      .filter(Boolean);
-                    return (
-                      <button
-                        key={game.version}
-                        type="button"
-                        className="catch-pill"
-                        onClick={() => handleGameSelection(game)}
-                        aria-label={`View catch locations for ${name} in ${game.label}`}
-                      >
-                        {logoUrls.length > 0 && (
-                          <span className="catch-pill-logos" aria-hidden="true">
-                            {logoUrls.map((src) => (
-                              <img key={src} src={src} alt="" className="catch-pill-logo" />
-                            ))}
-                          </span>
-                        )}
-                        <span className="catch-pill-text">
-                          <span className="catch-pill-label">{game.label}</span>
-                          <span className="catch-pill-summary">{game.summary}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+              ) : gameAvailability.length > 0 && latestCatchGame ? (
+                <button
+                  type="button"
+                  className="catch-pill catch-trigger-button"
+                  onClick={handleCatchModalOpen}
+                  aria-label={`View catch locations for ${name || "this Pokemon"} across ${gameAvailability.length} ${gameAvailability.length === 1 ? "game" : "games"}`}
+                >
+                  {latestCatchLogos.length > 0 && (
+                    <span className="catch-pill-logos" aria-hidden="true">
+                      {latestCatchLogos.map((src) => (
+                        <img key={src} src={src} alt="" className="catch-pill-logo" />
+                      ))}
+                    </span>
+                  )}
+                  <span className="catch-trigger-text">
+                    <span className="catch-trigger-primary">View Catch Locations</span>
+                    <span className="catch-trigger-secondary">
+                      {gameAvailability.length === 1
+                        ? `Available in ${latestCatchGame.label}`
+                        : `Latest: ${latestCatchGame.label}`}
+                    </span>
+                  </span>
+                  <span className="catch-trigger-count">
+                    {gameAvailability.length} {gameAvailability.length === 1 ? "game" : "games"}
+                  </span>
+                </button>
               ) : (
                 <div className="catch-empty">No wild encounter data for this Pokemon.</div>
               )}
             </section>
-  </div>
+          </div>
         </div>
         {details && (
           <>
@@ -3102,7 +3114,13 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         />
       )}
       {activeGame && (
-        <GameAvailabilityModal game={activeGame} pokemonName={name} onClose={closeGameModal} />
+        <GameAvailabilityModal
+          games={gameAvailability}
+          activeGame={activeGame}
+          pokemonName={name}
+          onClose={closeGameModal}
+          onSelectGame={handleGameSelection}
+        />
       )}
       {activeAbility && (
         <AbilityOverlay
@@ -3526,8 +3544,14 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
   );
 }
 
-function GameAvailabilityModal({ game, pokemonName, onClose }) {
-  const titleId = game?.version ? `game-modal-title-${game.version}` : undefined;
+function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSelectGame }) {
+  const gameList = Array.isArray(games) ? games : [];
+  const activeVersion = activeGame?.version;
+  const selectedGame =
+    activeVersion != null
+      ? gameList.find((entry) => entry.version === activeVersion) || activeGame
+      : gameList[gameList.length - 1] || activeGame || null;
+  const titleId = selectedGame?.version ? `game-modal-title-${selectedGame.version}` : undefined;
   const displayPokemonName = pokemonName ? toTitleCase(pokemonName) : "";
 
   useEffect(() => {
@@ -3541,7 +3565,7 @@ function GameAvailabilityModal({ game, pokemonName, onClose }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  if (!game) return null;
+  if (!selectedGame) return null;
 
   const handleBackdropMouseDown = (event) => {
     event.stopPropagation();
@@ -3552,17 +3576,25 @@ function GameAvailabilityModal({ game, pokemonName, onClose }) {
     event.stopPropagation();
   };
 
+  const handleSelectGame = useCallback(
+    (entry) => {
+      if (!entry || entry.version === selectedGame.version) return;
+      onSelectGame?.(entry);
+    },
+    [onSelectGame, selectedGame?.version],
+  );
+
   const logoUrls = useMemo(() => {
-    if (!Array.isArray(game?.logos)) return [];
-    return game.logos
+    if (!Array.isArray(selectedGame?.logos)) return [];
+    return selectedGame.logos
       .map((logo) => GAME_LOGO_LOOKUP.get(logo))
       .filter(Boolean);
-  }, [game?.logos]);
+  }, [selectedGame?.logos]);
 
-  const areaList = Array.isArray(game.areas) ? game.areas : [];
+  const areaList = Array.isArray(selectedGame.areas) ? selectedGame.areas : [];
   const locationSummary =
-    game.totalLocations > 0 && game.totalMethods > 0
-      ? `${game.totalLocations} ${game.totalLocations === 1 ? "location" : "locations"}`
+    selectedGame.totalLocations > 0 && selectedGame.totalMethods > 0
+      ? `${selectedGame.totalLocations} ${selectedGame.totalLocations === 1 ? "location" : "locations"}`
       : "No wild encounters";
 
   return (
@@ -3585,7 +3617,7 @@ function GameAvailabilityModal({ game, pokemonName, onClose }) {
                 <span className="game-modal-title-sep"> in </span>
               </>
             )}
-            <span className="game-modal-title-game">{game.label}</span>
+            <span className="game-modal-title-game">{selectedGame.label}</span>
           </h2>
           {logoUrls.length > 0 && (
             <span className="game-modal-logos" aria-hidden="true">
@@ -3597,7 +3629,8 @@ function GameAvailabilityModal({ game, pokemonName, onClose }) {
           <p className="game-modal-subtitle">{locationSummary}</p>
         </header>
         <div className="game-modal-body">
-          {areaList.length > 0 ? (
+          <div className="game-modal-column game-modal-column-left">
+            {areaList.length > 0 ? (
             <ul className="game-modal-area-list">
               {areaList.map((area) => (
                 <li key={area.name} className="game-modal-area">
@@ -3644,6 +3677,44 @@ function GameAvailabilityModal({ game, pokemonName, onClose }) {
           ) : (
             <div className="game-modal-empty">No wild encounter data for this game.</div>
           )}
+          </div>
+          <aside className="game-modal-column game-modal-column-right">
+            <h3 className="game-modal-games-title">Available Games</h3>
+            {gameList.length > 0 ? (
+              <ul className="game-modal-game-options">
+                {gameList.map((entry) => {
+                  const isActive = entry.version === selectedGame.version;
+                  const optionLogos = (entry.logos || [])
+                    .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+                    .filter(Boolean);
+                  return (
+                    <li key={entry.version}>
+                      <button
+                        type="button"
+                        className={`game-modal-game-button${isActive ? " is-active" : ""}`}
+                        onClick={() => handleSelectGame(entry)}
+                        aria-current={isActive ? "true" : undefined}
+                      >
+                        {optionLogos.length > 0 && (
+                          <span className="game-modal-game-logos" aria-hidden="true">
+                            {optionLogos.map((src) => (
+                              <img key={src} src={src} alt="" className="game-modal-game-logo" />
+                            ))}
+                          </span>
+                        )}
+                        <span className="game-modal-game-info">
+                          <span className="game-modal-game-name">{entry.label}</span>
+                          <span className="game-modal-game-summary">{entry.summary}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="game-modal-game-empty">No other games available.</div>
+            )}
+          </aside>
         </div>
       </div>
     </div>
