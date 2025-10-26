@@ -1454,6 +1454,99 @@ const abilityCache = new Map();
 const natureDetailsCache = new Map();
 let cachedNatureList = null;
 
+const NEUTRAL_NATURE_KEY = "neutral";
+const NATURE_STAT_ORDER = new Map([
+  ["attack", 0],
+  ["defense", 1],
+  ["special-attack", 2],
+  ["special-defense", 3],
+  ["speed", 4],
+  [NEUTRAL_NATURE_KEY, 5],
+]);
+
+const NATURE_STAT_LABELS = new Map([
+  ["attack", "Attack"],
+  ["defense", "Defense"],
+  ["special-attack", "Sp. Atk"],
+  ["special-defense", "Sp. Def"],
+  ["speed", "Speed"],
+  [NEUTRAL_NATURE_KEY, "Neutral"],
+]);
+
+const NATURE_SUMMARIES = new Map([
+  ["adamant", { raises: "attack", lowers: "special-attack" }],
+  ["bashful", { raises: null, lowers: null }],
+  ["bold", { raises: "defense", lowers: "attack" }],
+  ["brave", { raises: "attack", lowers: "speed" }],
+  ["calm", { raises: "special-defense", lowers: "attack" }],
+  ["careful", { raises: "special-defense", lowers: "special-attack" }],
+  ["docile", { raises: null, lowers: null }],
+  ["gentle", { raises: "special-defense", lowers: "defense" }],
+  ["hardy", { raises: null, lowers: null }],
+  ["hasty", { raises: "speed", lowers: "defense" }],
+  ["impish", { raises: "defense", lowers: "special-attack" }],
+  ["jolly", { raises: "speed", lowers: "special-attack" }],
+  ["lax", { raises: "defense", lowers: "special-defense" }],
+  ["lonely", { raises: "attack", lowers: "defense" }],
+  ["mild", { raises: "special-attack", lowers: "defense" }],
+  ["modest", { raises: "special-attack", lowers: "attack" }],
+  ["naive", { raises: "speed", lowers: "special-defense" }],
+  ["naughty", { raises: "attack", lowers: "special-defense" }],
+  ["quiet", { raises: "special-attack", lowers: "speed" }],
+  ["quirky", { raises: null, lowers: null }],
+  ["rash", { raises: "special-attack", lowers: "special-defense" }],
+  ["relaxed", { raises: "defense", lowers: "speed" }],
+  ["sassy", { raises: "special-defense", lowers: "speed" }],
+  ["serious", { raises: null, lowers: null }],
+  ["timid", { raises: "speed", lowers: "attack" }],
+]);
+
+function sortNatureEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .slice()
+    .sort((a, b) => {
+      const orderA = a?.sortIndex ?? NATURE_STAT_ORDER.size;
+      const orderB = b?.sortIndex ?? NATURE_STAT_ORDER.size;
+      if (orderA !== orderB) return orderA - orderB;
+      const nameA = a?.name ?? "";
+      const nameB = b?.name ?? "";
+      return nameA.localeCompare(nameB);
+    });
+}
+
+function decorateNatureEntry(name, url) {
+  const normalized = String(name || "").toLowerCase();
+  const summary = NATURE_SUMMARIES.get(normalized) || {};
+  const raises = summary.raises ?? null;
+  const lowers = summary.lowers ?? null;
+  const primaryKey = raises ?? NEUTRAL_NATURE_KEY;
+  const sortIndex = NATURE_STAT_ORDER.get(primaryKey) ?? NATURE_STAT_ORDER.size;
+  return {
+    name: normalized,
+    url,
+    raises,
+    lowers,
+    primaryStat: raises ?? null,
+    sortIndex,
+  };
+}
+
+function normalizeNatureEntries(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  return sortNatureEntries(
+    entries
+      .map((entry) => {
+        if (!entry) return null;
+        if (entry.sortIndex != null && entry.name) {
+          return entry;
+        }
+        return decorateNatureEntry(entry.name, entry.url);
+      })
+      .filter(Boolean),
+  );
+}
+
 // Simple global fetch queue to limit concurrent requests
 let IN_FLIGHT = 0;
 const MAX_CONCURRENT = 6;
@@ -2371,21 +2464,21 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               <div className="toggle-group">
                 <button
                   type="button"
-                  className={`toggle-btn${animated ? " is-on" : ""}`}
+                  className={`toggle-btn detail-toggle${animated ? " is-on" : ""}`}
                   onClick={() => setAnimated((v) => !v)}
                   aria-pressed={animated}
                   title={animated ? "Use HD static sprite" : "Use animated sprite"}
                 >
-                  🎞️ Animate
+                  <span className="toggle-label">Animate</span>
                 </button>
                 <button
                   type="button"
-                  className={`toggle-btn${shiny ? " is-on" : ""}`}
+                  className={`toggle-btn detail-toggle${shiny ? " is-on" : ""}`}
                   onClick={() => setShiny((v) => !v)}
                   aria-pressed={shiny}
                   title={shiny ? "Show default variant" : "Show shiny variant"}
                 >
-                  ✨ Shiny
+                  <span className="toggle-label">Shiny</span>
                 </button>
               </div>
             </div>
@@ -2594,8 +2687,10 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
   const [natureData, setNatureData] = useState(initialNatureData);
   const [natureLoading, setNatureLoading] = useState(() => !!initialSelectedNature && !initialNatureData);
   const [natureError, setNatureError] = useState(null);
-  const [natureList, setNatureList] = useState(() => cachedNatureList);
-  const [listLoading, setListLoading] = useState(() => !cachedNatureList);
+  const [natureList, setNatureList] = useState(() => normalizeNatureEntries(cachedNatureList));
+  const [listLoading, setListLoading] = useState(
+    () => !Array.isArray(cachedNatureList) || cachedNatureList.length === 0,
+  );
   const [listError, setListError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -2617,7 +2712,9 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
 
   useEffect(() => {
     if (cachedNatureList) {
-      setNatureList(cachedNatureList);
+      const normalized = normalizeNatureEntries(cachedNatureList);
+      cachedNatureList = normalized;
+      setNatureList(normalized);
       setListLoading(false);
       return;
     }
@@ -2633,14 +2730,14 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
       })
       .then((data) => {
         if (ignore) return;
-        const list = Array.isArray(data?.results)
+        const decorated = Array.isArray(data?.results)
           ? data.results
               .filter((entry) => entry?.name)
-              .map((entry) => ({ name: entry.name.toLowerCase(), url: entry.url }))
-              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((entry) => decorateNatureEntry(entry.name, entry.url))
           : [];
-        cachedNatureList = list;
-        setNatureList(list);
+        const normalized = sortNatureEntries(decorated);
+        cachedNatureList = normalized;
+        setNatureList(normalized);
         setListLoading(false);
       })
       .catch(() => {
@@ -2700,6 +2797,11 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
     if (!query) return natureList;
     return natureList.filter((entry) => entry.name.includes(query));
   }, [natureList, searchTerm]);
+
+  const getStatLabel = (stat) => {
+    if (!stat) return "";
+    return NATURE_STAT_LABELS.get(stat) || humanizeName(stat);
+  };
 
   const likesFlavor = natureData?.likes_flavor?.name || null;
   const hatesFlavor = natureData?.hates_flavor?.name || null;
@@ -2792,6 +2894,9 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
               <>
                 <div className="nature-section">
                   <h3 className="nature-section-title">Stat Changes</h3>
+                  <p className="nature-section-description">
+                    Natures apply a 10% modifier to the listed stats during battle, boosting one stat while lowering another.
+                  </p>
                   {isNeutralNature ? (
                     <div className="nature-neutral-card">This nature does not alter stats.</div>
                   ) : (
@@ -2818,6 +2923,9 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
                 {(likesFlavor || hatesFlavor) && (
                   <div className="nature-section">
                     <h3 className="nature-section-title">Flavor Preferences</h3>
+                    <p className="nature-section-description">
+                      Influences which Berry flavors this Pokemon enjoys or dislikes when making Pokeblocks or Poffins.
+                    </p>
                     <div className="nature-highlight-grid">
                       {likesFlavor && (
                         <div className="nature-highlight nature-highlight-flavor-like">
@@ -2841,6 +2949,9 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
                 {battlePreferences.length > 0 && (
                   <div className="nature-section">
                     <h3 className="nature-section-title">Move Style Preference</h3>
+                    <p className="nature-section-description">
+                      Used in the Battle Palace to decide whether the AI favors attacking, defensive, or support moves at different HP ranges.
+                    </p>
                     <ul className="nature-info-list">
                       {battlePreferences.map((pref) => (
                         <li key={pref.style} className="nature-info-card">
@@ -2865,6 +2976,9 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
                 {pokeathlonChanges.length > 0 && (
                   <div className="nature-section">
                     <h3 className="nature-section-title">Pokeathlon Impact</h3>
+                    <p className="nature-section-description">
+                      Adjusts the stats used during the HeartGold and SoulSilver Pokeathlon events.
+                    </p>
                     <ul className="nature-info-list">
                       {pokeathlonChanges.map((entry) => (
                         <li key={entry.stat} className="nature-info-card">
@@ -2910,6 +3024,7 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
                 {filteredNatures.map((entry) => {
                   const isActive = entry.name === selectedNature;
                   const isRecommended = entry.name === recommendedNormalized;
+                  const hasStatChange = Boolean(entry.primaryStat);
                   return (
                     <li key={entry.name}>
                       <button
@@ -2918,7 +3033,25 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
                         onClick={() => handleNatureSelect(entry.name)}
                         aria-pressed={isActive}
                       >
-                        <span className="nature-item-name text-capitalize">{humanizeName(entry.name)}</span>
+                        <div className="nature-item-main">
+                          <span className="nature-item-name text-capitalize">{humanizeName(entry.name)}</span>
+                          <div className={`nature-item-statline${hasStatChange ? "" : " is-neutral"}`}>
+                            {hasStatChange ? (
+                              <>
+                                <span className="nature-item-chip nature-item-chip-positive">
+                                  +{getStatLabel(entry.raises)}
+                                </span>
+                                {entry.lowers && (
+                                  <span className="nature-item-chip nature-item-chip-negative">
+                                    -{getStatLabel(entry.lowers)}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="nature-item-chip nature-item-chip-neutral">No stat change</span>
+                            )}
+                          </div>
+                        </div>
                         {isRecommended && <span className="nature-item-tag">Recommended</span>}
                       </button>
                     </li>
@@ -3320,4 +3453,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
 }
 
 export default App;
+
+
+
 

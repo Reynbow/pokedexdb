@@ -48,6 +48,129 @@
   color: #bfdbfe;
 }
 
+.api-toggle {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  margin: 24px auto 18px;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 999px;
+}
+
+.toggle-btn {
+  border: none;
+  background: transparent;
+  color: #cbd5f5;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.toggle-btn:hover,
+.toggle-btn:focus {
+  color: #f8fafc;
+  background: rgba(59, 130, 246, 0.22);
+  outline: none;
+}
+
+.toggle-btn.is-active {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.9), rgba(59, 130, 246, 0.75));
+  color: #0f172a;
+  box-shadow: 0 8px 18px rgba(59, 130, 246, 0.35);
+}
+
+.pokemon-selector {
+  display: grid;
+  gap: 12px;
+  margin: 20px auto 28px;
+  max-width: 720px;
+  text-align: left;
+}
+
+.selector-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.pokemon-search-input {
+  flex: 1 1 220px;
+  min-width: 200px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  font-size: 14px;
+  transition: border 150ms ease, box-shadow 150ms ease;
+}
+
+.pokemon-search-input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+.sprite-select {
+  min-width: 140px;
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  font-size: 14px;
+  align-self: flex-start;
+  transition: border 150ms ease, box-shadow 150ms ease;
+}
+
+.sprite-select:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+.selector-apply-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.2);
+  color: #e0f2fe;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.selector-apply-btn:hover,
+.selector-apply-btn:focus {
+  background: rgba(59, 130, 246, 0.35);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.selector-hint {
+  font-size: 13px;
+  color: #a3bffa;
+}
+
+.selector-error {
+  font-size: 13px;
+  color: #fca5a5;
+}
+
 .test-header h1 {
   font-size: 40px;
   margin: 0 0 12px;
@@ -110,6 +233,192 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
+}
+
+.flavor-text {
+  margin: 18px 0 0;
+  font-size: 15px;
+  color: #cbd5f5;
+  line-height: 1.6;
+}
+
+.profile-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.profile-sprite {
+  flex: 0 0 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.6);
+  padding: 16px;
+}
+
+.sprite-image {
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+}
+
+.sprite-placeholder {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.profile-summary {
+  flex: 1 1 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.profile-card {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.6);
+  padding: 18px;
+}
+
+.profile-card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: #f1f5f9;
+}
+
+.ability-list,
+.stat-list,
+.move-preview,
+.pill-list,
+.catalog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ability-list li,
+.move-preview li,
+.catalog-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #dbeafe;
+}
+
+.ability-tag {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(14, 165, 233, 0.14);
+  color: #bae6fd;
+}
+
+.stat-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #cbd5f5;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.pill-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.14);
+  color: #dbeafe;
+  font-size: 12px;
+}
+
+.move-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-left: 8px;
+}
+
+.sprite-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.sprite-column {
+  flex: 1 1 320px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sprite-column h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #f1f5f9;
+}
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.catalog-card {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 18px;
+}
+
+.catalog-card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: #f1f5f9;
+}
+
+.catalog-list a {
+  color: #bfdbfe;
+  text-decoration: none;
+}
+
+.catalog-list a:hover,
+.catalog-list a:focus {
+  text-decoration: underline;
 }
 
 .summary-grid .label,
@@ -290,6 +599,58 @@
   border: 1px solid rgba(148, 163, 184, 0.15);
 }
 
+.endpoint-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.endpoint-row {
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 16px;
+  padding: 14px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.endpoint-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.endpoint-main a {
+  color: #bfdbfe;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.endpoint-main a:hover,
+.endpoint-main a:focus {
+  color: #f8fafc;
+  text-decoration: underline;
+}
+
+.endpoint-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #94a3b8;
+  word-break: break-all;
+}
+
+.endpoint-description {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -347,6 +708,25 @@
   text-decoration: underline;
 }
 
+.api-retry-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.2);
+  color: #e2e8f0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.api-retry-btn:hover,
+.api-retry-btn:focus {
+  background: rgba(59, 130, 246, 0.35);
+  transform: translateY(-1px);
+  outline: none;
+}
+
 @media (max-width: 700px) {
   .test-page {
     padding: 32px 18px 64px;
@@ -368,5 +748,43 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .api-toggle {
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .toggle-btn {
+    flex: 1 1 auto;
+  }
+
+  .selector-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pokemon-search-input,
+  .pokemon-select,
+  .sprite-select {
+    min-width: 0;
+  }
+
+  .profile-overview {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profile-sprite {
+    justify-content: center;
+  }
+
+  .sprite-gallery {
+    flex-direction: column;
+  }
+
+  .sprite-column {
+    flex: 1 1 auto;
+  }
 }
+
 
