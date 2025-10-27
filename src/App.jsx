@@ -180,32 +180,32 @@ const EV_ITEM_GUIDE = [
 const FEATHER_VARIANTS = {
   hp: {
     name: "Health Feather",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/health-feather.png",
+    icon: "/items/health-feather.png",
     order: 10,
   },
   attack: {
     name: "Muscle Feather",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-feather.png",
+    icon: "/items/muscle-feather.png",
     order: 11,
   },
   defense: {
     name: "Resist Feather",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/resist-feather.png",
+    icon: "/items/resist-feather.png",
     order: 12,
   },
   "special-attack": {
     name: "Genius Feather",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/genius-feather.png",
+    icon: "/items/genius-feather.png",
     order: 13,
   },
   "special-defense": {
     name: "Clever Feather",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/clever-feather.png",
+    icon: "/items/clever-feather.png",
     order: 14,
   },
   speed: {
     name: "Swift Feather",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/swift-feather.png",
+    icon: "/items/swift-feather.png",
     order: 15,
   },
 };
@@ -492,6 +492,7 @@ const VERSION_LOGO_FILES = new Map([
   ["violet", "violet.png"],
   ["lets-go-pikachu", "letsgopikachu.png"],
   ["lets-go-eevee", "letsgoeevee.png"],
+  ["legends-za", "za.png"],
 ]);
 
 const VERSION_RELEASE_SEQUENCE = [
@@ -532,6 +533,7 @@ const VERSION_RELEASE_SEQUENCE = [
   "legends-arceus",
   "scarlet",
   "violet",
+  "legends-za",
 ];
 
 const VERSION_ORDER_LOOKUP = new Map(
@@ -1146,6 +1148,103 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
 
   return includeDefault ? entries : entries.filter((entry) => !entry.isDefault);
 };
+
+function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pokemonName }) {
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  const getVersionLogo = (versionName) => {
+    const logoFile = VERSION_LOGO_FILES.get(versionName);
+    return logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
+  };
+
+  // Sort versions by release date
+  const sortedVersions = useMemo(() => {
+    return [...versions].sort((a, b) => {
+      const indexA = VERSION_RELEASE_SEQUENCE.indexOf(a.name);
+      const indexB = VERSION_RELEASE_SEQUENCE.indexOf(b.name);
+      
+      // If both in sequence, sort by index
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      // If only one in sequence, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      // If neither in sequence, maintain original order
+      return 0;
+    });
+  }, [versions]);
+
+  return (
+    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="game-modal"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={handleModalMouseDown}
+        style={{ width: "min(560px, 90vw)" }}
+      >
+        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close">
+          X
+        </button>
+        <div className="game-modal-header">
+          <h2 className="game-modal-title">
+            Pokedex Entries for <span className="game-modal-title-name text-capitalize">{pokemonName}</span>
+          </h2>
+          <p className="game-modal-subtitle">
+            Select a version to view its Pokedex entry
+          </p>
+        </div>
+        <div className="game-modal-body" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="game-modal-column game-modal-column-left" style={{ overflowY: "auto" }}>
+            <ul className="game-modal-game-options">
+              {sortedVersions.map((version) => {
+                const logo = getVersionLogo(version.name);
+                const isSelected = version.name === selectedVersion;
+                return (
+                  <li key={version.name}>
+                    <button
+                      type="button"
+                      className={`game-modal-game-button${isSelected ? " is-active" : ""}`}
+                      onClick={() => onSelect(version.name)}
+                    >
+                      {logo && (
+                        <span className="game-modal-game-logos">
+                          <img src={logo} alt="" className="game-modal-game-logo" />
+                        </span>
+                      )}
+                      <div className="game-modal-game-info">
+                        <div className="game-modal-game-name text-capitalize">{version.displayName}</div>
+                        {version.text && (
+                          <div className="game-modal-game-summary" style={{ 
+                            fontSize: "0.8rem", 
+                            color: "#94a3b8",
+                            fontStyle: "italic",
+                            lineHeight: "1.3",
+                            marginTop: "4px"
+                          }}>
+                            {version.text}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [pokemon, setPokemon] = useState([]);
@@ -2351,6 +2450,8 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [gameAvailabilityLoading, setGameAvailabilityLoading] = useState(false);
   const [gameAvailabilityError, setGameAvailabilityError] = useState(null);
   const [activeGame, setActiveGame] = useState(null);
+  const [selectedFlavorVersion, setSelectedFlavorVersion] = useState(null);
+  const [isFlavorModalOpen, setIsFlavorModalOpen] = useState(false);
   const hasRecommendedEvs = useMemo(() => {
     if (!smogonEvs || typeof smogonEvs !== "object") return false;
     return Object.values(smogonEvs).some((value) => typeof value === "number" && value > 0);
@@ -2377,8 +2478,97 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     return null;
   }, [selectedDex, selectedGame]);
   const preferLatestEvolution = selectedDex === "national" && !selectedGame;
+  
+  // Compute available flavor text versions
+  const flavorTextVersions = useMemo(() => {
+    if (!species?.flavor_text_entries || !Array.isArray(species.flavor_text_entries)) return [];
+    const englishEntries = species.flavor_text_entries.filter((entry) => entry?.language?.name === "en");
+    const versions = new Map();
+    englishEntries.forEach((entry) => {
+      const versionName = entry?.version?.name;
+      if (!versionName) return;
+      if (!versions.has(versionName)) {
+        versions.set(versionName, {
+          name: versionName,
+          displayName: humanizeName(versionName),
+          text: entry.flavor_text?.replace(/\s+/g, " ") || "",
+        });
+      }
+    });
+    return Array.from(versions.values()).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [species]);
+  
+  // Auto-select flavor text version based on selectedDex/selectedGame
+  useEffect(() => {
+    if (!flavorTextVersions.length) {
+      setSelectedFlavorVersion(null);
+      return;
+    }
+    
+    // If national dex is selected and no game is selected, default to latest version
+    if (selectedDex === "national" && !selectedGame) {
+      // Get the latest version by generation number
+      const latest = flavorTextVersions[flavorTextVersions.length - 1];
+      setSelectedFlavorVersion(latest?.name || null);
+      return;
+    }
+    
+    // If a specific dex is selected, try to match the game
+    if (selectedDex && selectedDex !== "national") {
+      const dexFilter = DEX_FILTERS.find((dex) => dex.key === selectedDex);
+      if (dexFilter && selectedGame) {
+        // Try to find a matching game version
+        const matching = flavorTextVersions.find((v) => 
+          v.name.includes(selectedGame.toLowerCase())
+        );
+        if (matching) {
+          setSelectedFlavorVersion(matching.name);
+          return;
+        }
+      }
+      // If no game match, default to first available
+      setSelectedFlavorVersion(flavorTextVersions[0]?.name || null);
+      return;
+    }
+    
+    // Default to first available
+    setSelectedFlavorVersion(flavorTextVersions[0]?.name || null);
+  }, [flavorTextVersions, selectedDex, selectedGame, species?.id]);
+  
+  // Get the selected flavor text
+  const selectedFlavorText = useMemo(() => {
+    if (!selectedFlavorVersion || !species?.flavor_text_entries) return null;
+    const entry = species.flavor_text_entries.find((e) => 
+      e?.language?.name === "en" && e?.version?.name === selectedFlavorVersion
+    );
+    return entry?.flavor_text?.replace(/\s+/g, " ") || null;
+  }, [species, selectedFlavorVersion]);
+  
+  // Get logo for current version
+  const currentVersionLogo = useMemo(() => {
+    if (!selectedFlavorVersion) return null;
+    // Map version name to logo file
+    const logoFile = VERSION_LOGO_FILES.get(selectedFlavorVersion);
+    return logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
+  }, [selectedFlavorVersion]);
+  
+  const openFlavorModal = useCallback(() => {
+    setIsFlavorModalOpen(true);
+  }, []);
+  
+  const closeFlavorModal = useCallback(() => {
+    setIsFlavorModalOpen(false);
+  }, []);
+  
+  const selectFlavorVersion = useCallback((versionName) => {
+    setSelectedFlavorVersion(versionName);
+    closeFlavorModal();
+  }, [closeFlavorModal]);
+  
   useEffect(() => {
     setNatureOverlayName(null);
+    setSelectedFlavorVersion(null);
+    setIsFlavorModalOpen(false);
   }, [id]);
   useEffect(() => {
     if (!hasRecommendedEvs) {
@@ -3645,6 +3835,47 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 })}
               </div>
             </section>
+            {flavorTextVersions.length > 0 && (
+              <section className="catch-section single-col" style={{ padding: "0 16px 16px", marginTop: "0px" }}>
+                <div className="matchup-box pokedex-entry-box">
+                  <div className="matchup-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <span>Pokedex Entry</span>
+                    {flavorTextVersions.length > 1 && currentVersionLogo && (
+                      <button
+                        type="button"
+                        onClick={openFlavorModal}
+                        style={{
+                          background: "transparent",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          borderRadius: "8px",
+                          padding: "4px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "border-color 0.15s ease, transform 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                        title="View all Pokedex entries"
+                      >
+                        <img src={currentVersionLogo} alt="" width={28} height={28} style={{ display: "block" }} />
+                      </button>
+                    )}
+                  </div>
+                  {selectedFlavorText && (
+                    <div style={{ fontSize: "0.9rem", color: "#cbd5f5", lineHeight: "1.5", fontStyle: "italic" }}>
+                      {selectedFlavorText}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
             {evoPaths.length > 0 && (
               <section className="evo-section">
                 <div className="evo-tree">
@@ -3739,6 +3970,15 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           currentPokemonId={id}
         />
       )}
+      {isFlavorModalOpen && flavorTextVersions.length > 0 && (
+        <PokedexEntriesModal
+          versions={flavorTextVersions}
+          selectedVersion={selectedFlavorVersion}
+          onSelect={selectFlavorVersion}
+          onClose={closeFlavorModal}
+          pokemonName={name}
+        />
+      )}
       <div style={{ maxHeight: 140, overflow: 'auto', background: 'rgba(0,0,0,0.25)', borderTop: '1px solid rgba(255,255,255,0.1)', padding: 8 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Debug</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8, marginBottom: 8 }}>
@@ -3778,10 +4018,12 @@ function RecommendedEvModal({ evs, stats, onClose }) {
       .filter(Boolean)
       .sort((a, b) => b.value - a.value);
   }, [evs, stats]);
+
   const totalRecommended = useMemo(
     () => evEntries.reduce((sum, entry) => sum + entry.value, 0),
     [evEntries],
   );
+  
   const recommendedStatKeys = useMemo(() => {
     const set = new Set();
     for (const entry of evEntries) {
@@ -3791,9 +4033,10 @@ function RecommendedEvModal({ evs, stats, onClose }) {
     }
     return set;
   }, [evEntries]);
-  const relevantItems = useMemo(() => {
+
+  const groupedItems = useMemo(() => {
     const hasEntries = evEntries.length > 0;
-    if (!hasEntries) return [];
+    if (!hasEntries) return {};
 
     const baseItems = [];
     const generalItems = [];
@@ -3821,13 +4064,48 @@ function RecommendedEvModal({ evs, stats, onClose }) {
           stat: statLabel,
           description: `+8 ${statLabel} EVs per battle while held (halves Speed in battle)`,
           icon: variant.icon,
+          category: "Held Items",
           order: variant.order ?? 0,
         };
       })
       .filter(Boolean)
       .sort((a, b) => a.order - b.order);
 
-    return [...baseItems, ...powerItems, ...generalItems];
+    const featherItems = Array.from(recommendedStatKeys)
+      .map((stat) => {
+        const variant = FEATHER_VARIANTS[stat];
+        if (!variant) return null;
+        const statLabel = humanizeName(stat);
+        return {
+          name: variant.name,
+          stat: statLabel,
+          description: `+1 ${statLabel} EV instantly`,
+          icon: variant.icon,
+          category: "Consumables",
+          order: variant.order ?? 100,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.order - b.order);
+
+    const allItems = [...baseItems, ...powerItems, ...featherItems, ...generalItems];
+
+    // Group items by category
+    const grouped = {};
+    allItems.forEach((item) => {
+      const category = item.category || "Other";
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(item);
+    });
+
+    // Sort items within each category
+    Object.keys(grouped).forEach((category) => {
+      grouped[category].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    });
+
+    return grouped;
   }, [recommendedStatKeys, evEntries]);
 
   useEffect(() => {
@@ -3876,45 +4154,55 @@ function RecommendedEvModal({ evs, stats, onClose }) {
           Smogon recommended EV spreads focus on maximizing the stats that matter most. Use the spread summary and
           training items below to reach the suggested build quickly.
         </p>
-        <div className="ev-modal-columns">
-          <section className="ev-modal-column">
+        <div className="ev-modal-content-layout">
+          <section className="ev-modal-column ev-modal-spread-column">
             <h4 className="ev-modal-subtitle">Recommended Spread</h4>
             <ul className="ev-modal-spread">
               {evEntries.map((entry) => (
                 <li key={entry.stat} className="ev-spread-row">
                   <span className="ev-spread-stat text-capitalize">{entry.label}</span>
-                  <span className="ev-spread-value">{entry.value} EVs</span>
+                  <span className="ev-spread-value">{entry.value}</span>
                   {entry.baseStat != null && <span className="ev-spread-base">Base {entry.baseStat}</span>}
                 </li>
               ))}
             </ul>
             <div className="ev-modal-total">Total recommended EVs: {totalRecommended}</div>
+            <div className="ev-modal-explanation">
+              <p className="ev-modal-explanation-text">
+                EVs increase stats in increments of 4. Every 4 EVs = +1 to the stat at level 100. The recommended spread 
+                optimizes stat gains without wasting EVs on values that don't reach the next breakpoint.
+              </p>
+            </div>
           </section>
-          <section className="ev-modal-column ev-modal-column-items">
-            <h4 className="ev-modal-subtitle">Items To Boost EVs</h4>
-            {relevantItems.length > 0 ? (
-              <ul className="ev-modal-items">
-                {relevantItems.map((item) => (
-                  <li key={item.name} className="ev-item-row">
-                    <div className="ev-item-header">
-                      {item.icon && (
-                        <span className="ev-item-icon">
-                          <img src={item.icon} alt={`${item.name} icon`} loading="lazy" />
-                        </span>
-                      )}
-                      <div className="ev-item-title">
-                        <span className="ev-item-name">{item.name}</span>
-                        <span className="ev-item-stat">{item.stat}</span>
-                      </div>
-                    </div>
-                    <div className="ev-item-description">{item.description}</div>
-                  </li>
-                ))}
-              </ul>
+          <div className="ev-modal-items-columns">
+            {Object.keys(groupedItems).length > 0 ? (
+              Object.entries(groupedItems).map(([category, items]) => (
+                <div key={category} className="ev-item-category">
+                  <h5 className="ev-item-category-title">{category}</h5>
+                  <ul className="ev-modal-items">
+                    {items.map((item) => (
+                      <li key={item.name} className="ev-item-row">
+                        <div className="ev-item-left">
+                          {item.icon && (
+                            <span className="ev-item-icon">
+                              <img src={item.icon} alt={`${item.name} icon`} loading="lazy" />
+                            </span>
+                          )}
+                          <div className="ev-item-title">
+                            <span className="ev-item-name">{item.name}</span>
+                            <span className="ev-item-stat">{item.stat}</span>
+                          </div>
+                        </div>
+                        <div className="ev-item-description">{item.description}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
             ) : (
               <div className="ev-modal-empty">No EV training items match this spread.</div>
             )}
-          </section>
+          </div>
         </div>
       </div>
     </div>

@@ -182,6 +182,11 @@ function TestPage() {
     types: null,
     lastUpdated: null,
   });
+  const [catchData, setCatchData] = useState({
+    loading: false,
+    error: null,
+    data: null,
+  });
   const [selectedSpriteKey, setSelectedSpriteKey] = useState(null);
   const [selectedShowdownVariant, setSelectedShowdownVariant] = useState(
     SHOWDOWN_VARIANTS[0].key
@@ -189,11 +194,13 @@ function TestPage() {
   const [selectedShowdownSlug, setSelectedShowdownSlug] = useState(null);
 
   useEffect(() => {
+    console.log('[TestPage] Initializing...');
     setSearchTerm(selectedPokemon ? humanizeResourceName(selectedPokemon) : "");
   }, [selectedPokemon]);
 
   useEffect(() => {
     let cancelled = false;
+    console.log('[TestPage] Pokemon list loader triggered', { hasList: pokemonOptions.list.length > 0, loading: pokemonOptions.loading });
     if (pokemonOptions.list.length > 0 || pokemonOptions.loading) {
       return;
     }
@@ -204,12 +211,14 @@ function TestPage() {
     }));
     const load = async () => {
       try {
+        console.log('[TestPage] Fetching Pokemon list from:', POKEMON_LIST_URL);
         const response = await fetch(POKEMON_LIST_URL);
         if (!response.ok) {
           throw new Error(`Unable to load Pokemon list (status ${response.status})`);
         }
         const payload = await response.json();
         if (cancelled) return;
+        console.log('[TestPage] Pokemon list loaded, processing results');
         const list = Array.isArray(payload?.results)
           ? payload.results.map((entry) => ({
               name: entry?.name || "",
@@ -217,12 +226,14 @@ function TestPage() {
               normalized: normalizeSpeciesName(entry?.name || ""),
             }))
           : [];
+        console.log('[TestPage] Processed', list.length, 'Pokemon');
         setPokemonOptions({
           loading: false,
           error: null,
           list,
         });
       } catch (error) {
+        console.error('[TestPage] Failed to load Pokemon list:', error);
         if (cancelled) return;
         setPokemonOptions({
           loading: false,
@@ -426,6 +437,43 @@ function TestPage() {
     };
   }, [selectedPokemon]);
 
+  // Fetch catch location data
+  useEffect(() => {
+    console.log('[TestPage] Catch data loader triggered', { 
+      speciesId: pokeDetails.species?.id, 
+      pokemonId: pokeDetails.data?.id 
+    });
+    if (!pokeDetails.species?.id) {
+      setCatchData({ loading: false, error: null, data: null });
+      return;
+    }
+    let cancelled = false;
+    setCatchData({ loading: true, error: null, data: null });
+    const load = async () => {
+      try {
+        const url = `${POKEAPI_BASE}pokemon/${pokeDetails.data?.id}/encounters`;
+        console.log('[TestPage] Fetching encounter data from:', url);
+        const response = await fetch(url);
+        if (cancelled) return;
+        if (!response.ok) {
+          throw new Error(`Failed to load encounter data (status ${response.status})`);
+        }
+        const data = await response.json();
+        if (cancelled) return;
+        console.log('[TestPage] Encounter data loaded, locations:', data.length);
+        setCatchData({ loading: false, error: null, data });
+      } catch (error) {
+        console.error('[TestPage] Failed to load encounter data:', error);
+        if (cancelled) return;
+        setCatchData({ loading: false, error: error.message || String(error), data: null });
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [pokeDetails.species?.id, pokeDetails.data?.id]);
+
   const spriteOptions = useMemo(() => {
     if (!pokeDetails.data?.sprites) return [];
     const flattened = flattenSprites(pokeDetails.data.sprites);
@@ -563,8 +611,8 @@ function TestPage() {
 
   useEffect(() => {
     if (activeApi !== "pokeapi") return;
-    if (pokeCatalog.loading) return;
-    if (pokeCatalog.items && pokeCatalog.abilities && pokeCatalog.moves && pokeCatalog.types) {
+    // Skip if already loaded or currently loading
+    if (pokeCatalog.loading || (pokeCatalog.items && pokeCatalog.abilities && pokeCatalog.moves && pokeCatalog.types)) {
       return;
     }
     let cancelled = false;
@@ -627,15 +675,7 @@ function TestPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    activeApi,
-    pokeCatalog.abilities,
-    pokeCatalog.error,
-    pokeCatalog.items,
-    pokeCatalog.loading,
-    pokeCatalog.moves,
-    pokeCatalog.types,
-  ]);
+  }, [activeApi]);
 
   const handlePokeRetry = useCallback(() => {
     setPokeRoot({
@@ -1081,7 +1121,7 @@ function TestPage() {
     const typeList = Array.isArray(pokemonData?.types)
       ? pokemonData.types.map((entry) => entry?.type?.name).filter(Boolean)
       : [];
-    const abilityList = Array.isArray(pokemonData?.abilities)
+    const allAbilities = Array.isArray(pokemonData?.abilities)
       ? pokemonData.abilities
           .map((entry) => ({
             name: entry?.ability?.name,
@@ -1089,6 +1129,10 @@ function TestPage() {
           }))
           .filter((entry) => entry.name)
       : [];
+    
+    // Separate regular abilities from hidden abilities
+    const regularAbilities = allAbilities.filter((ability) => !ability.hidden);
+    const hiddenAbilities = allAbilities.filter((ability) => ability.hidden);
     const statsList = Array.isArray(pokemonData?.stats)
       ? pokemonData.stats
           .map((entry) => ({
@@ -1195,7 +1239,7 @@ function TestPage() {
                     </div>
                     <div>
                       <span className="label">Ability Count</span>
-                      <span className="value">{abilityList.length}</span>
+                      <span className="value">{allAbilities.length}</span>
                     </div>
                   </div>
                   {englishFlavorText && (
@@ -1204,14 +1248,13 @@ function TestPage() {
                 </div>
               </div>
               <div className="profile-details-grid">
-                {abilityList.length > 0 && (
+                {regularAbilities.length > 0 && (
                   <article className="profile-card">
                     <h3>Abilities</h3>
                     <ul className="ability-list">
-                      {abilityList.map((ability) => (
+                      {regularAbilities.map((ability) => (
                         <li key={ability.name}>
                           <span className="text-capitalize">{ability.name}</span>
-                          {ability.hidden && <span className="ability-tag">Hidden</span>}
                         </li>
                       ))}
                     </ul>
@@ -1259,6 +1302,18 @@ function TestPage() {
                   </article>
                 )}
               </div>
+              {hiddenAbilities.length > 0 && (
+                <article className="profile-card" style={{ marginTop: '1.5rem' }}>
+                  <h3>Hidden Ability</h3>
+                  <ul className="ability-list">
+                    {hiddenAbilities.map((ability) => (
+                      <li key={ability.name}>
+                        <span className="text-capitalize">{ability.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              )}
             </>
           ) : (
             <p className="test-status muted">
@@ -1363,6 +1418,66 @@ function TestPage() {
               )}
             </div>
           </div>
+        </section>
+
+        <section className="test-section">
+          <div className="section-heading">
+            <h2>Catch Locations by Game</h2>
+            <span className="section-meta">
+              {catchData.loading ? "Loading" : catchData.data?.length || 0} locations
+            </span>
+          </div>
+          {catchData.loading && <p className="test-status">Loading encounter data…</p>}
+          {catchData.error && <p className="test-status error">{catchData.error}</p>}
+          {catchData.data && Array.isArray(catchData.data) && catchData.data.length > 0 ? (
+            <div className="catch-locations">
+              {catchData.data.map((location, idx) => {
+                const locationArea = location?.location_area?.name;
+                const versionDetails = Array.isArray(location?.version_details) ? location.version_details : [];
+                return (
+                  <article key={idx} className="catch-location-card">
+                    <h3>{locationArea ? humanizeResourceName(locationArea) : `Location ${idx + 1}`}</h3>
+                    <div className="version-list">
+                      {versionDetails.map((detail, detailIdx) => {
+                        const version = detail?.version?.name;
+                        const encounters = Array.isArray(detail?.encounter_details) ? detail.encounter_details : [];
+                        if (!version || encounters.length === 0) return null;
+                        return (
+                          <div key={detailIdx} className="version-entry">
+                            <h4>{humanizeResourceName(version)}</h4>
+                            <ul className="encounter-list">
+                              {encounters.map((encounter, encIdx) => {
+                                const method = encounter?.method?.name;
+                                const minLevel = encounter?.min_level;
+                                const maxLevel = encounter?.max_level;
+                                const chance = encounter?.chance;
+                                const timeOfDay = encounter?.time_of_day;
+                                return (
+                                  <li key={encIdx} className="encounter-item">
+                                    <span className="text-capitalize">{method || "Unknown"}</span>
+                                    {minLevel && maxLevel && (
+                                      <span className="level-range">Lv {minLevel}-{maxLevel}</span>
+                                    )}
+                                    {minLevel && !maxLevel && (
+                                      <span className="level-range">Lv {minLevel}</span>
+                                    )}
+                                    {chance && <span className="chance">({chance}%)</span>}
+                                    {timeOfDay && <span className="text-capitalize">{timeOfDay}</span>}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : catchData.data && Array.isArray(catchData.data) && catchData.data.length === 0 ? (
+            <p className="test-status muted">No wild encounter data available for this Pokemon.</p>
+          ) : null}
         </section>
 
         <section className="test-section">
@@ -1510,6 +1625,9 @@ function TestPage() {
     );
   }, [
     activeSprite,
+    catchData.data,
+    catchData.error,
+    catchData.loading,
     englishFlavorText,
     handlePokeRetry,
     pokeCatalog.abilities,
@@ -1602,11 +1720,6 @@ function TestPage() {
               Load
             </button>
           </div>
-          {pokemonOptions.loading ? (
-            <span className="selector-hint">Loading Pokemon list…</span>
-          ) : pokemonOptions.error ? (
-            <span className="selector-error">Failed to load Pokemon list.</span>
-          ) : null}
         </form>
         <datalist id="pokemon-suggestions">
           {filteredPokemonSuggestions.map((option) => (
@@ -1642,6 +1755,97 @@ function TestPage() {
   );
 }
 
-export default TestPage;
+class TestPageErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[TestPage] Component Error:', error);
+    console.error('[TestPage] Error Info:', errorInfo);
+    console.error('[TestPage] Component Stack:', errorInfo.componentStack);
+    this.setState({ errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="test-page" style={{ padding: '2rem', textAlign: 'center', maxWidth: '800px', margin: '0 auto' }}>
+          <h1 style={{ color: '#e00' }}>Error Loading Test Page</h1>
+          <div style={{ 
+            margin: '1rem 0', 
+            padding: '1rem', 
+            backgroundColor: '#fee', 
+            border: '1px solid #c00',
+            borderRadius: '4px',
+            textAlign: 'left',
+            fontFamily: 'monospace',
+            fontSize: '0.875rem',
+            whiteSpace: 'pre-wrap',
+            overflow: 'auto'
+          }}>
+            <div style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>Error Details:</div>
+            <div style={{ color: '#c00', marginBottom: '1rem' }}>{this.state.error?.toString() || 'Unknown error'}</div>
+            {this.state.errorInfo && (
+              <>
+                <div style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>Stack Trace:</div>
+                <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                  {this.state.errorInfo.componentStack}
+                </div>
+              </>
+            )}
+          </div>
+          <div style={{ marginTop: '1.5rem' }}>
+            <button 
+              onClick={() => {
+                this.setState({ hasError: false, error: null, errorInfo: null });
+                window.location.reload();
+              }}
+              style={{ 
+                padding: '0.75rem 1.5rem', 
+                fontSize: '1rem',
+                backgroundColor: '#06f',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Reload Page
+            </button>
+          </div>
+          <details style={{ marginTop: '1rem', textAlign: 'left' }}>
+            <summary style={{ cursor: 'pointer', color: '#06f' }}>Additional Information</summary>
+            <pre style={{ 
+              marginTop: '0.5rem',
+              padding: '0.5rem',
+              backgroundColor: '#f0f0f0',
+              borderRadius: '4px',
+              fontSize: '0.75rem',
+              overflow: 'auto'
+            }}>
+              {JSON.stringify(this.state, null, 2)}
+            </pre>
+          </details>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default function WrappedTestPage() {
+  return (
+    <TestPageErrorBoundary>
+      <TestPage />
+    </TestPageErrorBoundary>
+  );
+}
 
 
