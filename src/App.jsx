@@ -1158,6 +1158,244 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
   return includeDefault ? entries : entries.filter((entry) => !entry.isDefault);
 };
 
+function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  const humanize = (s) => String(s || "").replace(/-/g, " ");
+  const humanizeName = (name) => name?.replace(/-/g, " ");
+  
+  if (!data) return null;
+
+  // Check if current form is a regional/alternate form
+  const isAlternateForm = currentForm?.tags?.some(tag => 
+    tag === 'Alolan' || tag === 'Galarian' || tag === 'Hisuian' || 
+    tag === 'Paldean' || tag === 'Regional' || tag === 'Mega' || 
+    tag === 'Primal' || tag === 'Gigantamax'
+  );
+  
+  const formName = currentForm?.displayName || humanizeName(pokemonName);
+  const displayTitle = isAlternateForm ? `Evolution Details (${formName})` : 'Evolution Requirement Details';
+
+  const trigger = data.trigger?.name;
+  const item = data.item?.name;
+  const heldItem = data.held_item?.name;
+  const knownMove = data.known_move?.name;
+  const knownMoveType = data.known_move_type?.name;
+  const location = data.location?.name;
+  const partySpecies = data.party_species?.name;
+  const partyType = data.party_type?.name;
+  const tradeSpecies = data.trade_species?.name;
+
+  const evolutionRequirements = [];
+
+  if (trigger) {
+    evolutionRequirements.push({
+      label: "Trigger",
+      value: humanize(trigger),
+    });
+  }
+
+  if (data.min_level != null) {
+    evolutionRequirements.push({
+      label: "Minimum Level",
+      value: `Level ${data.min_level}`,
+    });
+  }
+
+  if (data.min_happiness != null) {
+    evolutionRequirements.push({
+      label: "Happiness",
+      value: `${data.min_happiness} happiness`,
+    });
+  }
+
+  if (data.min_affection != null) {
+    evolutionRequirements.push({
+      label: "Affection",
+      value: `${data.min_affection} affection`,
+    });
+  }
+
+  if (data.min_beauty != null) {
+    evolutionRequirements.push({
+      label: "Beauty",
+      value: `${data.min_beauty} beauty`,
+    });
+  }
+
+  if (data.gender === 1) {
+    evolutionRequirements.push({
+      label: "Gender",
+      value: "Female",
+    });
+  } else if (data.gender === 2) {
+    evolutionRequirements.push({
+      label: "Gender",
+      value: "Male",
+    });
+  }
+
+  if (data.time_of_day) {
+    evolutionRequirements.push({
+      label: "Time of Day",
+      value: data.time_of_day === "day" ? "Daytime" : humanize(data.time_of_day),
+    });
+  }
+
+  if (data.needs_overworld_rain) {
+    evolutionRequirements.push({
+      label: "Weather",
+      value: "Raining",
+    });
+  }
+
+  if (item) {
+    evolutionRequirements.push({
+      label: "Item Required",
+      value: humanize(item),
+      icon: item.includes("stone") 
+        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item}.png`
+        : null,
+    });
+  }
+
+  if (heldItem) {
+    evolutionRequirements.push({
+      label: "Held Item",
+      value: humanize(heldItem),
+      icon: heldItem.includes("stone")
+        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${heldItem}.png`
+        : null,
+    });
+  }
+
+  if (tradeSpecies) {
+    evolutionRequirements.push({
+      label: "Trade Partner",
+      value: humanizeName(tradeSpecies),
+    });
+  }
+
+  if (partySpecies) {
+    evolutionRequirements.push({
+      label: "Party Member",
+      value: `Must have ${humanizeName(partySpecies)} in party`,
+    });
+  }
+
+  if (partyType) {
+    evolutionRequirements.push({
+      label: "Party Type",
+      value: `Must have ${humanize(partyType)} type Pokémon in party`,
+    });
+  }
+
+  if (location) {
+    evolutionRequirements.push({
+      label: "Location",
+      value: humanize(location),
+    });
+  }
+
+  if (knownMove) {
+    evolutionRequirements.push({
+      label: "Known Move",
+      value: humanizeName(knownMove),
+    });
+  }
+
+  if (knownMoveType) {
+    evolutionRequirements.push({
+      label: "Known Move Type",
+      value: `Must know a ${humanize(knownMoveType)} type move`,
+    });
+  }
+
+  return (
+    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="game-modal"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={handleModalMouseDown}
+        style={{ width: "min(560px, 90vw)" }}
+      >
+        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close">
+          X
+        </button>
+        <div className="game-modal-header">
+          <h2 className="game-modal-title">
+            {displayTitle}
+          </h2>
+          <p className="game-modal-subtitle">
+            {isAlternateForm 
+              ? `Evolution conditions for ${formName}` 
+              : 'Complete conditions for this evolution method'}
+          </p>
+        </div>
+        <div className="game-modal-body" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="game-modal-column game-modal-column-left" style={{ overflowY: "auto" }}>
+            {evolutionRequirements.length > 0 ? (
+              <ul className="game-modal-game-options">
+                {evolutionRequirements.map((req, idx) => (
+                  <li key={idx}>
+                    <div
+                      className="game-modal-method"
+                      style={{
+                        borderRadius: "12px",
+                        border: "1px solid rgba(148, 163, 184, 0.18)",
+                        background: "rgba(15, 23, 42, 0.55)",
+                        padding: "10px 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      {req.icon && (
+                        <img
+                          src={req.icon}
+                          alt=""
+                          width={32}
+                          height={32}
+                          style={{
+                            imageRendering: "pixelated",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            borderRadius: "6px",
+                            padding: "2px",
+                          }}
+                        />
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
+                          {req.label}
+                        </div>
+                        <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                          {req.value}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="game-modal-empty">
+                No specific requirements for this evolution method.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pokemonName }) {
   const handleBackdropMouseDown = (event) => {
     event.stopPropagation();
@@ -2222,9 +2460,9 @@ const buildSpriteSources = (id) => {
   const clean = String(id ?? "").trim();
   const sources = [];
   if (clean) {
+    // Use higher resolution Showdown sprites for better pixel art quality
+    sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.png`);
     sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${clean}.png`);
-    sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${clean}.png`);
-    sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${clean}.png`);
   }
   sources.push(SPRITE_PLACEHOLDER);
   return sources;
@@ -2463,6 +2701,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [activeGame, setActiveGame] = useState(null);
   const [selectedFlavorVersion, setSelectedFlavorVersion] = useState(null);
   const [isFlavorModalOpen, setIsFlavorModalOpen] = useState(false);
+  const [isEvolutionDetailModalOpen, setIsEvolutionDetailModalOpen] = useState(false);
+  const [evolutionDetailData, setEvolutionDetailData] = useState(null);
+  const [currentPokemonForm, setCurrentPokemonForm] = useState(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 768;
@@ -2746,21 +2987,46 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       : [];
     const children = Array.isArray(entry.children) ? entry.children : [];
 
+    const handleConditionClick = () => {
+      if (incomingCondition?.details) {
+        // Get the current form info from details
+        const formData = details?.forms?.find(f => f.id === parseInt(id)) || 
+                        forms?.find(f => String(f.id) === String(id));
+        setCurrentPokemonForm(formData);
+        setEvolutionDetailData(incomingCondition.details);
+        setIsEvolutionDetailModalOpen(true);
+      }
+    };
+
     return (
       <li key={`${keyPrefix}-${nodeKey}`} className="evo-tree-node">
         <div className="evo-tree-row" style={{ "--level": level }}>
           {incomingCondition?.text ? (
-            <span className="evo-tree-cond">{incomingCondition.text}</span>
+            <button
+              type="button"
+              className="evo-tree-cond"
+              onClick={handleConditionClick}
+              title="Click for details"
+            >
+              {incomingCondition.text}
+            </button>
           ) : null}
           {incomingCondition?.itemSprite ? (
-            <img
-              src={incomingCondition.itemSprite}
-              alt=""
-              width={20}
-              height={20}
-              loading="lazy"
-              className="evo-tree-item"
-            />
+            <button
+              type="button"
+              className="evo-tree-item-wrapper"
+              onClick={handleConditionClick}
+              title="Click for details"
+            >
+              <img
+                src={incomingCondition.itemSprite}
+                alt=""
+                width={20}
+                height={20}
+                loading="lazy"
+                className="evo-tree-item"
+              />
+            </button>
           ) : null}
           {level > 0 && (
             <span className="evo-tree-arrow" aria-hidden="true">
@@ -2936,7 +3202,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         if (ed.known_move?.name) parts.push(`Know ${humanize(ed.known_move.name)}`);
         if (ed.known_move_type?.name) parts.push(`Know ${humanize(ed.known_move_type.name)} move`);
         if (parts.length === 0) parts.push("Level up");
-        return { text: parts.join(" • ") };
+        return { text: parts.join(" • "), details: ed };
       }
       if (trig === "use-item") {
         if (ed.item?.name) {
@@ -2946,19 +3212,20 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           return {
             text: `Use ${humanize(name)}`,
             itemSprite: isStone ? sprite : undefined,
+            details: ed,
           };
         }
-        return { text: "Use item" };
+        return { text: "Use item", details: ed };
       }
       if (trig === "trade") {
         if (ed.trade_species?.name) parts.push(`for ${humanize(ed.trade_species.name)}`);
         if (ed.held_item?.name) parts.push(`holding ${humanize(ed.held_item.name)}`);
-        return { text: parts.length ? `Trade ${parts.join(", ")}` : "Trade" };
+        return { text: parts.length ? `Trade ${parts.join(", ")}` : "Trade", details: ed };
       }
       if (trig === "shed") {
-        return { text: "Shed evolution" };
+        return { text: "Shed evolution", details: ed };
       }
-      if (trig) return { text: humanize(trig) };
+      if (trig) return { text: humanize(trig), details: ed };
       return null;
     };
 
@@ -3344,7 +3611,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             if (chosen.known_move?.name) parts.push(`Know ${humanize(chosen.known_move.name)}`);
             if (chosen.known_move_type?.name) parts.push(`Know ${humanize(chosen.known_move_type.name)} move`);
             if (parts.length === 0) parts.push("Level up");
-            return { text: parts.join("  ") };
+            return { text: parts.join(" • "), details: chosen };
           }
           if (trig === "use-item") {
             if (chosen.item?.name) {
@@ -3354,19 +3621,20 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               return {
                 text: `Use ${humanize(name)}`,
                 itemSprite: isStone ? sprite : undefined,
+                details: chosen,
               };
             }
-            return { text: "Use item" };
+            return { text: "Use item", details: chosen };
           }
           if (trig === "trade") {
             if (chosen.trade_species?.name) parts.push(`for ${humanize(chosen.trade_species.name)}`);
             if (chosen.held_item?.name) parts.push(`holding ${humanize(chosen.held_item.name)}`);
-            return { text: parts.length ? `Trade ${parts.join(", ")}` : "Trade" };
+            return { text: parts.length ? `Trade ${parts.join(", ")}` : "Trade", details: chosen };
           }
           if (trig === "shed") {
-            return { text: "Shed evolution" };
+            return { text: "Shed evolution", details: chosen };
           }
-          if (trig) return { text: humanize(trig) };
+          if (trig) return { text: humanize(trig), details: chosen };
           return null;
         };
 
@@ -3542,9 +3810,10 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     };
   }, [activeAbility]);
 
-  // Prefer higher quality sources. If animated is enabled, try Showdown; otherwise use HD static (HOME > official-artwork > dream_world if not shiny) before pixel fallback.
+  // Prefer higher quality sources. If animated is enabled, try Showdown; otherwise use official-artwork > Gen 6 (omega-ruby-alpha-sapphire > x-y) > dream_world if not shiny before pixel fallback.
   const detailImg = (() => {
     const d = details?.sprites?.other || {};
+    const v = details?.sprites?.versions || {};
     const pixel = shiny
       ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
       : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
@@ -3555,10 +3824,16 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       // fall through to HD static if no animated available
     }
 
-    const home = d?.home?.[shiny ? "front_shiny" : "front_default"];
-    if (home) return home;
     const art = d?.["official-artwork"]?.[shiny ? "front_shiny" : "front_default"];
     if (art) return art;
+    
+    // Generation 6 sprites: Omega Ruby/Alpha Sapphire and X/Y
+    const gen6 = v?.["generation-vi"] || {};
+    const oras = gen6?.["omega-ruby-alpha-sapphire"]?.[shiny ? "front_shiny" : "front_default"];
+    if (oras) return oras;
+    const xy = gen6?.["x-y"]?.[shiny ? "front_shiny" : "front_default"];
+    if (xy) return xy;
+    
     if (!shiny) {
       const dream = d?.dream_world?.front_default;
       if (dream) return dream;
@@ -4007,6 +4282,14 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           onSelect={selectFlavorVersion}
           onClose={closeFlavorModal}
           pokemonName={name}
+        />
+      )}
+      {isEvolutionDetailModalOpen && evolutionDetailData && (
+        <EvolutionDetailModal
+          data={evolutionDetailData}
+          currentForm={currentPokemonForm}
+          pokemonName={name}
+          onClose={() => setIsEvolutionDetailModalOpen(false)}
         />
       )}
       <div style={{ maxHeight: 140, overflow: 'auto', background: 'rgba(0,0,0,0.25)', borderTop: '1px solid rgba(255,255,255,0.1)', padding: 8 }}>
