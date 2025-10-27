@@ -2841,6 +2841,13 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       return false;
     }
   });
+  const [female, setFemale] = useState(() => {
+    try {
+      return localStorage.getItem("pref:female") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [species, setSpecies] = useState(null);
   const [forms, setForms] = useState([]);
   const [evoPaths, setEvoPaths] = useState([]);
@@ -3247,6 +3254,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   useEffect(() => {
     try { localStorage.setItem("pref:animated", animated ? "1" : "0"); } catch {}
   }, [animated]);
+  useEffect(() => {
+    try { localStorage.setItem("pref:female", female ? "1" : "0"); } catch {}
+  }, [female]);
 
   useEffect(() => {
     if (!url) return;
@@ -3980,17 +3990,49 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   }, [activeAbility]);
 
   // Prefer higher quality sources. If animated is enabled, try Showdown; otherwise use official-artwork > Gen 6 (omega-ruby-alpha-sapphire > x-y) > dream_world if not shiny before pixel fallback.
+  const hasGenderVariants = useMemo(() => {
+    const showdown = details?.sprites?.other?.showdown || {};
+    const hasFemaleSprite = Boolean(
+      details?.sprites?.front_female ||
+      details?.sprites?.front_shiny_female ||
+      showdown?.front_female ||
+      showdown?.front_shiny_female
+    );
+    return Boolean(species?.has_gender_differences) || hasFemaleSprite;
+  }, [details, species]);
+  const isFemaleActive = hasGenderVariants && female;
+
   const detailImg = (() => {
     const d = details?.sprites?.other || {};
     const v = details?.sprites?.versions || {};
-    const pixel = shiny
-      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
-      : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+    const pixel = (() => {
+      if (shiny && isFemaleActive) {
+        return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/${id}.png`;
+      }
+      if (shiny) {
+        return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`;
+      }
+      if (isFemaleActive) {
+        return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/${id}.png`;
+      }
+      return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+    })();
 
     if (animated) {
-      const showdown = d?.showdown?.[shiny ? "front_shiny" : "front_default"];
+      const showdownKey = shiny
+        ? (isFemaleActive ? "front_shiny_female" : "front_shiny")
+        : (isFemaleActive ? "front_female" : "front_default");
+      const showdown = d?.showdown?.[showdownKey] || d?.showdown?.[shiny ? "front_shiny" : "front_default"];
       if (showdown) return showdown;
       // fall through to HD static if no animated available
+    }
+
+    // If gendered variant requested, prefer HOME female artwork first, then static female sprite
+    if (isFemaleActive) {
+      const homeFem = d?.home?.[shiny ? "front_shiny_female" : "front_female"];
+      if (homeFem) return homeFem;
+      const femStatic = details?.sprites?.[shiny ? "front_shiny_female" : "front_female"];
+      if (femStatic) return femStatic;
     }
 
     const art = d?.["official-artwork"]?.[shiny ? "front_shiny" : "front_default"];
@@ -4006,6 +4048,12 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     if (!shiny) {
       const dream = d?.dream_world?.front_default;
       if (dream) return dream;
+    }
+
+    // Prefer explicit female static sprite if requested and available
+    if (isFemaleActive) {
+      const fem = details?.sprites?.[shiny ? "front_shiny_female" : "front_female"];
+      if (fem) return fem;
     }
     return pixel;
   })();
@@ -4122,22 +4170,44 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               <div className="toggle-group">
                 <button
                   type="button"
-                  className={`toggle-btn detail-toggle${animated ? " is-on" : ""}`}
+                  className={`pill-button stat-total-pill${animated ? " is-on" : ""}`}
                   onClick={() => setAnimated((v) => !v)}
+                  onMouseUp={(e) => e.currentTarget.blur()}
                   aria-pressed={animated}
                   title={animated ? "Use HD static sprite" : "Use animated sprite"}
+                  aria-label={`Animation ${animated ? "on" : "off"}`}
                 >
                   <span className="toggle-label">Animate</span>
                 </button>
                 <button
                   type="button"
-                  className={`toggle-btn detail-toggle${shiny ? " is-on" : ""}`}
+                  className={`pill-button stat-total-pill${shiny ? " is-on" : ""}`}
                   onClick={() => setShiny((v) => !v)}
+                  onMouseUp={(e) => e.currentTarget.blur()}
                   aria-pressed={shiny}
                   title={shiny ? "Show default variant" : "Show shiny variant"}
+                  aria-label={`Shiny ${shiny ? "on" : "off"}`}
                 >
                   <span className="toggle-label">Shiny</span>
                 </button>
+                {hasGenderVariants && (
+                  <button
+                    type="button"
+                    className={`pill-button stat-total-pill${female ? " is-on" : ""}`}
+                    onClick={() => setFemale((v) => !v)}
+                    onMouseUp={(e) => e.currentTarget.blur()}
+                    aria-pressed={female}
+                    title={female ? "Female selected. Click to switch to Male" : "Male selected. Click to switch to Female"}
+                    aria-label={female ? "Selected gender: Female" : "Selected gender: Male"}
+                  >
+                    <span
+                      className={`gender-symbol ${female ? "is-female" : "is-male"}`}
+                      aria-hidden="true"
+                    >
+                      {female ? "♀" : "♂"}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
             <section className="about single-col">
