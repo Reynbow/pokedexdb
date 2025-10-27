@@ -896,6 +896,13 @@ const isRegionalFormName = (name) => {
   return parts.some((part) => REGIONAL_TOKENS.has(part));
 };
 
+const isCapFormName = (name) => {
+  const lower = String(name || "").toLowerCase();
+  // Match 'cap' as a standalone token or at the very end of the name.
+  // Avoid matching inside larger words like 'capsicum'.
+  return /(?:^|[-_\s])cap(?:$|[-_\s])/.test(lower) || lower.endsWith("cap");
+};
+
 const getIdFromUrl = (url) => {
   const parts = (url || "").split("/").filter(Boolean);
   return parts[parts.length - 1] || "";
@@ -1537,6 +1544,62 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
                 );
               })}
             </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlternateFormsModal({ forms, onClose, onSelectPokemon, title }) {
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  if (!Array.isArray(forms) || forms.length === 0) return null;
+
+  return (
+    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="game-modal"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={handleModalMouseDown}
+        style={{ width: "min(720px, 92vw)" }}
+      >
+        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close alternate forms">
+          X
+        </button>
+        <div className="game-modal-header">
+          <h2 className="game-modal-title">{title || "Alternate Forms"}</h2>
+          <p className="game-modal-subtitle">Select a form to view details</p>
+        </div>
+        <div className="game-modal-body" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="game-modal-column game-modal-column-left" style={{ overflowY: "auto" }}>
+            <div className="forms-grid">
+              {forms.map((form) => {
+                const formId = form?.id != null ? String(form.id) : null;
+                if (!formId) return null;
+                const formName = form.displayName || humanizeName(form.name);
+                return (
+                  <button
+                    key={formId}
+                    type="button"
+                    className="form-card"
+                    onClick={() => onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`)}
+                    title={formName}
+                  >
+                    <SpriteImage id={form.id} alt={form.name} width={72} height={72} loading="lazy" />
+                    <div className="form-name">{formName}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -2843,6 +2906,10 @@ function SpriteImage({ id, alt, onError, ...rest }) {
   useEffect(() => {
     setIndex(0);
   }, [id]);
+  // placeholders; real definitions moved after evolutionTree
+  const aggregatedAlternateForms = [];
+  const hasAnyAlternateForms = false;
+  const openAggregatedAltForms = () => {};
 
   const handleError = (event) => {
     setIndex((prev) => {
@@ -3079,6 +3146,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [isEvolutionDetailModalOpen, setIsEvolutionDetailModalOpen] = useState(false);
   const [evolutionDetailData, setEvolutionDetailData] = useState(null);
   const [currentPokemonForm, setCurrentPokemonForm] = useState(null);
+  const [isAltFormsModalOpen, setIsAltFormsModalOpen] = useState(false);
+  const [altFormsForModal, setAltFormsForModal] = useState([]);
+  const [altFormsModalTitle, setAltFormsModalTitle] = useState("");
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 768;
@@ -3322,6 +3392,41 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     return Array.from(rootSet).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [evoPaths]);
 
+  // Collect all non-regional, non-default alternate forms across the entire evolution tree
+  const aggregatedAlternateForms = useMemo(() => {
+    const seen = new Set();
+    const results = [];
+    const pushForm = (f) => {
+      const fid = f?.id != null ? String(f.id) : null;
+      if (!fid || f.isDefault) return; // exclude default forms
+      const isRegional = Array.isArray(f?.tags) && f.tags.includes("Regional");
+      const isCap = isCapFormName(f?.name);
+      if (isRegional && !isCap) return; // exclude regionals except Pikachu cap variants
+      if (seen.has(fid)) return;
+      seen.add(fid);
+      results.push(f);
+    };
+    const walkEntry = (entry) => {
+      if (!entry) return;
+      const forms = Array.isArray(entry.forms) ? entry.forms : [];
+      forms.forEach(pushForm);
+      const children = Array.isArray(entry.children) ? entry.children : [];
+      children.forEach((edge) => walkEntry(edge.child));
+    };
+    evolutionTree.forEach(walkEntry);
+    return results;
+  }, [evolutionTree]);
+
+  const hasAnyAlternateForms = aggregatedAlternateForms.length > 0;
+
+  const openAggregatedAltForms = useCallback(() => {
+    if (!aggregatedAlternateForms.length) return;
+    const titleBase = formatDisplayName(name || selected?.name || "");
+    setAltFormsModalTitle(`Alternate Forms — ${titleBase}`);
+    setAltFormsForModal(aggregatedAlternateForms);
+    setIsAltFormsModalOpen(true);
+  }, [aggregatedAlternateForms, name, selected]);
+
   // Preferred region for evolution tree based on the currently selected form name
   const selectedEvolutionRegion = useMemo(() => {
     const raw = selected?.name || null;
@@ -3444,6 +3549,20 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       }
     };
 
+    const regionalForms = (variantForms || []).filter((f) =>
+      Array.isArray(f?.tags) && f.tags.includes("Regional") && !isCapFormName(f?.name)
+    );
+    const defaultForms = (variantForms || []).filter((f) => Boolean(f?.isDefault));
+    const inlineForms = (() => {
+      const byId = new Map();
+      [...regionalForms, ...defaultForms].forEach((f) => {
+        const fid = f?.id != null ? String(f.id) : null;
+        if (!fid || byId.has(fid)) return;
+        byId.set(fid, f);
+      });
+      return Array.from(byId.values());
+    })();
+
     return (
       <li key={`${keyPrefix}-${nodeKey}`} className="evo-tree-node">
         <div className="evo-tree-split" style={{ "--level": level }}>
@@ -3485,9 +3604,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             </div>
           </div>
           <div className="evo-tree-right">
-            {variantForms.length > 0 && (
+            {inlineForms.length > 0 && (
               <div className="evo-tree-forms">
-                {variantForms.map((form) => {
+                {inlineForms.map((form) => {
                   const formId = form?.id != null ? String(form.id) : null;
                   if (!formId) return null;
                   const formName = form.displayName || humanizeName(form.name);
@@ -4736,6 +4855,18 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             {evoPaths.length > 0 && (
               <section className="evo-section">
                 <div className="evo-tree">
+                  {hasAnyAlternateForms && (
+                    <div className="evo-tree-actions">
+                      <button
+                        type="button"
+                        className="alt-forms-button"
+                        onClick={openAggregatedAltForms}
+                        title="Alternate forms"
+                      >
+                        Alternate forms
+                      </button>
+                    </div>
+                  )}
                   {evolutionTree.length > 0 ? (
                     <ul className="evo-tree-roots">
                       {evolutionTree.map((entry, idx) =>
@@ -4842,6 +4973,14 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           currentForm={currentPokemonForm}
           pokemonName={name}
           onClose={() => setIsEvolutionDetailModalOpen(false)}
+        />
+      )}
+      {isAltFormsModalOpen && altFormsForModal.length > 0 && (
+        <AlternateFormsModal
+          forms={altFormsForModal}
+          onClose={() => setIsAltFormsModalOpen(false)}
+          onSelectPokemon={onSelectPokemon}
+          title={altFormsModalTitle}
         />
       )}
     </aside>

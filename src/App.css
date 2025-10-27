@@ -2811,6 +2811,46 @@
   display: flex;
   align-items: center;
 }
+.evo-tree { position: relative; }
+.evo-tree-actions {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+}
+.alt-forms-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.40);
+  background: rgba(37, 99, 235, 0.22);
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  appearance: none;
+  font-family: inherit;
+  line-height: 1.1;
+}
+.alt-forms-button:hover,
+.alt-forms-button:focus-visible {
+  background: rgba(59,130,246,0.28);
+  border-color: rgba(59,130,246,0.60);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.45);
+  transform: translateY(-1px);
+  outline: none;
+}
+.alt-forms-button:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 12px rgba(15,23,42,0.35);
+}
 .evo-tree-forms {
   display: flex;
   flex-wrap: wrap;
