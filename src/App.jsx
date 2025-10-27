@@ -4271,17 +4271,32 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           </div>
           <div className="hero-right">
             <section className="stats hero-stats">
-              {hasRecommendedEvs && (
-                <div className="ev-info-cta">
-                  <button
-                    type="button"
-                    className="ev-info-button"
-                    onClick={openEvInfoModal}
-                  >
-                    Recommended EV Information
-                  </button>
+              <div className="stats-header">
+                <div className="stats-header-left">
+                  {Array.isArray(details?.stats) && details.stats.length > 0 && (
+                    <span className="stat-total-pill" title="Base stat total">
+                      <span className="stat-total-label">Stat Total</span>
+                      <span className="stat-total-value">
+                        {(details?.stats || []).reduce(
+                          (sum, s) => sum + (typeof s?.base_stat === "number" ? s.base_stat : 0),
+                          0,
+                        )}
+                      </span>
+                    </span>
+                  )}
                 </div>
-              )}
+                {hasRecommendedEvs && (
+                  <div className="ev-info-cta">
+                    <button
+                      type="button"
+                      className="ev-info-button"
+                      onClick={openEvInfoModal}
+                    >
+                      Recommended EV Information
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="stats-list">
                 {(details?.stats || []).map((s) => {
                   const statName = s?.stat?.name || "";

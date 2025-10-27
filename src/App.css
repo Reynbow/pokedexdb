@@ -1143,18 +1143,23 @@
 
 /* Add breathing room between sections */
 .hero-stats { margin-bottom: 0px; }
-.hero-stats .ev-info-cta { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.hero-stats .ev-info-cta { display: flex; justify-content: flex-end; }
+.stats-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px 8px; }
+.stats-header-left { display: flex; align-items: center; gap: 8px; }
+.stat-total-pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(148,163,184,0.3); background: rgba(148,163,184,0.14); color: #e5e7eb; box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
+.stat-total-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; }
+.stat-total-value { font-size: 0.95rem; font-weight: 700; color: #cbd5f5; font-variant-numeric: tabular-nums; }
 .ev-info-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 14px;
+  gap: 8px;
+  padding: 4px 10px;
   border-radius: 9999px;
   background: rgba(34, 197, 94, 0.12);
   border: 1px solid rgba(34, 197, 94, 0.38);
   color: #bbf7d0;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition:
