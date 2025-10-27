@@ -243,7 +243,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon }) {
                       .filter((a) => !a.is_hidden)
                       .map((a) => (
                         <span key={a.ability.name} className="ability-chip">
-                          <span className="text-capitalize">{a.ability.name}</span>
+                          <span className="text-capitalize">{String(a.ability.name || "").replace(/-/g, " ")}</span>
                         </span>
                       ))}
                   </div>
@@ -256,7 +256,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon }) {
                         .filter((a) => a.is_hidden)
                         .map((a) => (
                           <span key={a.ability.name} className="ability-chip">
-                            <span className="text-capitalize">{a.ability.name}</span>
+                            <span className="text-capitalize">{String(a.ability.name || "").replace(/-/g, " ")}</span>
                           </span>
                         ))}
                     </div>

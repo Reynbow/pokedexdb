@@ -4345,7 +4345,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                           onClick={() => handleAbilityClick(a)}
                           aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
                         >
-                          <span className="text-capitalize">{a.ability.name}</span>
+                          <span className="text-capitalize">{humanizeName(a.ability.name)}</span>
                         </button>
                       ))}
                   </div>
@@ -4364,7 +4364,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                             onClick={() => handleAbilityClick(a)}
                             aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
                           >
-                            <span className="text-capitalize">{a.ability.name}</span>
+                            <span className="text-capitalize">{humanizeName(a.ability.name)}</span>
                           </button>
                         ))}
                     </div>

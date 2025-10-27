@@ -1254,7 +1254,7 @@ function TestPage() {
                     <ul className="ability-list">
                       {regularAbilities.map((ability) => (
                         <li key={ability.name}>
-                          <span className="text-capitalize">{ability.name}</span>
+                          <span className="text-capitalize">{humanizeResourceName(ability.name)}</span>
                         </li>
                       ))}
                     </ul>
@@ -1308,7 +1308,7 @@ function TestPage() {
                   <ul className="ability-list">
                     {hiddenAbilities.map((ability) => (
                       <li key={ability.name}>
-                        <span className="text-capitalize">{ability.name}</span>
+                        <span className="text-capitalize">{humanizeResourceName(ability.name)}</span>
                       </li>
                     ))}
                   </ul>
