@@ -51,11 +51,17 @@
   color: #a1a1aa;
 }
 
-.search {
-  display: block;
-  width: 100%;
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   max-width: 560px;
   margin: 0 auto;
+  width: 100%;
+}
+
+.search {
+  flex: 1;
   padding: 12px 16px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
@@ -65,6 +71,40 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(8px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.reset-button {
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.reset-button:hover {
+  background: rgba(148, 163, 184, 0.18);
+  border-color: rgba(148, 163, 184, 0.4);
+  transform: translateY(-1px);
+}
+
+.reset-button:active {
+  transform: translateY(0);
+}
+
+.reset-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.25);
 }
 
 .search::placeholder {
@@ -199,9 +239,6 @@
   background: rgba(124, 140, 255, 0.35);
 }
 
-.reset-chip {
-  margin-left: auto;
-}
 .type-chip.off {
   opacity: 0.55;
   filter: grayscale(10%);
@@ -624,6 +661,27 @@
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
+}
+
+/* Top title - centered on all screens */
+.detail-title-top {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin: 16px 0 12px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-title-top h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  text-transform: capitalize;
+}
+
+.detail-title-top .dexno {
+  font-size: 0.75rem;
 }
 
 .hero-left {
@@ -2493,9 +2551,20 @@
   }
   
   /* Make search bar more mobile-friendly */
+  .search-row {
+    gap: 10px;
+  }
+  
   .search {
     padding: 10px 14px;
     font-size: 1rem;
+    height: 44px;
+  }
+  
+  .reset-button {
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    height: 44px;
   }
   
   /* Adjust title on mobile */
@@ -2542,6 +2611,7 @@
     padding: 16px 12px;
   }
   
+  
   .hero-left {
     width: 100%;
     display: flex;
@@ -2574,6 +2644,36 @@
   .section-title {
     font-size: 1rem;
     margin: 8px 12px 6px;
+  }
+  
+  /* Adjust toggle group to be justified in mobile */
+  .toggle-group {
+    display: flex;
+    width: 100%;
+    gap: 0;
+  }
+  
+  .detail-toggle {
+    flex: 1;
+    border-radius: 0;
+    min-width: 0;
+  }
+  
+  .detail-toggle:first-child {
+    border-top-left-radius: var(--pill-radius);
+    border-bottom-left-radius: var(--pill-radius);
+    border-right: none;
+  }
+  
+  .detail-toggle:not(:first-child):not(:last-child) {
+    border-left: none;
+    border-right: none;
+  }
+  
+  .detail-toggle:last-child {
+    border-top-right-radius: var(--pill-radius);
+    border-bottom-right-radius: var(--pill-radius);
+    border-left: none;
   }
   
   /* Stack stat rows on mobile */
@@ -2635,11 +2735,24 @@
     font-size: 0.6rem;
   }
   
-  .evo-tree { padding: 10px 12px; gap: 5px; }
-  .evo-tree-row { gap: 4px; }
+  .evo-tree { 
+    padding: 10px 12px; 
+    gap: 5px; 
+    overflow-x: auto;
+    overflow-wrap: break-word;
+  }
+  .evo-tree-row { 
+    gap: 4px; 
+    padding-left: calc(var(--level, 0) * 12px);
+    flex-wrap: wrap;
+  }
   .evo-tree-pokemon { font-size: 0.88rem; }
   .evo-tree-pokemon.is-root { font-size: 0.93rem; }
-  .evo-tree-forms { margin-left: calc(var(--level, 0) * 16px + 20px); }
+  .evo-tree-forms { margin-left: calc(var(--level, 0) * 12px + 16px); }
+  .evo-tree-cond { 
+    white-space: normal;
+    font-size: 0.7rem;
+  }
   .catch-pill-grid {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -2659,6 +2772,11 @@
     font-size: 1.5rem;
   }
   
+  /* Adjust top title on mobile */
+  .detail-title-top h2 {
+    font-size: 1.5rem;
+  }
+  
   /* Adjust padding on mobile */
   .detail-inner {
     padding-bottom: 20px;
@@ -2669,17 +2787,64 @@
     margin: 8px 0 4px;
   }
   
+  .filters-row {
+    display: block;
+  }
+  
   .type-filters {
-    gap: 5px;
+    gap: 4px;
+    justify-content: flex-start;
+    flex: none;
+    width: 100%;
+  }
+  
+  .type-chip {
+    flex: 0 1 calc(25% - 3px);
+    min-width: calc(25% - 3px);
+    text-align: center;
   }
   
   /* Adjust game filters on mobile */
   .game-filters {
-    gap: 8px;
+    gap: 10px;
+    justify-content: flex-start;
   }
   
   .game-filters-row {
     margin: 6px 0 16px;
+  }
+  
+  .filter-chip.game-chip {
+    flex: 0 0 auto;
+  }
+  
+  .special-filters-row,
+  .dex-filters-row {
+    display: block;
+  }
+  
+  .special-filters {
+    gap: 4px;
+    justify-content: flex-start;
+    width: 100%;
+  }
+  
+  .special-filter-chip {
+    flex: 0 1 calc(25% - 3px);
+    min-width: calc(25% - 3px);
+    text-align: center;
+  }
+  
+  .dex-filters {
+    gap: 4px;
+    justify-content: flex-start;
+    width: 100%;
+  }
+  
+  .neutral-chip {
+    flex: 0 1 calc(25% - 3px);
+    min-width: calc(25% - 3px);
+    text-align: center;
   }
   
   /* Adjust forms section on mobile */
@@ -2768,6 +2933,11 @@
     font-size: 1.25rem;
   }
   
+  /* Adjust top title on very small screens */
+  .detail-title-top h2 {
+    font-size: 1.5rem;
+  }
+  
   /* Smaller sprite in cards */
   .sprite {
     width: 112px;
@@ -2777,6 +2947,22 @@
   /* Compact spacing */
   .container {
     padding: 12px 8px;
+  }
+  
+  .search-row {
+    gap: 8px;
+  }
+  
+  .search {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    height: 40px;
+  }
+  
+  .reset-button {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    height: 40px;
   }
   
   .detail-hero {
@@ -2797,7 +2983,34 @@
   
   .type-chip {
     font-size: 0.7rem;
-    padding: 3px 8px;
+    padding: 3px 4px;
+    flex: 0 1 calc(25% - 3px);
+    min-width: calc(25% - 3px);
+  }
+  
+  .special-filter-chip {
+    flex: 0 1 calc(25% - 3px);
+    min-width: calc(25% - 3px);
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+  
+  .neutral-chip {
+    flex: 0 1 calc(25% - 3px);
+    min-width: calc(25% - 3px);
+  }
+  
+  .filter-chip.game-chip {
+    flex: 0 0 auto;
+  }
+  
+  .filter-chip {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+  
+  .game-filters {
+    padding: 4px 2px 8px;
   }
   
   /* Adjust game badges */
@@ -2840,6 +3053,31 @@
   .stat-base {
     font-size: 0.8rem;
     min-width: 26px;
+  }
+  
+  /* Even more compact evolution tree on very small screens */
+  .evo-tree-row {
+    padding-left: calc(var(--level, 0) * 8px);
+    gap: 3px;
+  }
+  
+  .evo-tree-forms {
+    margin-left: calc(var(--level, 0) * 8px + 12px);
+  }
+  
+  .evo-tree-icon img {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .evo-tree-pokemon.is-root .evo-tree-icon img {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .evo-tree-form img {
+    width: 24px;
+    height: 24px;
   }
 }
 

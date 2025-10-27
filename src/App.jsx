@@ -1788,12 +1788,27 @@ function App() {
         <div className="container">
           <h1 className="title">Pokedex</h1>
           <p className="subtitle">Search and explore every Pokemon</p>
-          <input
-            className="search"
-            placeholder="Search Pokemon"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="search-row">
+            <input
+              className="search"
+              placeholder="Search Pokemon"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button
+              type="button"
+              className="reset-button"
+              onClick={() => {
+                setSelectedTypes(new Set());
+                setSelectedTags(new Set());
+                setSelectedDex("national");
+                setSelectedGame(null);
+                setQuery("");
+              }}
+            >
+              Reset
+            </button>
+          </div>
           <div className="filters-stack">
             <div className="filters-row">
               <div className="type-filters">
@@ -1829,19 +1844,6 @@ function App() {
                   </span>
                 ))}
               </div>
-              <button
-                type="button"
-                className="type-chip neutral-chip reset-chip"
-                onClick={() => {
-                  setSelectedTypes(new Set());
-                  setSelectedTags(new Set());
-                  setSelectedDex("national");
-                  setSelectedGame(null);
-                  setQuery("");
-                }}
-              >
-                Reset
-              </button>
             </div>
             <div className="filters-row special-filters-row">
               <div className="special-filters">
@@ -3623,9 +3625,9 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             species: result.speciesKey,
           });
         } else {
-          const msg = `No Smogon nature found for ${name}.`;
-          setSmogonError(msg);
-          addLog("Smogon nature not found", {
+          // Don't treat "not found" as an error - it's just informational
+          setSmogonError(null);
+          addLog("Smogon data unavailable (not competitive)", {
             alias,
             generation: result?.generation,
             species: result?.speciesKey,
@@ -3658,6 +3660,10 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         <button className="close" onClick={onClose} aria-label="Close">
           <span className="close-icon" aria-hidden="true" />
         </button>
+        <div className="detail-title detail-title-top">
+          {id ? <span className="dexno">{displayDexNumber}</span> : null}
+          <h2>{name}</h2>
+        </div>
         <div className="detail-hero">
           <div className="hero-left">
             <div className="detail-art-wrap">
@@ -3741,30 +3747,34 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                     </div>
                   </div>
                 )}
-                {!smogonError && (
-                  <div className="about-row">
-                    <span className="label">Recommended Nature</span>
-                    <div className="value nature-value">
-                      {smogonLoading ? (
-                        <span className="nature-loading" aria-live="polite">
-                          <span className="nature-spinner" aria-hidden="true" />
-                          Loading
-                        </span>
-                      ) : smogonNature ? (
-                        <button
-                          type="button"
-                          className="nature-chip"
-                          onClick={handleNatureClick}
-                          aria-label={`View details for ${smogonNature} nature`}
-                        >
-                          <span className="text-capitalize">{smogonNature}</span>
-                        </button>
-                      ) : (
-                        <span className="nature-placeholder">-</span>
-                      )}
-                    </div>
+                <div className="about-row">
+                  <span className="label">Recommended Nature</span>
+                  <div className="value nature-value">
+                    {smogonLoading ? (
+                      <span className="nature-loading" aria-live="polite">
+                        <span className="nature-spinner" aria-hidden="true" />
+                        Loading
+                      </span>
+                    ) : smogonError ? (
+                      <span className="nature-placeholder" title={smogonError}>
+                        Unavailable
+                      </span>
+                    ) : smogonNature ? (
+                      <button
+                        type="button"
+                        className="nature-chip"
+                        onClick={handleNatureClick}
+                        aria-label={`View details for ${smogonNature} nature`}
+                      >
+                        <span className="text-capitalize">{smogonNature}</span>
+                      </button>
+                    ) : (
+                      <span className="nature-placeholder" title="No competitive data available">
+                        -
+                      </span>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </section>
             <div className="weak-resist">
@@ -3801,10 +3811,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             </div>
           </div>
           <div className="hero-right">
-            <div className="detail-title">
-              {id ? <span className="dexno">{displayDexNumber}</span> : null}
-              <h2>{name}</h2>
-            </div>
             <section className="stats hero-stats">
               {hasRecommendedEvs && (
                 <div className="ev-info-cta">
