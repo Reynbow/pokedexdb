@@ -647,6 +647,43 @@ const GAME_GENERATION_LOOKUP = new Map([
   ["legends-za", 9],
 ]);
 
+// Game feature flags for form mechanics
+const GAME_FEATURES = new Map([
+  ["red-blue-yellow", { mega: false, gmax: false }],
+  ["firered-leafgreen", { mega: false, gmax: false }],
+  ["lets-go", { mega: true, gmax: false }],
+  ["gold-silver-crystal", { mega: false, gmax: false }],
+  ["heartgold-soulsilver", { mega: false, gmax: false }],
+  ["ruby-sapphire-emerald", { mega: false, gmax: false }],
+  ["omega-ruby-alpha-sapphire", { mega: true, gmax: false }],
+  ["diamond-pearl", { mega: false, gmax: false }],
+  ["platinum", { mega: false, gmax: false }],
+  ["brilliant-diamond-shining-pearl", { mega: false, gmax: false }],
+  ["black-white", { mega: false, gmax: false }],
+  ["black-2-white-2", { mega: false, gmax: false }],
+  ["x-y", { mega: true, gmax: false }],
+  ["sun-moon", { mega: true, gmax: false }],
+  ["ultra-sun-ultra-moon", { mega: true, gmax: false }],
+  ["sword-shield", { mega: false, gmax: true }],
+  ["legends-arceus", { mega: false, gmax: false }],
+  ["scarlet-violet", { mega: false, gmax: false }],
+  ["legends-za", { mega: false, gmax: false }],
+]);
+
+// Region-level heuristics when no game is selected
+const REGION_FEATURES = new Map([
+  ["kalos", { mega: true, gmax: false }],
+  ["alola", { mega: true, gmax: false }],
+  ["galar", { mega: false, gmax: true }],
+  ["paldea", { mega: false, gmax: false }],
+  ["hisui", { mega: false, gmax: false }],
+  ["kanto", { mega: false, gmax: false }],
+  ["johto", { mega: false, gmax: false }],
+  ["hoenn", { mega: false, gmax: false }],
+  ["sinnoh", { mega: false, gmax: false }],
+  ["unova", { mega: false, gmax: false }],
+]);
+
 const itemGenerationCache = new Map();
 const locationGenerationCache = new Map();
 const moveGenerationCache = new Map();
@@ -817,12 +854,11 @@ const MYTHICAL_NAMES = new Set([
   "pecharunt",
 ]);
 
-const SPECIAL_FILTERS = ["Legendary", "Mythical", "Mega", "Primal", "Ultra Beast", "Paradox", "Gigantamax", "Baby"];
+const SPECIAL_FILTERS = ["Legendary", "Mythical", "Mega", "Ultra Beast", "Paradox", "Gigantamax", "Baby"];
 const SPECIAL_TAG_META = new Map([
-  ["Legendary", { short: "LEG", className: "legendary" }],
+  ["Legendary", { short: "LGD", className: "legendary" }],
   ["Mythical", { short: "MYTH", className: "mythical" }],
   ["Mega", { short: "MEGA", className: "mega" }],
-  ["Primal", { short: "PRIM", className: "primal" }],
   ["Ultra Beast", { short: "UB", className: "ultra-beast" }],
   ["Paradox", { short: "PDX", className: "paradox" }],
   ["Gigantamax", { short: "GMAX", className: "gigantamax" }],
@@ -847,7 +883,7 @@ const deriveSpecialTags = (name) => {
   if (LEGENDARY_NAMES.has(lower)) tags.push("Legendary");
   if (MYTHICAL_NAMES.has(lower)) tags.push("Mythical");
   if (lower.includes("-mega") || lower.startsWith("mega-")) tags.push("Mega");
-  if (lower.includes("-primal")) tags.push("Primal");
+  // Primal tag still derivable internally if needed, but no filter chip
   if (ULTRA_BEASTS.has(lower)) tags.push("Ultra Beast");
   if (PARADOX_NAMES.has(lower)) tags.push("Paradox");
   if (lower.includes("-gmax")) tags.push("Gigantamax");
@@ -873,6 +909,20 @@ const getIdNumberFromUrl = (url) => {
 const toTitleCase = (value) => {
   const base = humanizeName(value);
   return base.replace(/\b\w/g, (char) => char.toUpperCase()).trim();
+};
+
+// Remove visual noise from names for display while keeping underlying slug intact
+const stripMegaGmaxTokens = (rawName) => {
+  const lower = String(rawName || "").toLowerCase();
+  if (!lower) return "";
+  const tokens = lower.split("-");
+  const filtered = tokens.filter((t) => t !== "mega" && t !== "gmax");
+  return filtered.join("-");
+};
+
+const formatDisplayName = (rawName) => {
+  const stripped = stripMegaGmaxTokens(rawName);
+  return toTitleCase(stripped);
 };
 
 const CONDITION_LABEL_OVERRIDES = {
@@ -1101,11 +1151,10 @@ const FORM_ORDER = new Map([
   ["Default", 0],
   ["Regional", 1],
   ["Mega", 2],
-  ["Primal", 3],
-  ["Ultra Beast", 4],
-  ["Paradox", 5],
-  ["Gigantamax", 6],
-  ["Baby", 7],
+  ["Ultra Beast", 3],
+  ["Paradox", 4],
+  ["Gigantamax", 5],
+  ["Baby", 6],
 ]);
 
 const getFormPriority = (entry) => {
@@ -1443,7 +1492,7 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
         </button>
         <div className="game-modal-header">
           <h2 className="game-modal-title">
-            Pokedex Entries for <span className="game-modal-title-name text-capitalize">{pokemonName}</span>
+            Pokedex Entries for <span className="game-modal-title-name text-capitalize">{formatDisplayName(pokemonName)}</span>
           </h2>
           <p className="game-modal-subtitle">
             Select a version to view its Pokedex entry
@@ -2158,6 +2207,57 @@ function App() {
     const regularMatches = [];
     const megaGmaxMatches = [];
 
+    // Build the set of species to consider based on the active dex/game (or all species if none)
+    const speciesIdsToConsider = activeEntryMap
+      ? Array.from(activeEntryMap.keys())
+      : Array.from(regionFormsBySpecies.keys());
+
+    // Primary list: one representative per species, preferring regional form when applicable
+    for (const speciesId of speciesIdsToConsider) {
+      const bucket = regionFormsBySpecies.get(speciesId);
+      if (!bucket) continue;
+      const representative = (activeRegionKey ? bucket.get(activeRegionKey) : null) || bucket.get("default") || null;
+      if (!representative) continue;
+
+      const idStr = getIdFromUrl(representative.url);
+      if (!idStr) continue;
+      const idNum = Number(idStr);
+      if (Number.isNaN(idNum)) continue;
+
+      // Filters: type, tags, query
+      if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(representative.name))) {
+        continue;
+      }
+      if (hasTagFilter) {
+        const repTags = getTagsForName(representative.name);
+        let hasAllTags = true;
+        for (const tag of requiredTags) {
+          if (!repTags.includes(tag)) {
+            hasAllTags = false;
+            break;
+          }
+        }
+        if (!hasAllTags) continue;
+      }
+      if (q || qDigits) {
+        let matchedQuery = false;
+        const lower = representative.name.toLowerCase();
+        if (q && lower.includes(q)) {
+          matchedQuery = true;
+        } else if (qDigits) {
+          const idPad3 = idStr.padStart(3, "0");
+          const idPad4 = idStr.padStart(4, "0");
+          if (idStr.includes(qDigits) || idPad3.includes(qDigits) || idPad4.includes(qDigits)) {
+            matchedQuery = true;
+          }
+        }
+        if (!matchedQuery) continue;
+      }
+
+      regularMatches.push({ entry: representative, idNum, speciesId });
+    }
+
+    // Secondary list: Mega/Gigantamax forms that belong to included species
     for (const p of pokemon) {
       const idStr = getIdFromUrl(p.url);
       if (!idStr) continue;
@@ -2165,23 +2265,20 @@ function App() {
       if (Number.isNaN(idNum)) continue;
       const tags = getTagsForName(p.name);
       const speciesId = resolveSpeciesId(p.name, idNum < 10000 ? idNum : null);
-      const isSpecialForm = idNum >= 10000;
-      const hasSpecialTag = tags.some((tag) => SPECIAL_FILTERS.includes(tag));
-      const isMegaOrGmax = tags.includes("Mega") || tags.includes("Gigantamax");
-      if (isSpecialForm && !hasSpecialTag) {
-        continue;
-      }
-      if (activeEntryMap) {
-        const lookupId = speciesId ?? (idNum < 10000 ? idNum : null);
-        if (lookupId != null) {
-          if (!activeEntryMap.has(lookupId)) {
-            if (!(isSpecialForm && hasSpecialTag && speciesId == null)) {
-              continue;
-            }
-          }
-        } else if (!(isSpecialForm && hasSpecialTag)) {
-          continue;
-        }
+      const isMega = tags.includes("Mega");
+      const isGmax = tags.includes("Gigantamax");
+      const isMegaOrGmax = isMega || isGmax;
+      if (!isMegaOrGmax) continue;
+      if (speciesId == null || !speciesIdsToConsider.includes(speciesId)) continue;
+      // Gate by selected game/region feature support
+      if (selectedGame) {
+        const gf = GAME_FEATURES.get(selectedGame) || { mega: false, gmax: false };
+        if ((isMega && !gf.mega) || (isGmax && !gf.gmax)) continue;
+      } else if (selectedDex && selectedDex !== "national") {
+        const rf = REGION_FEATURES.get(selectedDex) || { mega: false, gmax: false };
+        if ((isMega && !rf.mega) || (isGmax && !rf.gmax)) continue;
+      } else {
+        // National dex without a game selected: allow both
       }
       if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
         continue;
@@ -2196,7 +2293,6 @@ function App() {
         }
         if (!hasAllTags) continue;
       }
-
       if (q || qDigits) {
         let matchedQuery = false;
         const lower = p.name.toLowerCase();
@@ -2211,12 +2307,7 @@ function App() {
         }
         if (!matchedQuery) continue;
       }
-
-      if (isMegaOrGmax) {
-        megaGmaxMatches.push({ entry: p, idNum, speciesId });
-      } else {
-        regularMatches.push({ entry: p, idNum, speciesId });
-      }
+      megaGmaxMatches.push({ entry: p, idNum, speciesId });
     }
 
     const sortMatches = (matches) => {
@@ -2878,7 +2969,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber }) {
       ) : (
         <div style={{ width: 144, height: 144 }} />
       )}
-      <div className="name">{name}</div>
+      <div className="name">{formatDisplayName(name)}</div>
       <div className="types">
         {types.length === 0 ? (
           <span className="type-chip skeleton" />
@@ -4254,7 +4345,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         </button>
         <div className="detail-title detail-title-top">
           {id ? <span className="dexno">{displayDexNumber}</span> : null}
-          <h2>{name}</h2>
+          <h2>{formatDisplayName(name)}</h2>
         </div>
         <div className="detail-hero">
           <div className="hero-left">
@@ -5285,7 +5376,7 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSele
       ? gameList.find((entry) => entry.version === activeVersion) || activeGame
       : gameList[gameList.length - 1] || activeGame || null;
   const titleId = selectedGame?.version ? `game-modal-title-${selectedGame.version}` : undefined;
-  const displayPokemonName = pokemonName ? toTitleCase(pokemonName) : "";
+  const displayPokemonName = pokemonName ? formatDisplayName(pokemonName) : "";
 
   useEffect(() => {
     const handleKeyDown = (event) => {
