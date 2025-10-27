@@ -831,6 +831,15 @@ const SPECIAL_TAG_META = new Map([
 
 const humanizeName = (s) => String(s || "").replace(/-/g, " ");
 
+const getStatLabel = (statName, isMobile) => {
+  const label = humanizeName(statName);
+  if (isMobile) {
+    if (label === "Special Attack") return "Sp. Attack";
+    if (label === "Special Defense") return "Sp. Defense";
+  }
+  return label;
+};
+
 const deriveSpecialTags = (name) => {
   const lower = String(name || "").toLowerCase();
   if (!lower) return [];
@@ -2452,6 +2461,21 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [activeGame, setActiveGame] = useState(null);
   const [selectedFlavorVersion, setSelectedFlavorVersion] = useState(null);
   const [isFlavorModalOpen, setIsFlavorModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   const hasRecommendedEvs = useMemo(() => {
     if (!smogonEvs || typeof smogonEvs !== "object") return false;
     return Object.values(smogonEvs).some((value) => typeof value === "number" && value > 0);
@@ -3802,7 +3826,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                       ? smogonEvs[evKey]
                       : null;
                   const showRecommended = typeof recommendedEv === "number" && recommendedEv > 0;
-                  const statLabel = humanizeName(statName);
+                  const statLabel = getStatLabel(statName, isMobile);
                   return (
                     <div className="stat-row" key={statName}>
                       <div className="stat-label">{statLabel}</div>

@@ -2485,20 +2485,363 @@
   background: rgba(15, 23, 42, 0.45);
 }
 
+/* Mobile responsive styles */
 @media (max-width: 768px) {
+  /* Adjust container padding on mobile */
+  .container {
+    padding: 16px 12px;
+  }
+  
+  /* Make search bar more mobile-friendly */
+  .search {
+    padding: 10px 14px;
+    font-size: 1rem;
+  }
+  
+  /* Adjust title on mobile */
+  .title {
+    font-size: 1.75rem;
+  }
+  
+  /* Grid adjustments for mobile */
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 140px));
+    gap: 12px;
+    padding: 12px 0 32px;
+  }
+  
+  /* Adjust card size for mobile */
+  :root {
+    --card-size: 140px;
+  }
+  
+  /* Hide list panel on mobile */
+  .content.split {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .list-panel {
+    display: none;
+  }
+  
+  /* Make detail panel full width and adjust height on mobile */
+  .detail-panel {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+  
+  /* Stack detail-hero vertically on mobile */
+  .detail-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 12px;
+  }
+  
+  .hero-left {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .hero-right {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .detail-art-wrap {
+    width: 100%;
+    max-width: 280px;
+    height: 280px;
+  }
+  
+  /* Adjust close button on mobile */
+  .close {
+    top: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+  }
+  
+  /* Adjust section titles on mobile */
+  .section-title {
+    font-size: 1rem;
+    margin: 8px 12px 6px;
+  }
+  
+  /* Stack stat rows on mobile */
+  .stat-row {
+    grid-template-columns: 75px 1fr auto;
+    gap: 8px;
+  }
+  
+  .stat-label {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    text-align: left;
+    overflow: visible;
+  }
+  
+  .stat-bar-wrap {
+    gap: 6px;
+    width: auto;
+    min-width: 160px;
+    max-width: 220px;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    flex-shrink: 1;
+  }
+  
+  .stat-bar {
+    width: 130px;
+    flex: 0 0 auto;
+    flex-shrink: 0;
+  }
+  
+  .stat-base {
+    font-size: 0.85rem;
+    min-width: 28px;
+    flex: 0 0 auto;
+  }
+  
+  .stat-value {
+    min-width: 0;
+    max-width: none;
+    width: auto;
+    justify-content: flex-start;
+    flex-shrink: 0;
+    padding-left: 4px;
+  }
+  
+  .stat-recommend {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  
+  .stat-recommend-text {
+    font-size: 0.7rem;
+  }
+  
+  .stat-recommend-suffix {
+    font-size: 0.6rem;
+  }
+  
   .evo-tree { padding: 10px 12px; gap: 5px; }
   .evo-tree-row { gap: 4px; }
   .evo-tree-pokemon { font-size: 0.88rem; }
   .evo-tree-pokemon.is-root { font-size: 0.93rem; }
   .evo-tree-forms { margin-left: calc(var(--level, 0) * 16px + 20px); }
   .catch-pill-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
   .catch-section {
     padding: 0 12px 16px;
   }
+  
+  /* Stack info sections on mobile */
+  .info-split {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Adjust title sizing on mobile */
+  .detail-title h2 {
+    font-size: 1.5rem;
+  }
+  
+  /* Adjust padding on mobile */
+  .detail-inner {
+    padding-bottom: 20px;
+  }
+  
+  /* Adjust filters on mobile */
+  .filters-stack {
+    margin: 8px 0 4px;
+  }
+  
+  .type-filters {
+    gap: 5px;
+  }
+  
+  /* Adjust game filters on mobile */
+  .game-filters {
+    gap: 8px;
+  }
+  
+  .game-filters-row {
+    margin: 6px 0 16px;
+  }
+  
+  /* Adjust forms section on mobile */
+  .forms-section {
+    padding: 0 12px 12px;
+  }
+  
+  .forms-grid {
+    gap: 10px;
+  }
+  
+  .form-card {
+    min-width: 100px;
+    padding: 8px 10px;
+  }
+  
+  .form-card img {
+    width: 64px;
+    height: 64px;
+  }
+  
+  /* Adjust detail info sections on mobile */
+  .detail-info {
+    padding: 0 12px 12px;
+  }
+  
+  .about-list {
+    padding: 0 12px;
+  }
+  
+  .about-row {
+    grid-template-columns: 100px 1fr;
+    gap: 6px;
+  }
+  
+  /* Adjust weak-resist sections on mobile */
+  .weak-resist {
+    padding: 0 12px;
+  }
+  
+  /* Adjust detail-body sections on mobile */
+  .detail-body {
+    padding: 8px 12px 12px;
+  }
+  
+  /* Adjust evolution section on mobile */
+  .evo-section {
+    padding: 0 12px 0;
+  }
+  
+  /* Adjust catch section on mobile */
+  .catch-section-inline {
+    padding: 0 12px 12px;
+  }
+  
+  /* Stack stats section */
+  .hero-stats {
+    padding: 0 12px;
+  }
+  
+  .stats-list {
+    padding: 0 12px;
+  }
 }
 
+/* Additional mobile optimizations for smaller screens */
+@media (max-width: 480px) {
+  /* Even smaller card size */
+  :root {
+    --card-size: 120px;
+  }
+  
+  /* Adjust grid for very small screens */
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 120px));
+    gap: 10px;
+  }
+  
+  /* Smaller title */
+  .title {
+    font-size: 1.5rem;
+  }
+  
+  /* Adjust detail title */
+  .detail-title h2 {
+    font-size: 1.25rem;
+  }
+  
+  /* Smaller sprite in cards */
+  .sprite {
+    width: 112px;
+    height: 112px;
+  }
+  
+  /* Compact spacing */
+  .container {
+    padding: 12px 8px;
+  }
+  
+  .detail-hero {
+    padding: 12px 8px;
+    gap: 12px;
+  }
+  
+  /* Adjust art wrap for small screens */
+  .detail-art-wrap {
+    max-width: 240px;
+    height: 240px;
+  }
+  
+  /* Adjust filters to be more compact */
+  .filters-stack {
+    margin: 6px 0 2px;
+  }
+  
+  .type-chip {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
+  
+  /* Adjust game badges */
+  .game-badge {
+    min-width: 100px;
+    padding: 6px 10px;
+  }
+  
+  .game-badge img,
+  .game-badge-image {
+    width: 80px;
+    height: 30px;
+  }
+  
+  /* Even more compact stat rows on very small screens */
+  .stat-row {
+    grid-template-columns: 68px 1fr auto;
+    gap: 6px;
+  }
+  
+  .stat-label {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    text-align: left;
+    overflow: visible;
+  }
+  
+  .stat-bar-wrap {
+    width: auto;
+    min-width: 130px;
+    max-width: 180px;
+    flex: 1 1 auto;
+    gap: 5px;
+  }
+  
+  .stat-bar {
+    width: 110px;
+  }
+  
+  .stat-base {
+    font-size: 0.8rem;
+    min-width: 26px;
+  }
+}
 
 .card {
   position: relative;
