@@ -1816,6 +1816,76 @@ function App() {
     [speciesIdLookup]
   );
 
+  // Normalize regional tokens to canonical region keys
+  const REGION_CANON_MAP = useMemo(() => new Map([
+    ["alola", "alola"],
+    ["alolan", "alola"],
+    ["galar", "galar"],
+    ["galarian", "galar"],
+    ["hisui", "hisui"],
+    ["hisuan", "hisui"],
+    ["paldea", "paldea"],
+    ["paldean", "paldea"],
+  ]), []);
+
+  // Determine the active region key from selection
+  const activeRegionKey = useMemo(() => {
+    if (selectedDex && selectedDex !== "national") return selectedDex;
+    if (selectedGame) {
+      const gameCfg = GAME_LOOKUP.get(selectedGame);
+      return gameCfg?.dexKey || null;
+    }
+    return null;
+  }, [selectedDex, selectedGame]);
+
+  // Map: speciesId -> Map(regionKey | "default" -> entry)
+  const regionFormsBySpecies = useMemo(() => {
+    const result = new Map();
+    for (const entry of pokemon) {
+      const idStr = getIdFromUrl(entry?.url);
+      const idNum = Number(idStr);
+      if (!idStr || Number.isNaN(idNum)) continue;
+      const lowerName = String(entry?.name || "").toLowerCase();
+      const speciesId = resolveSpeciesId(lowerName, idNum < 10000 ? idNum : null);
+      if (speciesId == null) continue;
+      let bucket = result.get(speciesId);
+      if (!bucket) {
+        bucket = new Map();
+        result.set(speciesId, bucket);
+      }
+      // Track default/base form (prefer < 10000 ids without regional token)
+      if (!bucket.has("default") && idNum < 10000) {
+        bucket.set("default", entry);
+      }
+      // Track regional variants
+      const tokens = lowerName.split("-");
+      for (const token of tokens) {
+        const canon = REGION_CANON_MAP.get(token);
+        if (canon && !bucket.has(canon)) {
+          bucket.set(canon, entry);
+          break;
+        }
+      }
+    }
+    return result;
+  }, [pokemon, resolveSpeciesId, REGION_CANON_MAP]);
+
+  const getRegionPreferredEntry = useCallback((entry) => {
+    if (!entry || !activeRegionKey) return entry;
+    const idStr = getIdFromUrl(entry?.url);
+    const idNum = Number(idStr);
+    if (!idStr || Number.isNaN(idNum)) return entry;
+    const lowerName = String(entry?.name || "").toLowerCase();
+    const speciesId = resolveSpeciesId(lowerName, idNum < 10000 ? idNum : null);
+    if (speciesId == null) return entry;
+    const bucket = regionFormsBySpecies.get(speciesId);
+    if (!bucket) return entry;
+    const regional = bucket.get(activeRegionKey);
+    return regional || entry;
+  }, [activeRegionKey, regionFormsBySpecies, resolveSpeciesId]);
+
+  // moved earlier
+
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/pokemon?limit=100000&offset=0")
       .then((r) => r.json())
@@ -2003,10 +2073,20 @@ function App() {
   }, [pokemon]);
 
   const selectPokemon = (id, name, url) => {
+    // Route selection through region preference
+    let target = { name, url };
+    try {
+      if (url) {
+        const pref = getRegionPreferredEntry({ name, url });
+        if (pref && pref.url) target = pref;
+      }
+    } catch {}
+    const parts = (target.url || "").split("/").filter(Boolean);
+    const prefId = parts[parts.length - 1] || id;
     const u = new URL(window.location.href);
-    u.searchParams.set("p", id);
+    u.searchParams.set("p", prefId);
     window.history.pushState({}, "", u);
-    setSelected({ id, name, url });
+    setSelected({ id: prefId, name: target.name, url: target.url || url });
   };
 
   const clearSelection = () => {
@@ -2015,6 +2095,22 @@ function App() {
     window.history.pushState({}, "", u);
     setSelected(null);
   };
+
+  // When region changes, migrate current selection to region-preferred form if available
+  useEffect(() => {
+    if (!selected) return;
+    const { id, name, url } = selected;
+    if (!url) return;
+    const pref = getRegionPreferredEntry({ name, url });
+    if (pref && pref.url && pref.url !== url) {
+      const parts = pref.url.split("/").filter(Boolean);
+      const prefId = parts[parts.length - 1] || id;
+      const u = new URL(window.location.href);
+      u.searchParams.set("p", prefId);
+      window.history.pushState({}, "", u);
+      setSelected({ id: prefId, name: pref.name, url: pref.url });
+    }
+  }, [activeRegionKey]);
 
   const filteredLists = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -2362,17 +2458,18 @@ function App() {
                 {regularFiltered.length > 0 && (
                   <div className="list">
                     {regularFiltered.map((p) => {
-                      const parts = p.url.split("/").filter(Boolean);
+                      const pref = getRegionPreferredEntry(p);
+                      const parts = pref.url.split("/").filter(Boolean);
                       const id = parts[parts.length - 1];
                       const idNum = Number(id);
                       const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
                       return (
                         <PokemonCard
-                          key={p.name}
+                          key={pref.name}
                           id={id}
-                          name={p.name}
-                          url={p.url}
-                          onSelect={() => selectPokemon(id, p.name, p.url)}
+                          name={pref.name}
+                          url={pref.url}
+                          onSelect={() => selectPokemon(id, pref.name, pref.url)}
                           selected={String(selected.id) === String(id)}
                           dexNumber={dexDisplay}
                         />
@@ -2386,17 +2483,18 @@ function App() {
                     <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
                     <div className="list">
                       {megaGigantamaxFiltered.map((p) => {
-                        const parts = p.url.split("/").filter(Boolean);
+                        const pref = getRegionPreferredEntry(p);
+                        const parts = pref.url.split("/").filter(Boolean);
                         const id = parts[parts.length - 1];
                         const idNum = Number(id);
                         const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
                         return (
                           <PokemonCard
-                            key={p.name}
+                            key={pref.name}
                             id={id}
-                            name={p.name}
-                            url={p.url}
-                            onSelect={() => selectPokemon(id, p.name, p.url)}
+                            name={pref.name}
+                            url={pref.url}
+                            onSelect={() => selectPokemon(id, pref.name, pref.url)}
                             selected={String(selected.id) === String(id)}
                             dexNumber={dexDisplay}
                           />
@@ -2442,17 +2540,18 @@ function App() {
             {regularFiltered.length > 0 && (
               <section className="grid">
                 {regularFiltered.map((p) => {
-                  const parts = p.url.split("/").filter(Boolean);
+                  const pref = getRegionPreferredEntry(p);
+                  const parts = pref.url.split("/").filter(Boolean);
                   const id = parts[parts.length - 1];
                   const idNum = Number(id);
                   const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
                   return (
                     <PokemonCard
-                      key={p.name}
+                      key={pref.name}
                       id={id}
-                      name={p.name}
-                      url={p.url}
-                      onSelect={() => selectPokemon(id, p.name, p.url)}
+                      name={pref.name}
+                      url={pref.url}
+                      onSelect={() => selectPokemon(id, pref.name, pref.url)}
                       dexNumber={dexDisplay}
                     />
                   );
@@ -2464,17 +2563,18 @@ function App() {
                 <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
                 <section className="grid grid-special">
                   {megaGigantamaxFiltered.map((p) => {
-                    const parts = p.url.split("/").filter(Boolean);
+                    const pref = getRegionPreferredEntry(p);
+                    const parts = pref.url.split("/").filter(Boolean);
                     const id = parts[parts.length - 1];
                     const idNum = Number(id);
                     const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
                     return (
                       <PokemonCard
-                        key={p.name}
+                        key={pref.name}
                         id={id}
-                        name={p.name}
-                        url={p.url}
-                        onSelect={() => selectPokemon(id, p.name, p.url)}
+                        name={pref.name}
+                        url={pref.url}
+                        onSelect={() => selectPokemon(id, pref.name, pref.url)}
                         dexNumber={dexDisplay}
                       />
                     );
