@@ -239,14 +239,29 @@ function DetailPanel({ selected, onClose, onSelectPokemon }) {
                 <div className="about-row">
                   <span className="label">Abilities</span>
                   <div className="value">
-                    {(details.abilities || []).map((a) => (
-                      <span key={a.ability.name} className="ability-chip">
-                        <span className="text-capitalize">{a.ability.name}</span>
-                        {a.is_hidden && <span className="ability-tag">Hidden</span>}
-                      </span>
-                    ))}
+                    {(details.abilities || [])
+                      .filter((a) => !a.is_hidden)
+                      .map((a) => (
+                        <span key={a.ability.name} className="ability-chip">
+                          <span className="text-capitalize">{a.ability.name}</span>
+                        </span>
+                      ))}
                   </div>
                 </div>
+                {(details.abilities || []).some((a) => a.is_hidden) && (
+                  <div className="about-row">
+                    <span className="label">Hidden Ability</span>
+                    <div className="value">
+                      {(details.abilities || [])
+                        .filter((a) => a.is_hidden)
+                        .map((a) => (
+                          <span key={a.ability.name} className="ability-chip">
+                            <span className="text-capitalize">{a.ability.name}</span>
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
                 <div className="about-row">
                   <span className="label">Height</span>
                   <span className="value">{(details.height ?? 0) / 10} m</span>

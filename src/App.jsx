@@ -2311,7 +2311,6 @@ function App() {
       <main className="container">
         {showGameFilters && (
           <div className="game-filters-row">
-            <span className="game-filters-label">Games</span>
             <div className="game-filters-controls">
               <div
                 className={`game-filters${selectedDex === "national" ? " game-filters--left" : ""}`}
@@ -4160,20 +4159,41 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 <div className="about-row">
                   <span className="label">Abilities</span>
                   <div className="value">
-                    {(details?.abilities || []).map((a) => (
-                      <button
-                        key={a.ability.name}
-                        type="button"
-                        className={`ability-chip${a.is_hidden ? " is-hidden" : ""}`}
-                        onClick={() => handleAbilityClick(a)}
-                        aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
-                      >
-                        <span className="text-capitalize">{a.ability.name}</span>
-                        {a.is_hidden && <span className="ability-tag">Hidden</span>}
-                      </button>
-                    ))}
+                    {(details?.abilities || [])
+                      .filter((a) => !a.is_hidden)
+                      .map((a) => (
+                        <button
+                          key={a.ability.name}
+                          type="button"
+                          className="ability-chip"
+                          onClick={() => handleAbilityClick(a)}
+                          aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
+                        >
+                          <span className="text-capitalize">{a.ability.name}</span>
+                        </button>
+                      ))}
                   </div>
                 </div>
+                {(details?.abilities || []).some((a) => a.is_hidden) && (
+                  <div className="about-row">
+                    <span className="label">Hidden Ability</span>
+                    <div className="value">
+                      {(details?.abilities || [])
+                        .filter((a) => a.is_hidden)
+                        .map((a) => (
+                          <button
+                            key={a.ability.name}
+                            type="button"
+                            className="ability-chip is-hidden"
+                            onClick={() => handleAbilityClick(a)}
+                            aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
+                          >
+                            <span className="text-capitalize">{a.ability.name}</span>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
                 {specialTags.length > 0 && (
                   <div className="about-row">
                     <span className="label">Tags</span>
