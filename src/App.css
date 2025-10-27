@@ -1128,6 +1128,15 @@
   gap: 6px;
 }
 
+/* Match type pills in Weak to / Resists frames to preview card size */
+.weak-resist .types .type-chip {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  border-radius: 8px;
+  border-width: 1px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
 .detail-body { display: grid; grid-template-columns: 1fr; gap: var(--gap); padding: 8px 16px 16px; }
 .left-col, .right-col, .single-col { min-width: 0; }
 
@@ -3526,7 +3535,7 @@
 /* Tighter spacing in preview cards between sprite, name, and types */
 .card .sprite { margin-bottom: -10px; }
 .card .name { margin-top: 0; }
-.card .types { margin-top: 2px; gap: 4px; margin-bottom: 0; }
+.card .types { display: flex; justify-content: center; gap: 6px; margin-top: 2px; margin-bottom: 0; }
 
 /* Smaller type chips in cards */
 .card .type-chip {
@@ -3630,4 +3639,13 @@
   position: relative;
   z-index: 10;
   box-sizing: border-box;
+}
+
+/* Match type pills in detail About section to preview card size */
+.about-row .value .type-chip {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  border-radius: 8px;
+  border-width: 1px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
