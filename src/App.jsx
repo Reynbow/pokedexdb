@@ -3163,66 +3163,72 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
     return (
       <li key={`${keyPrefix}-${nodeKey}`} className="evo-tree-node">
-        <div className="evo-tree-row" style={{ "--level": level }}>
-          {incomingCondition?.text ? (
-            <button
-              type="button"
-              className="evo-tree-cond"
-              onClick={handleConditionClick}
-              title="Click for details"
-            >
-              {incomingCondition.text}
-            </button>
-          ) : null}
-          {incomingCondition?.itemSprite ? (
-            <button
-              type="button"
-              className="evo-tree-item-wrapper"
-              onClick={handleConditionClick}
-              title="Click for details"
-            >
-              <img
-                src={incomingCondition.itemSprite}
-                alt=""
-                width={20}
-                height={20}
-                loading="lazy"
-                className="evo-tree-item"
-              />
-            </button>
-          ) : null}
-          {level > 0 && (
-            <span className="evo-tree-arrow" aria-hidden="true">
-              &rarr;
-            </span>
-          )}
-          {renderEvolutionPokemon(entry, { isCurrent: isCurrentNode, isRoot: level === 0 })}
-        </div>
-        {variantForms.length > 0 && (
-          <div className="evo-tree-forms" style={{ "--level": level }}>
-            {variantForms.map((form) => {
-              const formId = form?.id != null ? String(form.id) : null;
-              if (!formId) return null;
-              const formName = form.displayName || humanizeName(form.name);
-              const isActiveForm = formId === String(id);
-              return (
+        <div className="evo-tree-split" style={{ "--level": level }}>
+          <div className="evo-tree-left">
+            <div className="evo-tree-row">
+              {incomingCondition?.text ? (
                 <button
-                  key={`${nodeKey}-form-${formId}`}
                   type="button"
-                  className={`evo-tree-form${isActiveForm ? " is-current" : ""}`}
-                  onClick={() =>
-                    onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`)
-                  }
-                  aria-pressed={isActiveForm}
-                  title={formName}
+                  className="evo-tree-cond"
+                  onClick={handleConditionClick}
+                  title="Click for details"
                 >
-                  <SpriteImage id={form.id} alt={form.name} width={30} height={30} loading="lazy" />
-                  <span className="evo-tree-form-name">{formName}</span>
+                  {incomingCondition.text}
                 </button>
-              );
-            })}
+              ) : null}
+              {incomingCondition?.itemSprite ? (
+                <button
+                  type="button"
+                  className="evo-tree-item-wrapper"
+                  onClick={handleConditionClick}
+                  title="Click for details"
+                >
+                  <img
+                    src={incomingCondition.itemSprite}
+                    alt=""
+                    width={20}
+                    height={20}
+                    loading="lazy"
+                    className="evo-tree-item"
+                  />
+                </button>
+              ) : null}
+              {level > 0 && (
+                <span className="evo-tree-arrow" aria-hidden="true">
+                  &rarr;
+                </span>
+              )}
+              {renderEvolutionPokemon(entry, { isCurrent: isCurrentNode, isRoot: level === 0 })}
+            </div>
           </div>
-        )}
+          <div className="evo-tree-right">
+            {variantForms.length > 0 && (
+              <div className="evo-tree-forms">
+                {variantForms.map((form) => {
+                  const formId = form?.id != null ? String(form.id) : null;
+                  if (!formId) return null;
+                  const formName = form.displayName || humanizeName(form.name);
+                  const isActiveForm = formId === String(id);
+                  return (
+                    <button
+                      key={`${nodeKey}-form-${formId}`}
+                      type="button"
+                      className={`evo-tree-form${isActiveForm ? " is-current" : ""}`}
+                      onClick={() =>
+                        onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`)
+                      }
+                      aria-pressed={isActiveForm}
+                      title={formName}
+                    >
+                      <SpriteImage id={form.id} alt={form.name} width={30} height={30} loading="lazy" />
+                      <span className="evo-tree-form-name">{formName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
         {children.length > 0 && (
           <ul className="evo-tree-children">
             {children.map((edge, idx) =>
