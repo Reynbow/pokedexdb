@@ -1184,6 +1184,8 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
         const formName = variant?.pokemon?.name;
         const formUrl = variant?.pokemon?.url;
         if (!formName || !formUrl) return null;
+        // Exclude Totem forms entirely
+        if (String(formName).toLowerCase().includes("totem")) return null;
         const formId = getIdFromUrl(formUrl);
         if (!formId) return null;
         const tags = new Set(deriveSpecialTags(formName));
@@ -1938,7 +1940,12 @@ function App() {
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/pokemon?limit=100000&offset=0")
       .then((r) => r.json())
-      .then((data) => setPokemon(data.results || []));
+      .then((data) => {
+        const list = Array.isArray(data.results) ? data.results : [];
+        // Filter out any Totem forms from the root list
+        const filtered = list.filter((entry) => !String(entry?.name || "").toLowerCase().includes("totem"));
+        setPokemon(filtered);
+      });
   }, []);
 
   const loadEntryMap = useCallback(
@@ -2121,15 +2128,22 @@ function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, [pokemon]);
 
-  const selectPokemon = (id, name, url) => {
-    // Route selection through region preference
+  const selectPokemon = (id, name, url, options) => {
+    const opts = options || {};
+    if (opts.forceNational) {
+      setSelectedDex("national");
+      setSelectedGame(null);
+    }
+    // If preferExact is set, do not remap to region-preferred form
     let target = { name, url };
-    try {
-      if (url) {
-        const pref = getRegionPreferredEntry({ name, url });
-        if (pref && pref.url) target = pref;
-      }
-    } catch {}
+    if (!opts.preferExact) {
+      try {
+        if (url) {
+          const pref = getRegionPreferredEntry({ name, url });
+          if (pref && pref.url) target = pref;
+        }
+      } catch {}
+    }
     const parts = (target.url || "").split("/").filter(Boolean);
     const prefId = parts[parts.length - 1] || id;
     const u = new URL(window.location.href);
@@ -3308,7 +3322,29 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     return Array.from(rootSet).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [evoPaths]);
 
-  const renderEvolutionPokemon = (node, { isCurrent = false, isRoot = false } = {}) => {
+  // Preferred region for evolution tree based on the currently selected form name
+  const selectedEvolutionRegion = useMemo(() => {
+    const raw = selected?.name || null;
+    if (!raw) return null;
+    const lower = String(raw).toLowerCase();
+    const tokens = lower.split("-");
+    const CANON = {
+      alola: "alola",
+      alolan: "alola",
+      galar: "galar",
+      galarian: "galar",
+      hisui: "hisui",
+      hisuan: "hisui",
+      paldea: "paldea",
+      paldean: "paldea",
+    };
+    for (const token of tokens) {
+      if (CANON[token]) return CANON[token];
+    }
+    return null;
+  }, [selected?.name]);
+
+  const renderEvolutionPokemon = (node, { isCurrent = false, isRoot = false, clickOptions = null } = {}) => {
     if (!node) return null;
     const nodeId = node.id != null ? String(node.id) : null;
     const nodeName = node.displayName || humanizeName(node.name);
@@ -3331,7 +3367,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         type="button"
         className={classes}
         title={nodeName}
-        onClick={() => onSelectPokemon?.(nodeId, node.name, `https://pokeapi.co/api/v2/pokemon/${nodeId}`)}
+        onClick={() => onSelectPokemon?.(nodeId, node.name, `https://pokeapi.co/api/v2/pokemon/${nodeId}`, clickOptions || undefined)}
         aria-pressed={isActive}
       >
         {inner}
@@ -3339,14 +3375,63 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     );
   };
 
-  const renderEvolutionBranch = (entry, level = 0, incomingCondition = null, keyPrefix = "node") => {
+  const renderEvolutionBranch = (entry, level = 0, incomingCondition = null, keyPrefix = "node", inheritedRegion = selectedEvolutionRegion) => {
     if (!entry) return null;
     const nodeKey = entry.id != null ? String(entry.id) : `${entry.name}-${level}`;
-    const isCurrentNode = entry.id != null && String(entry.id) === String(id);
-    const variantForms = Array.isArray(entry.forms)
+    const rawVariantForms = Array.isArray(entry.forms)
       ? entry.forms.filter((form) => form && !form.isDefault)
       : [];
+    // Helper: derive canonical region key (e.g., "alola", "galar") from a name
+    const getCanonRegion = (rawName) => {
+      const tokens = String(rawName || "").toLowerCase().split("-");
+      // Local canonical region mapping to avoid external dependencies
+      const CANON = {
+        alola: "alola",
+        alolan: "alola",
+        galar: "galar",
+        galarian: "galar",
+        hisui: "hisui",
+        hisuan: "hisui",
+        paldea: "paldea",
+        paldean: "paldea",
+      };
+      for (const token of tokens) {
+        const canon = CANON[token];
+        if (canon) return canon;
+      }
+      return null;
+    };
+    // Determine which form to promote as primary for this node
+    const activeAltForm = rawVariantForms.find((form) => String(form?.id) === String(id)) || null;
+    const regionFromActive = activeAltForm ? getCanonRegion(activeAltForm.name) : null;
+    const promotedByRegion = !activeAltForm && inheritedRegion
+      ? rawVariantForms.find((f) => getCanonRegion(f.name) === inheritedRegion) || null
+      : null;
+    const promotedForm = activeAltForm || promotedByRegion;
+    const isCurrentNode = Boolean(promotedForm)
+      ? String(promotedForm.id) === String(id)
+      : (entry.id != null && String(entry.id) === String(id));
+    const primaryDisplayNode = promotedForm
+      ? { id: promotedForm.id, name: promotedForm.name, displayName: promotedForm.displayName }
+      : entry;
+    const variantForms = promotedForm
+      ? [
+          ...rawVariantForms.filter((f) => String(f?.id) !== String(promotedForm.id)),
+          {
+            id: entry.id,
+            name: entry.name,
+            displayName: entry.displayName || humanizeName(entry.name),
+            isDefault: true,
+            tags: ["Default"],
+          },
+        ]
+      : rawVariantForms;
     const children = Array.isArray(entry.children) ? entry.children : [];
+    // Determine the preferred region to pass to children
+    const nextPreferredRegion = promotedForm ? (regionFromActive || getCanonRegion(promotedForm.name)) : inheritedRegion;
+    const regionActive = selectedDex !== "national" || Boolean(selectedGame);
+    const primaryIsDefault = !promotedForm; // when no promotion, primary is the base/default species
+    const primaryClickOptions = regionActive && primaryIsDefault ? { forceNational: true, preferExact: true } : null;
 
     const handleConditionClick = () => {
       if (incomingCondition?.details) {
@@ -3396,7 +3481,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   &rarr;
                 </span>
               )}
-              {renderEvolutionPokemon(entry, { isCurrent: isCurrentNode, isRoot: level === 0 })}
+              {renderEvolutionPokemon(primaryDisplayNode, { isCurrent: isCurrentNode, isRoot: level === 0, clickOptions: primaryClickOptions })}
             </div>
           </div>
           <div className="evo-tree-right">
@@ -3407,13 +3492,14 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   if (!formId) return null;
                   const formName = form.displayName || humanizeName(form.name);
                   const isActiveForm = formId === String(id);
+                  const clickOptions = regionActive && form?.isDefault ? { forceNational: true, preferExact: true } : null;
                   return (
                     <button
                       key={`${nodeKey}-form-${formId}`}
                       type="button"
                       className={`evo-tree-form${isActiveForm ? " is-current" : ""}`}
                       onClick={() =>
-                        onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`)
+                        onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`, clickOptions || undefined)
                       }
                       aria-pressed={isActiveForm}
                       title={formName}
@@ -3430,7 +3516,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         {children.length > 0 && (
           <ul className="evo-tree-children">
             {children.map((edge, idx) =>
-              renderEvolutionBranch(edge.child, level + 1, edge.condition, `${nodeKey}-${idx}`)
+              renderEvolutionBranch(edge.child, level + 1, edge.condition, `${nodeKey}-${idx}`, nextPreferredRegion)
             )}
           </ul>
         )}
@@ -3679,7 +3765,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         const formsBySpeciesId = new Map();
         const currentSpeciesId = sp?.id != null ? String(sp.id) : null;
         if (currentSpeciesId) {
-          const altForms = formList.filter((form) => !form.isDefault);
+        const altForms = formList.filter((form) => !form.isDefault);
           if (altForms.length) {
             formsBySpeciesId.set(currentSpeciesId, altForms);
           }

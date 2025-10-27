@@ -130,6 +130,8 @@ const deriveShowdownOptions = (forms = []) => {
   const base = [{ key: "default", label: "Default", slug: null }];
   const extra = forms
     .filter((form) => form?.name)
+    // Exclude Totem forms in test page selections as well
+    .filter((form) => !String(form.name).toLowerCase().includes("totem"))
     .map((form) => ({
       key: form.name,
       label: humanizeResourceName(form.name),
