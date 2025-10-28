@@ -9,10 +9,13 @@ export default function MovesPage() {
   const [loading, setLoading] = useState(false);
   const [selectedMove, setSelectedMove] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
+  const [selectedDamageClass, setSelectedDamageClass] = useState(null); // 'physical' | 'special' | 'status'
+  const [priorityOnly, setPriorityOnly] = useState(false); // true => priority > 0
   const [typeMovesMap, setTypeMovesMap] = useState(() => new Map());
   const [typeLoading, setTypeLoading] = useState(() => new Map());
   const [typeError, setTypeError] = useState(() => new Map());
   const [moveTypeMap, setMoveTypeMap] = useState(() => new Map());
+  const [moveMetaMap, setMoveMetaMap] = useState(() => new Map()); // name -> {power, accuracy, pp, priority, damage_class}
 
   useEffect(() => {
     let cancelled = false;
@@ -58,8 +61,19 @@ export default function MovesPage() {
     if (selectedType && !activeTypeSet) return [];
     const base = selectedType ? moves.filter((m) => activeTypeSet.has(m.name)) : moves;
     const result = q ? base.filter((m) => m.name.includes(q)) : base;
-    return [...result].sort((a, b) => a.name.localeCompare(b.name));
-  }, [moves, query, selectedType, activeTypeSet]);
+    const needsMeta = !!(selectedDamageClass || priorityOnly);
+    let afterMeta = result;
+    if (needsMeta) {
+      afterMeta = result.filter((m) => {
+        const meta = moveMetaMap.get(m.name);
+        if (!meta) return false;
+        if (selectedDamageClass && meta.damage_class !== selectedDamageClass) return false;
+        if (priorityOnly && (meta.priority ?? 0) <= 0) return false;
+        return true;
+      });
+    }
+    return [...afterMeta].sort((a, b) => a.name.localeCompare(b.name));
+  }, [moves, query, selectedType, activeTypeSet, selectedDamageClass, priorityOnly, moveMetaMap]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -119,6 +133,45 @@ export default function MovesPage() {
   function onClickAll() {
     setSelectedType(null);
   }
+
+  // Background-load metadata when meta filters are active
+  useEffect(() => {
+    const needsMeta = !!(selectedDamageClass || priorityOnly);
+    if (!needsMeta) return;
+    const q = query.trim().toLowerCase();
+    const base = selectedType && activeTypeSet ? moves.filter((m) => activeTypeSet.has(m.name)) : moves;
+    const result = q ? base.filter((m) => m.name.includes(q)) : base;
+    const toFetch = [];
+    for (const m of result) {
+      if (!moveMetaMap.has(m.name)) toFetch.push(m.name);
+      if (toFetch.length >= 200) break;
+    }
+    if (toFetch.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const chunks = [];
+        for (let i = 0; i < toFetch.length; i += 25) chunks.push(toFetch.slice(i, i + 25));
+        for (const names of chunks) {
+          const results = await Promise.all(names.map(async (name) => {
+            try {
+              const j = await fetch(`https://pokeapi.co/api/v2/move/${name}`).then((r) => r.json());
+              return { name, power: j?.power ?? null, accuracy: j?.accuracy ?? null, pp: j?.pp ?? null, priority: j?.priority ?? 0, damage_class: j?.damage_class?.name || null };
+            } catch {
+              return { name, power: null, accuracy: null, pp: null, priority: 0, damage_class: null };
+            }
+          }));
+          if (cancelled) return;
+          setMoveMetaMap((prev) => {
+            const next = new Map(prev);
+            for (const m of results) next.set(m.name, m);
+            return next;
+          });
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [selectedDamageClass, priorityOnly, query, selectedType, activeTypeSet, moves, moveMetaMap]);
 
   // Preload all types in the background to color-code move list
   useEffect(() => {
@@ -196,38 +249,74 @@ export default function MovesPage() {
               Reset
             </button>
           </div>
-          <div className="items-filter-row" role="tablist" aria-label="Move types">
-            {/* All Moves default filter */}
-            {(() => {
-              const isOn = selectedType == null;
-              return (
-                <button
-                  key="all"
-                  type="button"
-                  className={`filter-chip${isOn ? " is-on" : ""}`}
-                  aria-pressed={isOn}
-                  onClick={onClickAll}
-                >
-                  All Moves
-                </button>
-              );
-            })()}
-            {MOVE_TYPES.map((t) => {
-              const isOn = selectedType === t;
-              const isLoading = typeLoading.get(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  className={`filter-chip ${`type-${t}`}${isOn ? " is-on" : ""}`}
-                  aria-pressed={isOn}
-                  onClick={() => onClickType(t)}
-                  title={isLoading ? "Loading…" : undefined}
-                >
-                  {t}
-                </button>
-              );
-            })}
+          <div className="filters-desktop">
+            <div className="filters-row moves-filters">
+              {/* Type group */}
+              <div className="filter-box-wrap">
+                <div className="filter-box-title">Type</div>
+                <div className="filter-box type-filters">
+                  {(() => {
+                    const isOn = selectedType == null;
+                    return (
+                      <button
+                        key="all"
+                        type="button"
+                        className={`neutral-chip${isOn ? " is-on" : ""}`}
+                        aria-pressed={isOn}
+                        onClick={onClickAll}
+                      >
+                        All
+                      </button>
+                    );
+                  })()}
+                  {MOVE_TYPES.map((t) => {
+                    const isOn = selectedType === t;
+                    const isLoading = typeLoading.get(t);
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        className={`type-chip ${`type-${t}`}${isOn ? " is-on" : ""}`}
+                        aria-pressed={isOn}
+                        onClick={() => onClickType(t)}
+                        title={isLoading ? "Loading…" : undefined}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Category group */}
+              <div className="filter-box-wrap">
+                <div className="filter-box-title">Category</div>
+                <div className="filter-box special-filters">
+                  {['physical','special','status'].map((c) => {
+                    const isOn = selectedDamageClass === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`special-filter-chip${isOn ? ' is-on' : ''}`}
+                        aria-pressed={isOn}
+                        onClick={() => setSelectedDamageClass(isOn ? null : c)}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className={`special-filter-chip${priorityOnly ? ' is-on' : ''}`}
+                    aria-pressed={priorityOnly}
+                    onClick={() => setPriorityOnly((v) => !v)}
+                  >
+                    priority
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -319,6 +408,12 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
       .map((s) => s.trim())
       .filter(Boolean);
   }, [englishEffect]);
+
+  const mentionsStages = useMemo(() => {
+    const text = `${englishShortEffect || ""} ${englishEffect || ""}`.toLowerCase();
+    if (!text.includes("stage")) return false;
+    return /(raise|raises|boost|boosts|increase|increases|lower|lowers|decrease|decreases|drop|drops)/.test(text);
+  }, [englishShortEffect, englishEffect]);
 
   const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -418,9 +513,6 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
 
   return (
     <>
-      <button className="close" onClick={onClose} aria-label="Close">
-        <span className="close-icon" aria-hidden="true" />
-      </button>
       <div className="detail-title detail-title-top">
         <h2>{move.name.replaceAll("-", " ")}</h2>
       </div>
@@ -507,6 +599,18 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                         ))}
                       </ul>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {mentionsStages ? (
+                  <div className="effect-window">
+                    <div className="effect-summary">What is a "stage"?</div>
+                    <ul className="effect-list">
+                      <li>Stats change in steps from −6 to +6. Each step is a "stage".</li>
+                      <li>For Attack/Defense/Sp. Atk/Sp. Def/Speed: +1 = 1.5×, +2 = 2.0×; −1 ≈ 0.67×, −2 = 0.5×.</li>
+                      <li>At extremes: +6 = 4.0×; −6 = 0.25×.</li>
+                      <li>Accuracy/Evasion use different multipliers: +1 ≈ 1.33×; −1 = 0.75×.</li>
+                    </ul>
                   </div>
                 ) : null}
 

@@ -266,9 +266,6 @@ function AbilityDetailPanel({ ability, onClose }) {
 
   return (
     <>
-      <button className="close" onClick={onClose} aria-label="Close">
-        <span className="close-icon" aria-hidden="true" />
-      </button>
       <div className="detail-title detail-title-top">
         <h2>{ability.name.replaceAll("-", " ")}</h2>
       </div>
