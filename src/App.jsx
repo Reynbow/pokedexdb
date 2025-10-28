@@ -2560,15 +2560,20 @@ function App() {
           <p className="subtitle">Search and explore every Pokemon</p>
           <CategoryToggle />
           <div className="search-row">
-            <button
-              type="button"
-              className={`reset-button`}
-              aria-pressed={showFilters}
-              title={showFilters ? "Hide filters" : "Show filters"}
-              onClick={() => setShowFilters((v) => !v)}
-            >
-              {showFilters ? "Hide Filters" : "Show Filters"}
-            </button>
+            <div className="filters-toggle" aria-label="Filters visibility">
+              <span className="filters-toggle-label">Filters</span>
+              <button
+                type="button"
+                className={`ios-switch${showFilters ? " is-on" : ""}`}
+                role="switch"
+                aria-checked={showFilters}
+                aria-label={showFilters ? "Hide filters" : "Show filters"}
+                onClick={() => setShowFilters((v) => !v)}
+              >
+                <span className="ios-switch-track" aria-hidden="true"></span>
+                <span className="ios-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
             <input
               className="search"
               placeholder="Search Pokemon"
@@ -2655,6 +2660,26 @@ function App() {
         {selected ? (
           <section className="content split">
             <div className="list-panel">
+              {!showFilters && (selectedTypes.size + selectedTags.size > 0 || selectedDex || selectedGame) && (
+                <h2 className="active-filters-header">
+                  {selectedDex && (
+                    <span className="filter-token" key={`dex-${selectedDex}`}>
+                      {DEX_FILTERS.find((d) => d.key === selectedDex)?.label || selectedDex}
+                    </span>
+                  )}
+                  {selectedGame && (
+                    <span className="filter-token" key={`game-${selectedGame}`}>
+                      {(selectedDexConfig?.games || []).find((g) => g.key === selectedGame)?.label || selectedGame}
+                    </span>
+                  )}
+                  {Array.from(selectedTypes).map((t) => (
+                    <span key={`t-${t}`} className="filter-token">{t}</span>
+                  ))}
+                  {Array.from(selectedTags).map((tag) => (
+                    <span key={`tag-${tag}`} className="filter-token">{tag}</span>
+                  ))}
+                </h2>
+              )}
               <div className="list-scroll">
                 {regularFiltered.length > 0 && (
                   <div className="list">
@@ -2738,6 +2763,26 @@ function App() {
           </section>
         ) : (
           <>
+            {!showFilters && (selectedTypes.size + selectedTags.size > 0 || selectedDex || selectedGame) && (
+              <h2 className="active-filters-header">
+                {selectedDex && (
+                  <span className="filter-token" key={`dex-${selectedDex}`}>
+                    {DEX_FILTERS.find((d) => d.key === selectedDex)?.label || selectedDex}
+                  </span>
+                )}
+                {selectedGame && (
+                  <span className="filter-token" key={`game-${selectedGame}`}>
+                    {(selectedDexConfig?.games || []).find((g) => g.key === selectedGame)?.label || selectedGame}
+                  </span>
+                )}
+                {Array.from(selectedTypes).map((t) => (
+                  <span key={`t-${t}`} className="filter-token">{t}</span>
+                ))}
+                {Array.from(selectedTags).map((tag) => (
+                  <span key={`tag-${tag}`} className="filter-token">{tag}</span>
+                ))}
+              </h2>
+            )}
             {regularFiltered.length > 0 && (
               <section className="grid">
                 {regularFiltered.map((p) => {
