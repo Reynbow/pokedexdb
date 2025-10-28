@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
+import CategoryToggle from "./CategoryToggle.jsx";
 
 const ULTRA_BEASTS = new Set([
   "nihilego",
@@ -2533,10 +2534,20 @@ function App() {
 
   return (
     <div className="app-shell">
+      <a
+        className="discord-support-fab"
+        href="https://discord.gg/WXMjmyjeC3"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Report a bug or request a feature on Discord"
+      >
+        Feedback · Discord
+      </a>
       <header className="app-header">
         <div className="container">
           <h1 className="title">Pokedex</h1>
           <p className="subtitle">Search and explore every Pokemon</p>
+          <CategoryToggle />
           <div className="search-row">
             <input
               className="search"

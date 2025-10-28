@@ -1,8 +1,11 @@
-import React, { StrictMode, Component } from 'react'
+import React, { StrictMode, Component, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import TestPage from './TestPage.jsx'
+import ItemsPage from './ItemsPage.jsx'
+import MovesPage from './MovesPage.jsx'
+import AbilitiesPage from './AbilitiesPage.jsx'
 
 const pathSegments = window.location.pathname.toLowerCase().split('/').filter(Boolean)
 const lastSegment = pathSegments[pathSegments.length - 1] || ''
@@ -74,10 +77,29 @@ class GlobalErrorBoundary extends Component {
   }
 }
 
+function RootRouter() {
+  const [, setVersion] = useState(0)
+  useEffect(() => {
+    const onChange = () => setVersion(v => v + 1)
+    window.addEventListener('hashchange', onChange)
+    window.addEventListener('popstate', onChange)
+    return () => {
+      window.removeEventListener('hashchange', onChange)
+      window.removeEventListener('popstate', onChange)
+    }
+  }, [])
+
+  const hash = String(window.location.hash || '').toLowerCase()
+  if (hash.startsWith('#/items')) return <ItemsPage />
+  if (hash.startsWith('#/moves')) return <MovesPage />
+  if (hash.startsWith('#/abilities')) return <AbilitiesPage />
+  return <App />
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <GlobalErrorBoundary>
-      {isTestPage ? <TestPage /> : <App />}
+      {isTestPage ? <TestPage /> : <RootRouter />}
     </GlobalErrorBoundary>
   </StrictMode>,
 )
