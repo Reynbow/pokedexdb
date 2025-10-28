@@ -860,6 +860,11 @@
   position: sticky;
   top: 16px;
   height: calc(5 * var(--card-size) + 4 * var(--list-gap));
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .list-scroll {
@@ -872,31 +877,6 @@
   scrollbar-width: none; /* Firefox */
 }
 .list-scroll::-webkit-scrollbar { display: none; }
-
-.list-panel::before,
-.list-panel::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 40px;
-  pointer-events: none;
-  z-index: 2;
-}
-.list-panel::before {
-  top: 0;
-  /* Lighter, subtler fade to blend with the app background */
-  background: linear-gradient(
-    to bottom,
-    rgba(15, 18, 32, 0.45),
-    rgba(15, 18, 32, 0.2) 60%,
-    rgba(15, 18, 32, 0)
-  );
-}
-.list-panel::after {
-  bottom: 0;
-  background: linear-gradient(to top, rgba(10,13,24,1), rgba(10,13,24,0.85) 60%, rgba(10,13,24,0));
-}
 
 .list {
   display: grid;
