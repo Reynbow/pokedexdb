@@ -18,6 +18,13 @@ export default function MovesPage() {
   const [moveMetaMap, setMoveMetaMap] = useState(() => new Map()); // name -> {power, accuracy, pp, priority, damage_class}
 
   useEffect(() => {
+    // On mount, ensure URL only carries the Moves param
+    try {
+      const u = new URL(window.location.href);
+      ["p", "i", "a"].forEach((k) => u.searchParams.delete(k));
+      window.history.replaceState({}, "", u);
+    } catch {}
+
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -203,6 +210,7 @@ export default function MovesPage() {
 
   function selectMove(mv) {
     const u = new URL(window.location.href);
+    ["p", "i", "a"].forEach((k) => u.searchParams.delete(k));
     u.searchParams.set("m", mv.name);
     window.history.pushState({}, "", u);
     setSelectedMove(mv);
@@ -606,10 +614,29 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                   <div className="effect-window">
                     <div className="effect-summary">What is a "stage"?</div>
                     <ul className="effect-list">
-                      <li>Stats change in steps from −6 to +6. Each step is a "stage".</li>
-                      <li>For Attack/Defense/Sp. Atk/Sp. Def/Speed: +1 = 1.5×, +2 = 2.0×; −1 ≈ 0.67×, −2 = 0.5×.</li>
-                      <li>At extremes: +6 = 4.0×; −6 = 0.25×.</li>
-                      <li>Accuracy/Evasion use different multipliers: +1 ≈ 1.33×; −1 = 0.75×.</li>
+                      <li>Stats change in steps from −6 to +6. Each step is a stage.</li>
+                      <li>
+                        Main stats (Atk, Def, Sp. Atk, Sp. Def, Speed):
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                          <span className="move-stat-chip positive">+1 → 1.5×</span>
+                          <span className="move-stat-chip positive">+2 → 2×</span>
+                          <span className="move-stat-chip positive">+6 → 4×</span>
+                          <span className="move-stat-chip negative">−1 → 0.67×</span>
+                          <span className="move-stat-chip negative">−2 → 0.5×</span>
+                          <span className="move-stat-chip negative">−6 → 0.25×</span>
+                        </div>
+                      </li>
+                      <li>
+                        Accuracy/Evasion:
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                          <span className="move-stat-chip positive">+1 → 1.33×</span>
+                          <span className="move-stat-chip positive">+2 → 1.67×</span>
+                          <span className="move-stat-chip positive">+3 → 2×</span>
+                          <span className="move-stat-chip negative">−1 → 0.75×</span>
+                          <span className="move-stat-chip negative">−2 → 0.6×</span>
+                          <span className="move-stat-chip negative">−3 → 0.5×</span>
+                        </div>
+                      </li>
                     </ul>
                   </div>
                 ) : null}

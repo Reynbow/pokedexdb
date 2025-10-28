@@ -37,6 +37,13 @@ export default function ItemsPage() {
   ];
 
   useEffect(() => {
+    // On mount, ensure URL only carries the Items param
+    try {
+      const u = new URL(window.location.href);
+      ["p", "m", "a"].forEach((k) => u.searchParams.delete(k));
+      window.history.replaceState({}, "", u);
+    } catch {}
+
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -97,6 +104,7 @@ export default function ItemsPage() {
 
   function selectItem(it) {
     const u = new URL(window.location.href);
+    ["p", "m", "a"].forEach((k) => u.searchParams.delete(k));
     u.searchParams.set("i", it.name);
     window.history.pushState({}, "", u);
     setSelectedItem(it);

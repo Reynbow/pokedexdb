@@ -10,6 +10,13 @@ export default function AbilitiesPage() {
   const [selectedAbility, setSelectedAbility] = useState(null);
 
   useEffect(() => {
+    // On mount, ensure URL only carries the Abilities param
+    try {
+      const u = new URL(window.location.href);
+      ["p", "i", "m"].forEach((k) => u.searchParams.delete(k));
+      window.history.replaceState({}, "", u);
+    } catch {}
+
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -53,6 +60,7 @@ export default function AbilitiesPage() {
 
   function selectAbility(ab) {
     const u = new URL(window.location.href);
+    ["p", "i", "m"].forEach((k) => u.searchParams.delete(k));
     u.searchParams.set("a", ab.name);
     window.history.pushState({}, "", u);
     setSelectedAbility(ab);

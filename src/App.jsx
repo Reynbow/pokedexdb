@@ -1710,7 +1710,7 @@ function FilterTabs({
                       <button
                         key={dex.key}
                         type="button"
-                        className={`type-chip neutral-chip${isActive ? " is-on" : ""}`}
+                        className={`type-chip special-filter-chip ${dex.key}${isActive ? " is-on" : ""}`}
                         onClick={() => {
                           setSelectedGame(dex.games?.[0]?.key ?? null);
                           setSelectedDex(dex.key);
@@ -1833,7 +1833,7 @@ function FilterTabs({
                     <button
                       key={dex.key}
                       type="button"
-                      className={`type-chip neutral-chip${isActive ? " is-on" : ""}`}
+                      className={`type-chip special-filter-chip ${dex.key}${isActive ? " is-on" : ""}`}
                       onClick={() => {
                         setSelectedGame(dex.games?.[0]?.key ?? null);
                         setSelectedDex(dex.key);
@@ -1874,6 +1874,15 @@ function App() {
     const u = new URL(window.location.href);
     return u.searchParams.get("p");
   });
+
+  // Ensure URL only carries Pokemon param when on Pokemon page
+  useEffect(() => {
+    try {
+      const u = new URL(window.location.href);
+      ["i", "m", "a"].forEach((k) => u.searchParams.delete(k));
+      window.history.replaceState({}, "", u);
+    } catch {}
+  }, []);
 
   const getTagsForName = (name) => {
     const lower = String(name || "").toLowerCase();
@@ -2211,6 +2220,7 @@ function App() {
     const parts = (target.url || "").split("/").filter(Boolean);
     const prefId = parts[parts.length - 1] || id;
     const u = new URL(window.location.href);
+    ["i", "m", "a"].forEach((k) => u.searchParams.delete(k));
     u.searchParams.set("p", prefId);
     window.history.pushState({}, "", u);
     setSelected({ id: prefId, name: target.name, url: target.url || url });

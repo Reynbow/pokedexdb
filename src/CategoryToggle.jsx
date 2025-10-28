@@ -21,8 +21,12 @@ export default function CategoryToggle() {
   const handleNavigate = (target) => {
     const targetHash = target.hash;
     const u = new URL(window.location.href);
-    // Clear any selected Pokemon param when switching sections
-    u.searchParams.delete("p");
+    // Keep only the relevant param for the target section
+    const keepMap = { pokemon: "p", items: "i", moves: "m", abilities: "a" };
+    const keep = keepMap[target.key] || null;
+    ["p", "i", "m", "a"].forEach((k) => {
+      if (k !== keep) u.searchParams.delete(k);
+    });
     window.history.replaceState({}, "", u);
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash;

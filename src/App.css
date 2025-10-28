@@ -661,6 +661,18 @@
   color: #f8fafc;
 }
 
+/* Regional selected-state colors */
+.special-filter-chip.is-on.kanto { background: #81bc17; border-color: rgba(129, 188, 23, 0.75); color: #0f172a; }
+.special-filter-chip.is-on.johto { background: #cac02e; border-color: rgba(202, 192, 46, 0.75); color: #0f172a; }
+.special-filter-chip.is-on.hoenn { background: #67c1ab; border-color: rgba(103, 193, 171, 0.75); color: #0f172a; }
+.special-filter-chip.is-on.unova { background: #6baece; border-color: rgba(107, 174, 206, 0.75); color: #0f172a; }
+.special-filter-chip.is-on.alola { background: #dc5a40; border-color: rgba(220, 90, 64, 0.75); }
+.special-filter-chip.is-on.galar { background: #ae349f; border-color: rgba(174, 52, 159, 0.75); }
+.special-filter-chip.is-on.paldea { background: #e2a03c; border-color: rgba(226, 160, 60, 0.75); color: #0f172a; }
+.special-filter-chip.is-on.hisui { background: #9173a4; border-color: rgba(145, 115, 164, 0.75); }
+.special-filter-chip.is-on.sinnoh { background: #9173a4; border-color: rgba(145, 115, 164, 0.75); }
+.special-filter-chip.is-on.kalos { background: #cc034e; border-color: rgba(204, 3, 78, 0.75); }
+
 .type-chip.skeleton {
   width: 48px;
   height: 22px;
@@ -1661,6 +1673,8 @@
 .move-category-status { background: rgba(148, 163, 184, 0.16); border-color: rgba(148, 163, 184, 0.35); color: #e2e8f0; }
 .move-meta-icon { width: 16px; height: 16px; display: inline-block; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); transform: scale(1.6); transform-origin: center; flex-shrink: 0; margin-right: 6px; }
 .move-stats-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.move-stat-chip.positive { border-color: rgba(74,222,128,0.45); background: rgba(34,197,94,0.16); color: #bbf7d0; }
+.move-stat-chip.negative { border-color: rgba(248,113,113,0.45); background: rgba(248,113,113,0.16); color: #fecaca; }
 .ability-chip {
   display: inline-flex;
   align-items: center;
@@ -3841,51 +3855,51 @@
 }
 
 .card-tag.legendary,
-.special-filter-chip.legendary {
+.special-filter-chip.is-on.legendary {
   background: linear-gradient(135deg, #facc15, #f97316);
   border-color: rgba(250, 204, 21, 0.65);
   color: #1e1e1e;
 }
 
 .card-tag.mythical,
-.special-filter-chip.mythical {
+.special-filter-chip.is-on.mythical {
   background: linear-gradient(135deg, #d946ef, #7c3aed);
   border-color: rgba(192, 132, 252, 0.65);
 }
 
 .card-tag.mega,
-.special-filter-chip.mega {
+.special-filter-chip.is-on.mega {
   background: linear-gradient(135deg, #38bdf8, #0284c7);
   border-color: rgba(59, 130, 246, 0.6);
 }
 
 .card-tag.primal,
-.special-filter-chip.primal {
+.special-filter-chip.is-on.primal {
   background: linear-gradient(135deg, #fb7185, #ef4444);
   border-color: rgba(248, 113, 113, 0.65);
 }
 
 .card-tag.ultra-beast,
-.special-filter-chip.ultra-beast {
+.special-filter-chip.is-on.ultra-beast {
   background: linear-gradient(135deg, #bef264, #22c55e);
   border-color: rgba(74, 222, 128, 0.65);
   color: #0f172a;
 }
 
 .card-tag.paradox,
-.special-filter-chip.paradox {
+.special-filter-chip.is-on.paradox {
   background: linear-gradient(135deg, #6366f1, #14b8a6);
   border-color: rgba(94, 234, 212, 0.55);
 }
 
 .card-tag.gigantamax,
-.special-filter-chip.gigantamax {
+.special-filter-chip.is-on.gigantamax {
   background: linear-gradient(135deg, #f472b6, #f97316);
   border-color: rgba(249, 115, 22, 0.55);
 }
 
 .card-tag.baby,
-.special-filter-chip.baby {
+.special-filter-chip.is-on.baby {
   background: linear-gradient(135deg, #38bdf8, #a855f7);
   border-color: rgba(129, 140, 248, 0.55);
 }
