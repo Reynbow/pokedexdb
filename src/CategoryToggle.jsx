@@ -2,7 +2,6 @@ import React, { useMemo } from "react";
 
 const CATEGORIES = [
   { key: "pokemon", label: "Pokemon", hash: "" },
-  { key: "items", label: "Items", hash: "#/items" },
   { key: "moves", label: "Moves", hash: "#/moves" },
   { key: "abilities", label: "Abilities", hash: "#/abilities" },
 ];

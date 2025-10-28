@@ -1858,6 +1858,7 @@ function FilterTabs({
 function App() {
   const [pokemon, setPokemon] = useState([]);
   const [query, setQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(true);
   const [selected, setSelected] = useState(null);
   const [selectedTypes, setSelectedTypes] = useState(() => new Set());
   const [selectedTags, setSelectedTags] = useState(() => new Set());
@@ -2559,6 +2560,15 @@ function App() {
           <p className="subtitle">Search and explore every Pokemon</p>
           <CategoryToggle />
           <div className="search-row">
+            <button
+              type="button"
+              className={`reset-button`}
+              aria-pressed={showFilters}
+              title={showFilters ? "Hide filters" : "Show filters"}
+              onClick={() => setShowFilters((v) => !v)}
+            >
+              {showFilters ? "Hide Filters" : "Show Filters"}
+            </button>
             <input
               className="search"
               placeholder="Search Pokemon"
@@ -2579,22 +2589,24 @@ function App() {
               Reset
             </button>
           </div>
-          <FilterTabs
-            selectedTypes={selectedTypes}
-            setSelectedTypes={setSelectedTypes}
-            typeIndexRef={typeIndexRef}
-            selectedTags={selectedTags}
-            setSelectedTags={setSelectedTags}
-            selectedDex={selectedDex}
-            setSelectedGame={setSelectedGame}
-            setSelectedDex={setSelectedDex}
-            clearSelection={clearSelection}
-          />
+          {showFilters && (
+            <FilterTabs
+              selectedTypes={selectedTypes}
+              setSelectedTypes={setSelectedTypes}
+              typeIndexRef={typeIndexRef}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              selectedDex={selectedDex}
+              setSelectedGame={setSelectedGame}
+              setSelectedDex={setSelectedDex}
+              clearSelection={clearSelection}
+            />
+          )}
         </div>
       </header>
 
       <main className="container">
-        {showGameFilters && (
+        {showFilters && showGameFilters && (
           <div className="game-filters-row">
             <div className="game-filters-controls">
               <div
@@ -4451,6 +4463,10 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       const femStatic = details?.sprites?.[shiny ? "front_shiny_female" : "front_female"];
       if (femStatic) return femStatic;
     }
+
+    // Prefer HOME high-res sprites for default (non-female) cases
+    const home = d?.home?.[shiny ? "front_shiny" : "front_default"];
+    if (home) return home;
 
     const art = d?.["official-artwork"]?.[shiny ? "front_shiny" : "front_default"];
     if (art) return art;
