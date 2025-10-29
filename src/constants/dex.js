@@ -190,4 +190,6 @@ export const DEX_FILTERS = [
   },
 ];
 
+export const DEX_LOOKUP = new Map(DEX_FILTERS.map((cfg) => [cfg.key, cfg]));
+
 

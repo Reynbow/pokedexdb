@@ -4,11 +4,15 @@ import GameFilters from "./sections/GameFilters.jsx";
 import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
-import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS } from "./constants/species.js";
+import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS, LEGENDARY_NAMES, MYTHICAL_NAMES } from "./constants/species.js";
 import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
 import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
 import { EV_ITEM_GUIDE, FEATHER_VARIANTS, POWER_ITEM_VARIANTS } from "./constants/evItems.js";
-import { DEX_FILTERS } from "./constants/dex.js";
+import { DEX_FILTERS, DEX_LOOKUP } from "./constants/dex.js";
+import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "./constants/tags.js";
+import { CONDITION_LABEL_OVERRIDES, TIME_OF_DAY_LABELS, METHOD_LABEL_OVERRIDES } from "./constants/labels.js";
+import { FORM_ORDER } from "./constants/forms.js";
+import { MAX_CONCURRENT } from "./constants/config.js";
 import {
   GAME_LOGO_LOOKUP,
   VERSION_LOGO_FILES,
@@ -257,169 +261,12 @@ const getRegionGeneration = (regionName) => {
   return REGION_GENERATION_LOOKUP.get(normalized) ?? null;
 };
 
-const DEX_LOOKUP = new Map(DEX_FILTERS.map((cfg) => [cfg.key, cfg]));
-const LEGENDARY_NAMES = new Set([
-  "articuno",
-  "articuno-galar",
-  "zapdos",
-  "zapdos-galar",
-  "moltres",
-  "moltres-galar",
-  "mewtwo",
-  "mewtwo-mega-x",
-  "mewtwo-mega-y",
-  "raikou",
-  "entei",
-  "suicune",
-  "lugia",
-  "ho-oh",
-  "regirock",
-  "regice",
-  "registeel",
-  "latias",
-  "latias-mega",
-  "latios",
-  "latios-mega",
-  "kyogre",
-  "kyogre-primal",
-  "groudon",
-  "groudon-primal",
-  "rayquaza",
-  "rayquaza-mega",
-  "uxie",
-  "mesprit",
-  "azelf",
-  "dialga",
-  "dialga-origin",
-  "palkia",
-  "palkia-origin",
-  "heatran",
-  "regigigas",
-  "giratina-altered",
-  "giratina-origin",
-  "cresselia",
-  "cobalion",
-  "terrakion",
-  "virizion",
-  "tornadus-incarnate",
-  "tornadus-therian",
-  "thundurus-incarnate",
-  "thundurus-therian",
-  "landorus-incarnate",
-  "landorus-therian",
-  "reshiram",
-  "zekrom",
-  "kyurem",
-  "kyurem-black",
-  "kyurem-white",
-  "xerneas",
-  "yveltal",
-  "zygarde",
-  "zygarde-50",
-  "zygarde-10",
-  "zygarde-10-power-construct",
-  "zygarde-50-power-construct",
-  "zygarde-complete",
-  "zygarde-mega",
-  "type-null",
-  "silvally",
-  "tapu-koko",
-  "tapu-lele",
-  "tapu-bulu",
-  "tapu-fini",
-  "cosmog",
-  "cosmoem",
-  "solgaleo",
-  "lunala",
-  "necrozma",
-  "necrozma-dawn",
-  "necrozma-dusk",
-  "necrozma-ultra",
-  "zacian",
-  "zacian-crowned",
-  "zamazenta",
-  "zamazenta-crowned",
-  "eternatus",
-  "eternatus-eternamax",
-  "kubfu",
-  "urshifu-single-strike",
-  "urshifu-rapid-strike",
-  "urshifu-single-strike-gmax",
-  "urshifu-rapid-strike-gmax",
-  "regieleki",
-  "regidrago",
-  "glastrier",
-  "spectrier",
-  "calyrex",
-  "calyrex-ice",
-  "calyrex-shadow",
-  "enamorus-incarnate",
-  "enamorus-therian",
-  "koraidon",
-  "miraidon",
-  "wo-chien",
-  "chien-pao",
-  "ting-lu",
-  "chi-yu",
-  "okidogi",
-  "munkidori",
-  "fezandipiti",
-  "ogerpon",
-  "ogerpon-wellspring-mask",
-  "ogerpon-hearthflame-mask",
-  "ogerpon-cornerstone-mask",
-  "terapagos",
-  "terapagos-terastal",
-  "terapagos-stellar",
-]);
+// moved to constants (DEX_LOOKUP)
+// moved to constants (LEGENDARY_NAMES)
 
-const MYTHICAL_NAMES = new Set([
-  "mew",
-  "celebi",
-  "jirachi",
-  "deoxys-normal",
-  "deoxys-attack",
-  "deoxys-defense",
-  "deoxys-speed",
-  "phione",
-  "manaphy",
-  "darkrai",
-  "shaymin-land",
-  "shaymin-sky",
-  "arceus",
-  "victini",
-  "keldeo-ordinary",
-  "keldeo-resolute",
-  "meloetta-aria",
-  "meloetta-pirouette",
-  "genesect",
-  "diancie",
-  "diancie-mega",
-  "hoopa",
-  "hoopa-unbound",
-  "volcanion",
-  "magearna",
-  "magearna-original",
-  "marshadow",
-  "zeraora",
-  "meltan",
-  "melmetal",
-  "melmetal-gmax",
-  "zarude",
-  "zarude-dada",
-  "pecharunt",
-]);
+// moved to constants (MYTHICAL_NAMES)
 
-const SPECIAL_FILTERS = ["Legendary", "Mythical", "Mega", "Ultra Beast", "Paradox", "Gigantamax", "Baby"];
-const SPECIAL_TAG_META = new Map([
-  ["Legendary", { short: "LGD", className: "legendary" }],
-  ["Mythical", { short: "MYTH", className: "mythical" }],
-  ["Mega", { short: "MEGA", className: "mega" }],
-  ["Ultra Beast", { short: "UB", className: "ultra-beast" }],
-  ["Paradox", { short: "PDX", className: "paradox" }],
-  ["Gigantamax", { short: "GMAX", className: "gigantamax" }],
-  ["Baby", { short: "BABY", className: "baby" }],
-]);
+// moved to constants (SPECIAL_FILTERS, SPECIAL_TAG_META)
 
 const humanizeName = (s) => String(s || "").replace(/-/g, " ");
 
@@ -488,28 +335,7 @@ const formatDisplayName = (rawName) => {
   return toTitleCase(stripped);
 };
 
-const CONDITION_LABEL_OVERRIDES = {
-  "time-morning": "Morning",
-  "time-day": "Daytime",
-  "time-night": "Nighttime",
-  "time-dusk": "Dusk",
-  "time-dawn": "Dawn",
-};
-
-const TIME_OF_DAY_LABELS = {
-  dawn: "Dawn",
-  day: "Daytime",
-  dusk: "Dusk",
-  evening: "Evening",
-  midnight: "Midnight",
-  morning: "Morning",
-  night: "Nighttime",
-};
-
-const METHOD_LABEL_OVERRIDES = {
-  "sos-encounter": "SOS Encounter",
-  "special-spot": "Special Spot",
-};
+// moved to constants (CONDITION_LABEL_OVERRIDES, TIME_OF_DAY_LABELS, METHOD_LABEL_OVERRIDES)
 
 const formatEncounterDescriptor = (name) => {
   if (!name) return null;
@@ -710,15 +536,7 @@ const normalizeEncounterData = (entries) => {
   return result;
 };
 
-const FORM_ORDER = new Map([
-  ["Default", 0],
-  ["Regional", 1],
-  ["Mega", 2],
-  ["Ultra Beast", 3],
-  ["Paradox", 4],
-  ["Gigantamax", 5],
-  ["Baby", 6],
-]);
+// moved to constants (FORM_ORDER)
 
 const getFormPriority = (entry) => {
   if (!entry?.tags || entry.tags.length === 0) return 99;
@@ -2406,7 +2224,7 @@ function normalizeNatureEntries(entries) {
 
 // Simple global fetch queue to limit concurrent requests
 let IN_FLIGHT = 0;
-const MAX_CONCURRENT = 6;
+// moved to constants (MAX_CONCURRENT)
 const FETCH_QUEUE = [];
 function runNext() {
   if (IN_FLIGHT >= MAX_CONCURRENT) return;
@@ -5672,7 +5490,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                           <div className="ability-learner-meta">
                             <div className="ability-learner-top">
                               <span className="ability-learner-name text-capitalize">{pokemon.name}</span>
-                              {pokemon.isHidden && <span className="ability-learner-tag">Hidden</span>}
+                              {pokemon.isHidden && <span className="ability-learner-tag">H</span>}
                             </div>
                           </div>
                           {typeList.length > 0 && (
