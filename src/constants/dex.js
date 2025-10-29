@@ -95,13 +95,13 @@ export const DEX_FILTERS = [
   {
     key: "unova",
     label: "Unova",
-    apiNames: ["unova", "updated-unova"],
+    apiNames: ["original-unova", "updated-unova"],
     pad: 3,
     games: [
       {
         key: "black-white",
         label: "Black & White",
-        apiNames: ["unova"],
+        apiNames: ["original-unova"],
         logos: ["black.png", "white.png"],
       },
       {
@@ -124,24 +124,30 @@ export const DEX_FILTERS = [
         apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
         logos: ["x.png", "y.png"],
       },
+      {
+        key: "legends-za",
+        label: "Legends: Z-A",
+        apiNames: ["lumiose-city"],
+        logos: ["za.png"],
+      },
     ],
   },
   {
     key: "alola",
     label: "Alola",
-    apiNames: ["sun-moon", "ultra-sun-ultra-moon"],
+    apiNames: ["original-alola", "updated-alola"],
     pad: 3,
     games: [
       {
         key: "sun-moon",
         label: "Sun & Moon",
-        apiNames: ["sun-moon"],
+        apiNames: ["original-alola"],
         logos: ["sun.png", "moon.png"],
       },
       {
         key: "ultra-sun-ultra-moon",
         label: "Ultra Sun & Ultra Moon",
-        apiNames: ["ultra-sun-ultra-moon"],
+        apiNames: ["updated-alola"],
         logos: ["ultrasun.png", "ultramoon.png"],
       },
     ],

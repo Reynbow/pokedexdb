@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeaderSection from "./sections/Header.jsx";
 import GameFilters from "./sections/GameFilters.jsx";
+import FilterTabs from "./sections/FilterTabs.jsx";
+import SpriteImage from "./components/SpriteImage.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
@@ -981,252 +985,7 @@ function AlternateFormsModal({ forms, onClose, onSelectPokemon, title }) {
   );
 }
 
-function FilterTabs({
-  selectedTypes,
-  setSelectedTypes,
-  typeIndexRef,
-  selectedTags,
-  setSelectedTags,
-  selectedDex,
-  setSelectedGame,
-  setSelectedDex,
-  clearSelection,
-}) {
-  const [activeTab, setActiveTab] = useState("types");
-
-  return (
-    <div className="filter-tabs-container">
-      <div className="filters-stack">
-        {/* Desktop: Show all filters */}
-        <div className="filters-desktop">
-          <div className="filters-row">
-            <div className="filter-box-wrap">
-              <div className="filter-box-title">Types</div>
-              <div className="filter-box">
-                <div className="type-filters">
-                  {ALL_TYPES.map((t) => (
-                    <span
-                      key={t}
-                      className={`type-chip type-${t}${selectedTypes.has(t) ? "" : " off"}`}
-                      role="button"
-                      title={`Toggle ${t}`}
-                      onClick={() => {
-                        setSelectedTypes((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(t)) {
-                            next.delete(t);
-                          } else {
-                            if (!typeIndexRef.current.get(t)) {
-                              fetch(`https://pokeapi.co/api/v2/type/${t}`)
-                                .then((r) => r.json())
-                                .then((data) => {
-                                  const items = new Set((data.pokemon || []).map((x) => x.pokemon.name));
-                                  typeIndexRef.current.set(t, items);
-                                })
-                                .catch(() => {});
-                            }
-                            next.add(t);
-                          }
-                          return next;
-                        });
-                      }}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="filter-box-wrap">
-              <div className="filter-box-title">Special</div>
-              <div className="filter-box">
-                <div className="special-filters">
-                  {SPECIAL_FILTERS.map((tag) => {
-                    const isOn = selectedTags.has(tag);
-                    const meta = SPECIAL_TAG_META.get(tag);
-                    const classNames = ["type-chip", "special-filter-chip"];
-                    if (meta?.className) classNames.push(meta.className);
-                    if (isOn) classNames.push("is-on");
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        className={classNames.join(" ")}
-                        onClick={() => {
-                          setSelectedTags((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(tag)) {
-                              next.delete(tag);
-                            } else {
-                              next.add(tag);
-                            }
-                            return next;
-                          });
-                        }}
-                        aria-pressed={isOn}
-                        title={`Toggle ${tag}`}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="filter-box-wrap">
-              <div className="filter-box-title">Regional</div>
-              <div className="filter-box">
-                <div className="dex-filters">
-                  {DEX_FILTERS.map((dex) => {
-                    const isActive = dex.key === selectedDex;
-                    return (
-                      <button
-                        key={dex.key}
-                        type="button"
-                        className={`type-chip special-filter-chip ${dex.key}${isActive ? " is-on" : ""}`}
-                        onClick={() => {
-                          setSelectedGame(dex.games?.[0]?.key ?? null);
-                          setSelectedDex(dex.key);
-                          clearSelection();
-                        }}
-                        aria-pressed={isActive}
-                        title={`Use ${dex.label} Pokedex`}
-                      >
-                        {dex.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile: Tabbed interface */}
-        <div className="filters-mobile">
-          <div className="filter-tabs-header">
-            <button
-              type="button"
-              className={`filter-tab-button ${activeTab === "types" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("types")}
-            >
-              Types
-            </button>
-            <button
-              type="button"
-              className={`filter-tab-button ${activeTab === "special" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("special")}
-            >
-              Special
-            </button>
-            <button
-              type="button"
-              className={`filter-tab-button ${activeTab === "dex" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("dex")}
-            >
-              Dex
-            </button>
-          </div>
-
-          <div className="filter-tabs-content">
-            {activeTab === "types" && (
-              <div className="type-filters">
-                {ALL_TYPES.map((t) => (
-                  <span
-                    key={t}
-                    className={`type-chip type-${t}${selectedTypes.has(t) ? "" : " off"}`}
-                    role="button"
-                    title={`Toggle ${t}`}
-                    onClick={() => {
-                      setSelectedTypes((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(t)) {
-                          next.delete(t);
-                        } else {
-                          if (!typeIndexRef.current.get(t)) {
-                            fetch(`https://pokeapi.co/api/v2/type/${t}`)
-                              .then((r) => r.json())
-                              .then((data) => {
-                                const items = new Set((data.pokemon || []).map((x) => x.pokemon.name));
-                                typeIndexRef.current.set(t, items);
-                              })
-                              .catch(() => {});
-                          }
-                          next.add(t);
-                        }
-                        return next;
-                      });
-                    }}
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {activeTab === "special" && (
-              <div className="special-filters">
-                {SPECIAL_FILTERS.map((tag) => {
-                  const isOn = selectedTags.has(tag);
-                  const meta = SPECIAL_TAG_META.get(tag);
-                  const classNames = ["type-chip", "special-filter-chip"];
-                  if (meta?.className) classNames.push(meta.className);
-                  if (isOn) classNames.push("is-on");
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={classNames.join(" ")}
-                      onClick={() => {
-                        setSelectedTags((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(tag)) {
-                            next.delete(tag);
-                          } else {
-                            next.add(tag);
-                          }
-                          return next;
-                        });
-                      }}
-                      aria-pressed={isOn}
-                      title={`Toggle ${tag}`}
-                    >
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {activeTab === "dex" && (
-              <div className="dex-filters">
-                {DEX_FILTERS.map((dex) => {
-                  const isActive = dex.key === selectedDex;
-                  return (
-                    <button
-                      key={dex.key}
-                      type="button"
-                      className={`type-chip special-filter-chip ${dex.key}${isActive ? " is-on" : ""}`}
-                      onClick={() => {
-                        setSelectedGame(dex.games?.[0]?.key ?? null);
-                        setSelectedDex(dex.key);
-                        clearSelection();
-                      }}
-                      aria-pressed={isActive}
-                      title={`Use ${dex.label} Pokedex`}
-                    >
-                      {dex.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// Moved to ./sections/FilterTabs.jsx
 
 function App() {
   const [pokemon, setPokemon] = useState([]);
@@ -1902,6 +1661,18 @@ function App() {
 
   const selectedDexConfig = DEX_LOOKUP.get(selectedDex);
   const availableGames = selectedDex === "national" ? NATIONAL_GAME_OPTIONS : selectedDexConfig?.games || [];
+  const nationalOrderIndex = useMemo(() => new Map(NATIONAL_GAME_OPTIONS.map((g, idx) => [g.key, idx])), []);
+  const sortedAvailableGames = useMemo(() => {
+    const list = availableGames || [];
+    return list.slice().sort((a, b) => {
+      const ia = nationalOrderIndex.get(a?.key);
+      const ib = nationalOrderIndex.get(b?.key);
+      if (ia == null && ib == null) return 0;
+      if (ia == null) return 1;
+      if (ib == null) return -1;
+      return ib - ia; // newest first
+    });
+  }, [availableGames, nationalOrderIndex]);
   const showGameFilters = availableGames.length > 0;
 
   const handleGameClick = useCallback((gameKey) => {
@@ -1981,7 +1752,7 @@ function App() {
             showGameFilters={showGameFilters}
             selectedDex={selectedDex}
             gameFiltersRef={gameFiltersRef}
-            availableGames={availableGames}
+            availableGames={sortedAvailableGames}
             selectedGame={selectedGame}
             onGameClick={handleGameClick}
             resolveLogoUrls={resolveLogoUrls}
@@ -2028,6 +1799,7 @@ function App() {
                           onSelect={() => selectPokemon(id, pref.name, pref.url)}
                           selected={String(selected.id) === String(id)}
                           dexNumber={dexDisplay}
+                          detailsCache={detailsCache}
                         />
                       );
                     })}
@@ -2053,6 +1825,7 @@ function App() {
                             onSelect={() => selectPokemon(id, pref.name, pref.url)}
                             selected={String(selected.id) === String(id)}
                             dexNumber={dexDisplay}
+                            detailsCache={detailsCache}
                           />
                         );
                       })}
@@ -2129,6 +1902,7 @@ function App() {
                       url={pref.url}
                       onSelect={() => selectPokemon(id, pref.name, pref.url)}
                       dexNumber={dexDisplay}
+                      detailsCache={detailsCache}
                     />
                   );
                 })}
@@ -2152,6 +1926,7 @@ function App() {
                         url={pref.url}
                         onSelect={() => selectPokemon(id, pref.name, pref.url)}
                         dexNumber={dexDisplay}
+                        detailsCache={detailsCache}
                       />
                     );
                   })}
@@ -2246,217 +2021,13 @@ function queuedFetch(url, init) {
   });
 }
 
-const SPRITE_PLACEHOLDER =
-  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
+// Moved to ./components/SpriteImage.jsx
 
-const buildSpriteSources = (id) => {
-  const clean = String(id ?? "").trim();
-  const sources = [];
-  if (clean) {
-    // Use higher resolution Showdown sprites for better pixel art quality
-    sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.png`);
-    sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${clean}.png`);
-  }
-  sources.push(SPRITE_PLACEHOLDER);
-  return sources;
-};
+// Moved into ./components/PokemonCard.jsx
 
-function SpriteImage({ id, alt, onError, ...rest }) {
-  const sources = useMemo(() => buildSpriteSources(id), [id]);
-  const [index, setIndex] = useState(0);
+// Moved to ./components/PokemonCard.jsx
 
-  useEffect(() => {
-    setIndex(0);
-  }, [id]);
-  // placeholders; real definitions moved after evolutionTree
-  const aggregatedAlternateForms = [];
-  const hasAnyAlternateForms = false;
-  const openAggregatedAltForms = () => {};
-
-  const handleError = (event) => {
-    setIndex((prev) => {
-      const next = prev + 1;
-      if (next < sources.length) {
-        return next;
-      }
-      if (onError) {
-        onError(event);
-      }
-      return prev;
-    });
-  };
-
-  const src = sources[Math.min(index, sources.length - 1)];
-  return <img {...rest} alt={alt} src={src} onError={handleError} />;
-}
-
-function useInView(options) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      options || { root: null, rootMargin: "200px 0px", threshold: 0.01 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [options]);
-  return [ref, inView];
-}
-
-function PokemonCard({ name, id, url, onSelect, selected, dexNumber }) {
-  const [types, setTypes] = useState(detailsCache.get(id)?.types || []);
-  const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
-  const specialTags = useMemo(() => {
-    const tags = deriveSpecialTags(name) || [];
-    return tags
-      .map((tag) => {
-        const meta = SPECIAL_TAG_META.get(tag);
-        if (!meta) return null;
-        const order = SPECIAL_FILTERS.indexOf(tag);
-        return {
-          key: tag,
-          tag,
-          short: meta.short,
-          className: meta.className,
-          order: order >= 0 ? order : 99,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => {
-        if (a.order !== b.order) return a.order - b.order;
-        return a.tag.localeCompare(b.tag);
-      });
-  }, [name]);
-
-  // Load types lazily when the card is near the viewport
-  useEffect(() => {
-    let ignore = false;
-    if (!inView) return;
-    const key = String(id);
-    if (detailsCache.has(key)) {
-      setTypes(detailsCache.get(key).types);
-      return;
-    }
-    try {
-      const cached = localStorage.getItem(`types:${key}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        detailsCache.set(key, { types: parsed });
-        setTypes(parsed);
-        return;
-      }
-    } catch {}
-
-    queuedFetch(url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (ignore) return;
-        const t = (data.types || [])
-          .sort((a, b) => a.slot - b.slot)
-          .map((x) => x.type.name);
-        detailsCache.set(key, { types: t });
-        try { localStorage.setItem(`types:${key}`, JSON.stringify(t)); } catch {}
-        setTypes(t);
-      })
-      .catch(() => {});
-    return () => { ignore = true; };
-  }, [id, url, inView]);
-
-  useEffect(() => {
-    const node = cardRef.current;
-    if (!selected || !node || !node.isConnected) return;
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    node.scrollIntoView({
-      block: "center",
-      inline: "nearest",
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-    });
-  }, [selected]);
-
-  const dexNo = dexNumber || `#${id}`;
-
-  return (
-    <div
-      className={`card${selected ? " is-selected" : ""}`}
-      title={name}
-      onClick={onSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.()}
-      ref={cardRef}
-      aria-current={selected ? "true" : undefined}
-    >
-      {specialTags.length > 0 && (
-        <div className="card-tags">
-          {specialTags.map((tag) => (
-            <span
-              key={tag.key}
-              className={`card-tag ${tag.className}`}
-              title={tag.tag}
-              aria-label={tag.tag}
-            >
-              {tag.short}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="dexno">{dexNo}</div>
-      {inView ? (
-        <SpriteImage className="sprite" id={id} alt={name} width={144} height={144} loading="lazy" />
-      ) : (
-        <div style={{ width: 144, height: 144 }} />
-      )}
-      <div className="name">{formatDisplayName(name)}</div>
-      <div className="types">
-        {types.length === 0 ? (
-          <span className="type-chip skeleton" />
-        ) : (
-          types.map((t) => (
-            <span key={t} className={`type-chip type-${t}`}>
-              {t}
-            </span>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, info: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, info) {
-    this.setState({ info });
-    // eslint-disable-next-line no-console
-    console.error('DetailPanel crashed:', error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 16 }}>
-          <h2>Something went wrong loading details.</h2>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>
-            {String(this.state.error)}
-            {this.state.info ? '\n' + (this.state.info.componentStack || '') : ''}
-          </pre>
-          {this.props.fallback}
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+// Moved to ./components/ErrorBoundary.jsx
 
 function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNumber, selectedDex, selectedGame }) {
   const { id, name, url } = selected || {};
@@ -3103,7 +2674,46 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         }
         const data = await response.json();
         if (ignore) return;
-        const normalized = normalizeEncounterData(data);
+        let normalized = normalizeEncounterData(data);
+
+        // Fallback: if current form has no encounter data, try the default species variety
+        if (normalized.length === 0) {
+          try {
+            const speciesUrl = details?.species?.url;
+            if (speciesUrl) {
+              addLog('Encounter fallback: fetching species', { speciesUrl });
+              const speciesRes = await queuedFetch(speciesUrl);
+              if (speciesRes?.ok) {
+                const speciesData = await speciesRes.json();
+                const defaultVariety = Array.isArray(speciesData?.varieties)
+                  ? speciesData.varieties.find((v) => v?.is_default && v?.pokemon?.url)
+                  : null;
+                const defaultPokemonUrl = defaultVariety?.pokemon?.url || null;
+                // Avoid re-fetching the same form
+                if (defaultPokemonUrl && defaultPokemonUrl !== url) {
+                  addLog('Encounter fallback: fetching default variety details', { defaultPokemonUrl });
+                  const defaultRes = await queuedFetch(defaultPokemonUrl);
+                  if (defaultRes?.ok) {
+                    const defaultData = await defaultRes.json();
+                    const fallbackUrl = defaultData?.location_area_encounters;
+                    if (fallbackUrl) {
+                      addLog('Encounter fallback: fetching default variety encounters', { fallbackUrl });
+                      const fallbackRes = await queuedFetch(fallbackUrl);
+                      if (fallbackRes?.ok) {
+                        const fallbackJson = await fallbackRes.json();
+                        const fallbackNormalized = normalizeEncounterData(fallbackJson);
+                        if (fallbackNormalized.length > 0) {
+                          normalized = fallbackNormalized;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch {}
+        }
+
         setGameAvailability(normalized);
         setGameAvailabilityError(null);
         setGameAvailabilityLoading(false);
