@@ -1,250 +1,36 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import HeaderSection from "./sections/Header.jsx";
+import GameFilters from "./sections/GameFilters.jsx";
 import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
+import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS } from "./constants/species.js";
+import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
+import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
+import { EV_ITEM_GUIDE, FEATHER_VARIANTS, POWER_ITEM_VARIANTS } from "./constants/evItems.js";
+import { DEX_FILTERS } from "./constants/dex.js";
+import {
+  GAME_LOGO_LOOKUP,
+  VERSION_LOGO_FILES,
+  VERSION_RELEASE_SEQUENCE,
+  VERSION_ORDER_LOOKUP,
+  NATIONAL_GAME_OPTIONS,
+  GAME_LOOKUP,
+  GENERATION_NAME_LOOKUP,
+  REGION_GENERATION_LOOKUP,
+  DEX_GENERATION_LOOKUP,
+  GAME_GENERATION_LOOKUP,
+  GAME_FEATURES,
+  REGION_FEATURES,
+} from "./constants/games.js";
 
-const ULTRA_BEASTS = new Set([
-  "nihilego",
-  "buzzwole",
-  "pheromosa",
-  "xurkitree",
-  "celesteela",
-  "kartana",
-  "guzzlord",
-  "poipole",
-  "naganadel",
-  "stakataka",
-  "blacephalon",
-]);
 
-const PARADOX_NAMES = new Set([
-  "great-tusk",
-  "scream-tail",
-  "brute-bonnet",
-  "flutter-mane",
-  "slither-wing",
-  "roaring-moon",
-  "sandy-shocks",
-  "walking-wake",
-  "gouging-fire",
-  "raging-bolt",
-  "iron-treads",
-  "iron-bundle",
-  "iron-hands",
-  "iron-jugulis",
-  "iron-moth",
-  "iron-thorns",
-  "iron-valiant",
-  "iron-leaves",
-  "iron-boulder",
-  "iron-crown",
-  "koraidon",
-  "miraidon",
-  "bloodmoon-ursaluna",
-]);
+// FEATHER_VARIANTS moved to ./constants/evItems.js
 
-const BABY_NAMES = new Set([
-  "pichu",
-  "cleffa",
-  "igglybuff",
-  "togepi",
-  "tyrogue",
-  "smoochum",
-  "elekid",
-  "magby",
-  "azurill",
-  "wynaut",
-  "budew",
-  "chingling",
-  "bonsly",
-  "mime-jr",
-  "happiny",
-  "munchlax",
-  "riolu",
-  "mantyke",
-  "toxel",
-]);
+// POWER_ITEM_VARIANTS moved to ./constants/evItems.js
 
-const REGIONAL_TOKENS = new Set([
-  "alola",
-  "alolan",
-  "galar",
-  "galarian",
-  "hisui",
-  "hisuan",
-  "paldea",
-  "paldean",
-  "kanto",
-  "johto",
-  "hoenn",
-  "sinnoh",
-  "unova",
-  "kalos",
-]);
-
-const ALL_TYPES = [
-  "normal",
-  "fire",
-  "water",
-  "electric",
-  "grass",
-  "ice",
-  "fighting",
-  "poison",
-  "ground",
-  "flying",
-  "psychic",
-  "bug",
-  "rock",
-  "ghost",
-  "dragon",
-  "dark",
-  "steel",
-  "fairy",
-];
-
-const STAT_TO_EVS_KEY = {
-  hp: "hp",
-  attack: "atk",
-  defense: "def",
-  "special-attack": "spa",
-  "special-defense": "spd",
-  speed: "spe",
-};
-
-const EV_ITEM_GUIDE = [
-  {
-    name: "HP Up",
-    stat: "HP",
-    description: "+10 HP EVs instantly",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hp-up.png",
-    statKeys: ["hp"],
-    category: "Consumables",
-    order: 0,
-  },
-  {
-    name: "Protein",
-    stat: "Attack",
-    description: "+10 Attack EVs instantly",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protein.png",
-    statKeys: ["attack"],
-    category: "Consumables",
-    order: 1,
-  },
-  {
-    name: "Iron",
-    stat: "Defense",
-    description: "+10 Defense EVs instantly",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron.png",
-    statKeys: ["defense"],
-    category: "Consumables",
-    order: 2,
-  },
-  {
-    name: "Calcium",
-    stat: "Special Attack",
-    description: "+10 Special Attack EVs instantly",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/calcium.png",
-    statKeys: ["special-attack"],
-    category: "Consumables",
-    order: 3,
-  },
-  {
-    name: "Zinc",
-    stat: "Special Defense",
-    description: "+10 Special Defense EVs instantly",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zinc.png",
-    statKeys: ["special-defense"],
-    category: "Consumables",
-    order: 4,
-  },
-  {
-    name: "Carbos",
-    stat: "Speed",
-    description: "+10 Speed EVs instantly",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png",
-    statKeys: ["speed"],
-    category: "Consumables",
-    order: 5,
-  },
-  {
-    name: "Macho Brace",
-    stat: "All stats",
-    description: "Doubles EVs gained from battles while halving battle Speed",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/macho-brace.png",
-    statKeys: ["*"],
-    category: "Held Items",
-    order: 100,
-  },
-];
-
-const FEATHER_VARIANTS = {
-  hp: {
-    name: "Health Feather",
-    icon: "/items/health-feather.png",
-    order: 10,
-  },
-  attack: {
-    name: "Muscle Feather",
-    icon: "/items/muscle-feather.png",
-    order: 11,
-  },
-  defense: {
-    name: "Resist Feather",
-    icon: "/items/resist-feather.png",
-    order: 12,
-  },
-  "special-attack": {
-    name: "Genius Feather",
-    icon: "/items/genius-feather.png",
-    order: 13,
-  },
-  "special-defense": {
-    name: "Clever Feather",
-    icon: "/items/clever-feather.png",
-    order: 14,
-  },
-  speed: {
-    name: "Swift Feather",
-    icon: "/items/swift-feather.png",
-    order: 15,
-  },
-};
-
-const POWER_ITEM_VARIANTS = {
-  hp: {
-    name: "Power Weight",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-weight.png",
-    order: 0,
-  },
-  attack: {
-    name: "Power Bracer",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png",
-    order: 1,
-  },
-  defense: {
-    name: "Power Belt",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-belt.png",
-    order: 2,
-  },
-  "special-attack": {
-    name: "Power Lens",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-lens.png",
-    order: 3,
-  },
-  "special-defense": {
-    name: "Power Band",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-band.png",
-    order: 4,
-  },
-  speed: {
-    name: "Power Anklet",
-    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-anklet.png",
-    order: 5,
-  },
-};
-
-const DEX_FILTERS = [
+// DEX_FILTERS moved to ./constants/dex.js
+/* const DEX_FILTERS = [
   { key: "national", label: "National", apiNames: ["national"], pad: 4, games: [] },
   {
     key: "kanto",
@@ -440,250 +226,19 @@ const DEX_FILTERS = [
       },
     ],
   },
-];
+]; */
 
-const GAME_LOGO_IMPORTS = import.meta.glob("./assets/game-logos/*", {
-  eager: true,
-  import: "default",
-  query: "?url",
-});
+// moved to ./constants/games.js (GAME_LOGO_IMPORTS, GAME_LOGO_LOOKUP)
 
-const GAME_LOGO_LOOKUP = new Map(
-  Object.entries(GAME_LOGO_IMPORTS).map(([path, url]) => {
-    const parts = path.split("/");
-    return [parts[parts.length - 1], url];
-  })
-);
+// moved to ./constants/games.js (VERSION_LOGO_FILES)
 
-const VERSION_LOGO_FILES = new Map([
-  ["red", "red.png"],
-  ["blue", "blue.png"],
-  ["yellow", "yellow.png"],
-  ["gold", "gold.png"],
-  ["silver", "silver.png"],
-  ["crystal", "crystal.png"],
-  ["ruby", "ruby.png"],
-  ["sapphire", "sapphire.png"],
-  ["firered", "firered.png"],
-  ["leafgreen", "leafgreen.png"],
-  ["emerald", "emerald.png"],
-  ["diamond", "diamond.png"],
-  ["pearl", "pearl.png"],
-  ["platinum", "platinum.png"],
-  ["heartgold", "heartgold.png"],
-  ["soulsilver", "soulsilver.png"],
-  ["black", "black.png"],
-  ["white", "white.png"],
-  ["black-2", "black2.png"],
-  ["white-2", "white2.png"],
-  ["x", "x.png"],
-  ["y", "y.png"],
-  ["omega-ruby", "omegaruby.png"],
-  ["alpha-sapphire", "alphasapphire.png"],
-  ["sun", "sun.png"],
-  ["moon", "moon.png"],
-  ["ultra-sun", "ultrasun.png"],
-  ["ultra-moon", "ultramoon.png"],
-  ["sword", "sword.png"],
-  ["shield", "shield.png"],
-  ["brilliant-diamond", "brilliantdiamond.png"],
-  ["shining-pearl", "shiningpearl.png"],
-  ["legends-arceus", "arceus.png"],
-  ["scarlet", "scarlet.png"],
-  ["violet", "violet.png"],
-  ["lets-go-pikachu", "letsgopikachu.png"],
-  ["lets-go-eevee", "letsgoeevee.png"],
-  ["legends-za", "za.png"],
-]);
+// moved to ./constants/games.js (VERSION_RELEASE_SEQUENCE, VERSION_ORDER_LOOKUP)
 
-const VERSION_RELEASE_SEQUENCE = [
-  "red",
-  "blue",
-  "yellow",
-  "gold",
-  "silver",
-  "crystal",
-  "ruby",
-  "sapphire",
-  "firered",
-  "leafgreen",
-  "emerald",
-  "diamond",
-  "pearl",
-  "platinum",
-  "heartgold",
-  "soulsilver",
-  "black",
-  "white",
-  "black-2",
-  "white-2",
-  "x",
-  "y",
-  "omega-ruby",
-  "alpha-sapphire",
-  "sun",
-  "moon",
-  "ultra-sun",
-  "ultra-moon",
-  "lets-go-pikachu",
-  "lets-go-eevee",
-  "sword",
-  "shield",
-  "brilliant-diamond",
-  "shining-pearl",
-  "legends-arceus",
-  "scarlet",
-  "violet",
-  "legends-za",
-];
+// moved to ./constants/games.js (NATIONAL_GAME_ORDER, GAME_METADATA, ALL_GAME_OPTIONS, NATIONAL_GAME_OPTIONS, GAME_LOOKUP)
 
-const VERSION_ORDER_LOOKUP = new Map(
-  VERSION_RELEASE_SEQUENCE.map((name, index) => [name, index])
-);
+// moved to ./constants/games.js (GENERATION_* and *_GENERATION_LOOKUP)
 
-const NATIONAL_GAME_ORDER = [
-  "red-blue-yellow",
-  "gold-silver-crystal",
-  "ruby-sapphire-emerald",
-  "firered-leafgreen",
-  "diamond-pearl",
-  "platinum",
-  "heartgold-soulsilver",
-  "black-white",
-  "black-2-white-2",
-  "x-y",
-  "omega-ruby-alpha-sapphire",
-  "sun-moon",
-  "ultra-sun-ultra-moon",
-  "lets-go",
-  "sword-shield",
-  "brilliant-diamond-shining-pearl",
-  "legends-arceus",
-  "scarlet-violet",
-  "legends-za",
-];
-
-const GAME_METADATA = new Map();
-for (const cfg of DEX_FILTERS) {
-  for (const game of cfg.games || []) {
-    if (!GAME_METADATA.has(game.key)) {
-      GAME_METADATA.set(game.key, {
-        ...game,
-        dexKey: cfg.key,
-        pad: cfg.pad ?? 3,
-      });
-    }
-  }
-}
-
-const ALL_GAME_OPTIONS = Array.from(GAME_METADATA.values());
-
-const NATIONAL_GAME_OPTIONS = [
-  ...NATIONAL_GAME_ORDER.map((key) => GAME_METADATA.get(key)).filter(Boolean),
-  ...ALL_GAME_OPTIONS.filter((game) => !NATIONAL_GAME_ORDER.includes(game.key)),
-];
-
-const GAME_LOOKUP = new Map(GAME_METADATA);
-
-const GENERATION_NAME_LOOKUP = new Map([
-  ["generation-i", 1],
-  ["generation-ii", 2],
-  ["generation-iii", 3],
-  ["generation-iv", 4],
-  ["generation-v", 5],
-  ["generation-vi", 6],
-  ["generation-vii", 7],
-  ["generation-viii", 8],
-  ["generation-ix", 9],
-]);
-
-const REGION_GENERATION_LOOKUP = new Map([
-  ["kanto", 1],
-  ["johto", 2],
-  ["hoenn", 3],
-  ["sinnoh", 4],
-  ["unova", 5],
-  ["kalos", 6],
-  ["alola", 7],
-  ["galar", 8],
-  ["hisui", 8],
-  ["paldea", 9],
-  ["kitakami", 9],
-  ["blueberry-academy", 9],
-]);
-
-const DEX_GENERATION_LOOKUP = new Map([
-  ["national", null],
-  ["kanto", 1],
-  ["johto", 2],
-  ["hoenn", 3],
-  ["sinnoh", 4],
-  ["unova", 5],
-  ["kalos", 6],
-  ["alola", 7],
-  ["galar", 8],
-  ["hisui", 8],
-  ["paldea", 9],
-]);
-
-const GAME_GENERATION_LOOKUP = new Map([
-  ["red-blue-yellow", 1],
-  ["firered-leafgreen", 3],
-  ["lets-go", 7],
-  ["gold-silver-crystal", 2],
-  ["heartgold-soulsilver", 4],
-  ["ruby-sapphire-emerald", 3],
-  ["omega-ruby-alpha-sapphire", 6],
-  ["diamond-pearl", 4],
-  ["platinum", 4],
-  ["brilliant-diamond-shining-pearl", 8],
-  ["black-white", 5],
-  ["black-2-white-2", 5],
-  ["x-y", 6],
-  ["sun-moon", 7],
-  ["ultra-sun-ultra-moon", 7],
-  ["sword-shield", 8],
-  ["legends-arceus", 8],
-  ["scarlet-violet", 9],
-  ["legends-za", 9],
-]);
-
-// Game feature flags for form mechanics
-const GAME_FEATURES = new Map([
-  ["red-blue-yellow", { mega: false, gmax: false }],
-  ["firered-leafgreen", { mega: false, gmax: false }],
-  ["lets-go", { mega: true, gmax: false }],
-  ["gold-silver-crystal", { mega: false, gmax: false }],
-  ["heartgold-soulsilver", { mega: false, gmax: false }],
-  ["ruby-sapphire-emerald", { mega: false, gmax: false }],
-  ["omega-ruby-alpha-sapphire", { mega: true, gmax: false }],
-  ["diamond-pearl", { mega: false, gmax: false }],
-  ["platinum", { mega: false, gmax: false }],
-  ["brilliant-diamond-shining-pearl", { mega: false, gmax: false }],
-  ["black-white", { mega: false, gmax: false }],
-  ["black-2-white-2", { mega: false, gmax: false }],
-  ["x-y", { mega: true, gmax: false }],
-  ["sun-moon", { mega: true, gmax: false }],
-  ["ultra-sun-ultra-moon", { mega: true, gmax: false }],
-  ["sword-shield", { mega: false, gmax: true }],
-  ["legends-arceus", { mega: false, gmax: false }],
-  ["scarlet-violet", { mega: false, gmax: false }],
-  ["legends-za", { mega: false, gmax: false }],
-]);
-
-// Region-level heuristics when no game is selected
-const REGION_FEATURES = new Map([
-  ["kalos", { mega: true, gmax: false }],
-  ["alola", { mega: true, gmax: false }],
-  ["galar", { mega: false, gmax: true }],
-  ["paldea", { mega: false, gmax: false }],
-  ["hisui", { mega: false, gmax: false }],
-  ["kanto", { mega: false, gmax: false }],
-  ["johto", { mega: false, gmax: false }],
-  ["hoenn", { mega: false, gmax: false }],
-  ["sinnoh", { mega: false, gmax: false }],
-  ["unova", { mega: false, gmax: false }],
-]);
+// moved to ./constants/games.js (GAME_FEATURES, REGION_FEATURES)
 
 const itemGenerationCache = new Map();
 const locationGenerationCache = new Map();
@@ -2531,6 +2086,25 @@ function App() {
   const availableGames = selectedDex === "national" ? NATIONAL_GAME_OPTIONS : selectedDexConfig?.games || [];
   const showGameFilters = availableGames.length > 0;
 
+  const handleGameClick = useCallback((gameKey) => {
+    if (selectedGame === gameKey) {
+      if (selectedDex === "national") {
+        setSelectedGame(null);
+        clearSelection();
+      }
+      return;
+    }
+    setSelectedGame(gameKey);
+    clearSelection();
+  }, [selectedGame, selectedDex, setSelectedGame, clearSelection]);
+
+  const resolveLogoUrls = useCallback((game) => {
+    const logos = (game.logos || []);
+    return logos
+      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+      .filter(Boolean);
+  }, []);
+
   useEffect(() => {
     const el = gameFiltersRef.current;
     if (!el) return;
@@ -2554,108 +2128,46 @@ function App() {
       >
         Feedback · Discord
       </a>
-      <header className="app-header">
-        <div className="container">
-          <h1 className="title">Pokedex</h1>
-          <p className="subtitle">Search and explore every Pokemon</p>
-          <CategoryToggle />
-          <div className="search-row">
-            <div className="filters-toggle" aria-label="Filters visibility">
-              <span className="filters-toggle-label">Filters</span>
-              <button
-                type="button"
-                className={`ios-switch${showFilters ? " is-on" : ""}`}
-                role="switch"
-                aria-checked={showFilters}
-                aria-label={showFilters ? "Hide filters" : "Show filters"}
-                onClick={() => setShowFilters((v) => !v)}
-              >
-                <span className="ios-switch-track" aria-hidden="true"></span>
-                <span className="ios-switch-thumb" aria-hidden="true"></span>
-              </button>
-            </div>
-            <input
-              className="search"
-              placeholder="Search Pokemon"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button
-              type="button"
-              className="reset-button"
-              onClick={() => {
-                setSelectedTypes(new Set());
-                setSelectedTags(new Set());
-                setSelectedDex("national");
-                setSelectedGame(null);
-                setQuery("");
-              }}
-            >
-              Reset
-            </button>
-          </div>
-          {showFilters && (
-            <FilterTabs
-              selectedTypes={selectedTypes}
-              setSelectedTypes={setSelectedTypes}
-              typeIndexRef={typeIndexRef}
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
-              selectedDex={selectedDex}
-              setSelectedGame={setSelectedGame}
-              setSelectedDex={setSelectedDex}
-              clearSelection={clearSelection}
-            />
-          )}
-        </div>
-      </header>
+      <HeaderSection
+        title="Pokedex"
+        subtitle="Search and explore every Pokemon"
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        query={query}
+        setQuery={setQuery}
+        onReset={() => {
+          setSelectedTypes(new Set());
+          setSelectedTags(new Set());
+          setSelectedDex("national");
+          setSelectedGame(null);
+          setQuery("");
+        }}
+        FilterTabsComponent={FilterTabs}
+        filterTabsProps={{
+          selectedTypes,
+          setSelectedTypes,
+          typeIndexRef,
+          selectedTags,
+          setSelectedTags,
+          selectedDex,
+          setSelectedGame,
+          setSelectedDex,
+          clearSelection,
+        }}
+      />
 
       <main className="container">
         {showFilters && showGameFilters && (
-          <div className="game-filters-row">
-            <div className="game-filters-controls">
-              <div
-                className={`game-filters${selectedDex === "national" ? " game-filters--left" : ""}`}
-                ref={gameFiltersRef}
-              >
-                {availableGames.map((game) => {
-                  const isOn = game.key === selectedGame;
-                  const logoUrls = (game.logos || [])
-                    .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-                    .filter(Boolean);
-                  return (
-                    <button
-                      key={game.key}
-                      type="button"
-                      className={`filter-chip game-chip${isOn ? " is-on" : ""}`}
-                      onClick={() => {
-                        if (selectedGame === game.key) {
-                          if (selectedDex === "national") {
-                            setSelectedGame(null);
-                            clearSelection();
-                          }
-                          return;
-                        }
-                        setSelectedGame(game.key);
-                        clearSelection();
-                      }}
-                      aria-pressed={isOn}
-                      aria-label={game.label}
-                    >
-                      {logoUrls.length > 0 && (
-                        <span className="game-chip-logos" aria-hidden="true">
-                          {logoUrls.map((src) => (
-                            <img key={src} src={src} alt="" className="game-chip-logo" />
-                          ))}
-                        </span>
-                      )}
-                      <span className="game-chip-label">{game.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <GameFilters
+            showFilters={showFilters}
+            showGameFilters={showGameFilters}
+            selectedDex={selectedDex}
+            gameFiltersRef={gameFiltersRef}
+            availableGames={availableGames}
+            selectedGame={selectedGame}
+            onGameClick={handleGameClick}
+            resolveLogoUrls={resolveLogoUrls}
+          />
         )}
         {selected ? (
           <section className="content split">
@@ -2845,52 +2357,6 @@ const abilityCache = new Map();
 const natureDetailsCache = new Map();
 let cachedNatureList = null;
 
-const NEUTRAL_NATURE_KEY = "neutral";
-const NATURE_STAT_ORDER = new Map([
-  ["attack", 0],
-  ["defense", 1],
-  ["special-attack", 2],
-  ["special-defense", 3],
-  ["speed", 4],
-  [NEUTRAL_NATURE_KEY, 5],
-]);
-
-const NATURE_STAT_LABELS = new Map([
-  ["attack", "Attack"],
-  ["defense", "Defense"],
-  ["special-attack", "Sp. Atk"],
-  ["special-defense", "Sp. Def"],
-  ["speed", "Speed"],
-  [NEUTRAL_NATURE_KEY, "Neutral"],
-]);
-
-const NATURE_SUMMARIES = new Map([
-  ["adamant", { raises: "attack", lowers: "special-attack" }],
-  ["bashful", { raises: null, lowers: null }],
-  ["bold", { raises: "defense", lowers: "attack" }],
-  ["brave", { raises: "attack", lowers: "speed" }],
-  ["calm", { raises: "special-defense", lowers: "attack" }],
-  ["careful", { raises: "special-defense", lowers: "special-attack" }],
-  ["docile", { raises: null, lowers: null }],
-  ["gentle", { raises: "special-defense", lowers: "defense" }],
-  ["hardy", { raises: null, lowers: null }],
-  ["hasty", { raises: "speed", lowers: "defense" }],
-  ["impish", { raises: "defense", lowers: "special-attack" }],
-  ["jolly", { raises: "speed", lowers: "special-attack" }],
-  ["lax", { raises: "defense", lowers: "special-defense" }],
-  ["lonely", { raises: "attack", lowers: "defense" }],
-  ["mild", { raises: "special-attack", lowers: "defense" }],
-  ["modest", { raises: "special-attack", lowers: "attack" }],
-  ["naive", { raises: "speed", lowers: "special-defense" }],
-  ["naughty", { raises: "attack", lowers: "special-defense" }],
-  ["quiet", { raises: "special-attack", lowers: "speed" }],
-  ["quirky", { raises: null, lowers: null }],
-  ["rash", { raises: "special-attack", lowers: "special-defense" }],
-  ["relaxed", { raises: "defense", lowers: "speed" }],
-  ["sassy", { raises: "special-defense", lowers: "speed" }],
-  ["serious", { raises: null, lowers: null }],
-  ["timid", { raises: "speed", lowers: "attack" }],
-]);
 
 function sortNatureEntries(entries) {
   if (!Array.isArray(entries)) return [];

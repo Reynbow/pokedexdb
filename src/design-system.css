@@ -1,0 +1,209 @@
+/*
+  Design System: Tokens, Utilities, and Primitives
+  - Non-invasive: no element-level resets to avoid breaking existing styles
+  - Namespaced with `ds-` to prevent collisions
+*/
+
+/* Color & space tokens */
+:root {
+  /* palette */
+  --ds-color-bg: #ffffff;
+  --ds-color-surface: #f7f7f8;
+  --ds-color-text: #1f2328;
+  --ds-color-muted: #6b7280;
+  --ds-color-border: #e5e7eb;
+  --ds-color-primary: #3b82f6;
+  --ds-color-primary-foreground: #ffffff;
+  --ds-color-success: #16a34a;
+  --ds-color-warning: #d97706;
+  --ds-color-danger: #dc2626;
+
+  /* radii */
+  --ds-radius-sm: 6px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 14px;
+
+  /* shadow */
+  --ds-shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --ds-shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+
+  /* spacing scale */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-space-10: 40px;
+
+  /* typography */
+  --ds-font-sans: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --ds-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --ds-leading: 1.5;
+
+  /* layout */
+  --ds-container-max: 1200px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ds-color-bg: #0b0b0c;
+    --ds-color-surface: #121315;
+    --ds-color-text: #e6e7ea;
+    --ds-color-muted: #a0a6b0;
+    --ds-color-border: #24262a;
+    --ds-color-primary: #7aa2ff;
+    --ds-color-primary-foreground: #0b0b0c;
+    --ds-color-success: #3ddf80;
+    --ds-color-warning: #ffbb55;
+    --ds-color-danger: #ff7b7b;
+    --ds-shadow-sm: 0 1px 2px rgba(0,0,0,0.35);
+    --ds-shadow-md: 0 8px 20px rgba(0,0,0,0.4);
+  }
+}
+
+/* Typography utilities */
+.ds-h1 { font-family: var(--ds-font-sans); font-weight: 750; line-height: 1.15; font-size: 2.25rem; }
+.ds-h2 { font-family: var(--ds-font-sans); font-weight: 700; line-height: 1.2;  font-size: 1.75rem; }
+.ds-h3 { font-family: var(--ds-font-sans); font-weight: 650; line-height: 1.25; font-size: 1.375rem; }
+.ds-h4 { font-family: var(--ds-font-sans); font-weight: 600; line-height: 1.3;  font-size: 1.125rem; }
+.ds-text-sm { font-size: 0.875rem; line-height: var(--ds-leading); }
+.ds-text-base { font-size: 1rem; line-height: var(--ds-leading); }
+.ds-text-lg { font-size: 1.125rem; line-height: var(--ds-leading); }
+.ds-text-muted { color: var(--ds-color-muted); }
+
+/* Layout utilities */
+.ds-container { max-width: var(--ds-container-max); margin-left: auto; margin-right: auto; padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
+.ds-section { padding-top: var(--ds-space-8); padding-bottom: var(--ds-space-8); }
+.ds-flex { display: flex; }
+.ds-row { display: flex; flex-direction: row; }
+.ds-col { display: flex; flex-direction: column; }
+.ds-center { display: flex; align-items: center; justify-content: center; }
+.ds-wrap { flex-wrap: wrap; }
+.ds-gap-2 { gap: var(--ds-space-2); }
+.ds-gap-4 { gap: var(--ds-space-4); }
+.ds-gap-6 { gap: var(--ds-space-6); }
+.ds-p-2 { padding: var(--ds-space-2); }
+.ds-p-4 { padding: var(--ds-space-4); }
+.ds-p-6 { padding: var(--ds-space-6); }
+.ds-px-4 { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
+.ds-py-4 { padding-top: var(--ds-space-4); padding-bottom: var(--ds-space-4); }
+.ds-mx-auto { margin-left: auto; margin-right: auto; }
+.ds-w-full { width: 100%; }
+
+/* Surface primitives */
+.ds-card {
+  background: var(--ds-color-surface);
+  color: var(--ds-color-text);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-sm);
+  padding: var(--ds-space-4);
+}
+
+.ds-toolbar {
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+/* Buttons */
+.ds-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-color-border);
+  padding: 10px 14px;
+  font: 500 14px/1 var(--ds-font-sans);
+  color: var(--ds-color-text);
+  background: var(--ds-color-surface);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+.ds-button:hover { border-color: color-mix(in oklab, var(--ds-color-border), var(--ds-color-text) 20%); }
+.ds-button:active { transform: translateY(1px); }
+
+.ds-button--primary {
+  background: var(--ds-color-primary);
+  color: var(--ds-color-primary-foreground);
+  border-color: color-mix(in oklab, var(--ds-color-primary), black 15%);
+}
+.ds-button--ghost {
+  background: transparent;
+}
+.ds-button--danger {
+  background: var(--ds-color-danger);
+  color: #fff;
+  border-color: color-mix(in oklab, var(--ds-color-danger), black 15%);
+}
+
+/* Inputs */
+.ds-input {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-color-border);
+  background: var(--ds-color-bg);
+  color: var(--ds-color-text);
+  font: 400 14px/1.3 var(--ds-font-sans);
+}
+.ds-input:focus { outline: 2px solid color-mix(in oklab, var(--ds-color-primary), white 70%); outline-offset: 1px; }
+
+/* Badges/Tags */
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-border);
+  background: var(--ds-color-surface);
+  color: var(--ds-color-text);
+  font: 600 12px/1 var(--ds-font-sans);
+}
+.ds-badge--success { background: color-mix(in oklab, var(--ds-color-success), white 85%); color: var(--ds-color-success); border-color: color-mix(in oklab, var(--ds-color-success), white 70%); }
+.ds-badge--warning { background: color-mix(in oklab, var(--ds-color-warning), white 85%); color: var(--ds-color-warning); border-color: color-mix(in oklab, var(--ds-color-warning), white 70%); }
+.ds-badge--danger { background: color-mix(in oklab, var(--ds-color-danger), white 85%); color: var(--ds-color-danger); border-color: color-mix(in oklab, var(--ds-color-danger), white 70%); }
+
+/* Tables */
+.ds-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-lg);
+  overflow: hidden;
+}
+.ds-table th, .ds-table td { padding: 10px 12px; text-align: left; }
+.ds-table thead th { background: var(--ds-color-surface); color: var(--ds-color-text); font-weight: 650; }
+.ds-table tbody tr { border-top: 1px solid var(--ds-color-border); }
+.ds-table tbody tr:nth-child(odd) { background: color-mix(in oklab, var(--ds-color-surface), var(--ds-color-bg) 50%); }
+
+/* Links */
+.ds-link { color: var(--ds-color-primary); text-decoration: none; }
+.ds-link:hover { text-decoration: underline; }
+
+/* Section helpers */
+.ds-hero {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--ds-color-primary), transparent 80%), transparent 100%);
+  padding: var(--ds-space-10) 0;
+}
+.ds-feature {
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-lg);
+  padding: var(--ds-space-6);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+
