@@ -540,6 +540,283 @@ const normalizeEncounterData = (entries) => {
   return result;
 };
 
+// Local data support (JSONL) using single sources and game code mapping
+const LOCAL_DATA_PATHS = {
+  encounters: "/data/encounters.jsonl",
+  pokedex: "/data/pokedex_entries.jsonl",
+};
+
+const localJsonlCache = new Map(); // url -> parsed array
+const normalizeLocalKey = (value) => {
+  if (value == null) return "";
+  let normalized = String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  normalized = normalized
+    .replace(/pok[eé]mon/g, "pokemon")
+    .replace(/['’]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/\+/g, " plus ");
+  normalized = normalized.replace(/[^a-z0-9]+/g, "-");
+  normalized = normalized.replace(/-([a-z0-9])-(?=[a-z0-9]($|-))/g, "-$1");
+  normalized = normalized.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized;
+};
+
+const VERSION_ALIAS_LOOKUP = (() => {
+  const map = new Map();
+  const add = (alias, slug) => {
+    const key = normalizeLocalKey(alias);
+    if (!key || !slug) return;
+    if (!map.has(key)) {
+      map.set(key, slug);
+    }
+  };
+
+  VERSION_RELEASE_SEQUENCE.forEach((slug) => {
+    add(slug, slug);
+    add(toTitleCase(slug), slug);
+    add(formatDisplayName(slug), slug);
+  });
+
+  const extraAliases = [
+    ["legends arceus", "legends-arceus"],
+    ["legends: arceus", "legends-arceus"],
+    ["pokemon legends arceus", "legends-arceus"],
+    ["legends za", "legends-za"],
+    ["legends: z-a", "legends-za"],
+    ["pokemon legends za", "legends-za"],
+    ["lets go pikachu", "lets-go-pikachu"],
+    ["let's go pikachu", "lets-go-pikachu"],
+    ["lets go, pikachu!", "lets-go-pikachu"],
+    ["lets go eevee", "lets-go-eevee"],
+    ["let's go eevee", "lets-go-eevee"],
+    ["lets go, eevee!", "lets-go-eevee"],
+  ];
+
+  extraAliases.forEach(([alias, slug]) => add(alias, slug));
+
+  return map;
+})();
+
+const SPECIAL_VERSION_GROUPS = new Map([
+  ["sv", ["scarlet", "violet"]],
+  ["bdsp", ["brilliant-diamond", "shining-pearl"]],
+  ["lza", ["legends-za"]],
+  ["pla", ["legends-arceus"]],
+  ["scarlet-violet", ["scarlet", "violet"]],
+  ["brilliant-diamond-shining-pearl", ["brilliant-diamond", "shining-pearl"]],
+  ["lets-go", ["lets-go-pikachu", "lets-go-eevee"]],
+]);
+
+const mapGameCodeToVersions = (code) => {
+  const normalized = normalizeLocalKey(code);
+  if (!normalized) return [];
+  if (SPECIAL_VERSION_GROUPS.has(normalized)) {
+    return SPECIAL_VERSION_GROUPS.get(normalized) || [];
+  }
+  const slug = VERSION_ALIAS_LOOKUP.get(normalized);
+  return slug ? [slug] : [];
+};
+
+const compareVersionEntries = (a, b) => {
+  const orderA = VERSION_ORDER_LOOKUP.has(a?.version)
+    ? VERSION_ORDER_LOOKUP.get(a.version)
+    : Number.POSITIVE_INFINITY;
+  const orderB = VERSION_ORDER_LOOKUP.has(b?.version)
+    ? VERSION_ORDER_LOOKUP.get(b.version)
+    : Number.POSITIVE_INFINITY;
+  if (orderA !== orderB) return orderA - orderB;
+  const labelA = a?.label || "";
+  const labelB = b?.label || "";
+  return labelA.localeCompare(labelB);
+};
+
+const matchesAnyLocalName = (value, candidates) => {
+  const normalized = normalizeLocalKey(value);
+  if (!normalized) return false;
+  for (const candidate of candidates) {
+    const normCandidate = normalizeLocalKey(candidate);
+    if (!normCandidate) continue;
+    if (normalized === normCandidate) return true;
+    if (normalized.startsWith(`${normCandidate}-`)) return true;
+    if (normCandidate.startsWith(`${normalized}-`)) return true;
+  }
+  return false;
+};
+
+async function loadLocalJsonl(url) {
+  try {
+    if (localJsonlCache.has(url)) return localJsonlCache.get(url);
+    const response = await queuedFetch(url);
+    if (!response?.ok) return [];
+    const text = await response.text();
+    const lines = String(text || "").split(/\r?\n/);
+    const parsed = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      try {
+        parsed.push(JSON.parse(trimmed));
+      } catch {}
+    }
+    localJsonlCache.set(url, parsed);
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+async function loadLocalEncounterEntriesForPokemon(pokemonId, ...nameCandidates) {
+  const url = LOCAL_DATA_PATHS.encounters;
+  const records = await loadLocalJsonl(url);
+  if (!Array.isArray(records) || records.length === 0) return [];
+
+  const idNum = Number(pokemonId);
+  const idCandidates = Number.isFinite(idNum) ? [idNum] : [];
+  const nameSet = nameCandidates.filter(Boolean);
+
+  const versionMap = new Map(); // version -> Set(locations)
+
+  for (const rec of records) {
+    const recId = rec?.pokemon_id ?? rec?.pokemonId ?? rec?.id ?? null;
+    let matches = false;
+    const recIdNum = Number(recId);
+    if (Number.isFinite(recIdNum) && idCandidates.length > 0) {
+      matches = idCandidates.includes(recIdNum);
+    }
+    if (!matches) {
+      const recNames = [rec?.name, rec?.pokemon, rec?.pokemon_name, rec?.pokemonName].filter(Boolean);
+      if (recNames.length > 0 && nameSet.length > 0) {
+        matches = recNames.some((value) => matchesAnyLocalName(value, nameSet));
+      }
+    }
+    if (!matches) continue;
+
+    const location = String(rec?.location ?? rec?.details ?? rec?.note ?? rec?.notes ?? "").trim();
+    if (!location) continue;
+
+    let games = [];
+    if (Array.isArray(rec?.games) && rec.games.length > 0) games = rec.games;
+    else if (Array.isArray(rec?.versions) && rec.versions.length > 0) games = rec.versions;
+    else if (rec?.game) games = [rec.game];
+    if (games.length === 0) continue;
+
+    for (const gameCode of games) {
+      const versions = mapGameCodeToVersions(gameCode);
+      for (const version of versions) {
+        if (!version) continue;
+        if (!versionMap.has(version)) versionMap.set(version, new Set());
+        versionMap.get(version).add(location);
+      }
+    }
+  }
+
+  if (versionMap.size === 0) return [];
+
+  const normalized = [];
+  for (const [version, locations] of versionMap.entries()) {
+    const locationList = Array.from(locations);
+    if (locationList.length === 0) continue;
+    const logoFile = VERSION_LOGO_FILES.get(version);
+    const methods = locationList.map((location, idx) => ({
+      key: `local-${version}-${idx}`,
+      method: null,
+      label: `Location ${idx + 1}`,
+      chance: null,
+      minLevel: null,
+      maxLevel: null,
+      descriptors: [],
+      description: location,
+    }));
+    const locationCount = methods.length;
+    normalized.push({
+      version,
+      label: formatDisplayName(version),
+      logos: logoFile ? [logoFile] : [],
+      areas: [
+        {
+          name: `local-${version}`,
+          label: "Locations",
+          methods,
+        },
+      ],
+      totalLocations: locationCount,
+      totalMethods: locationCount,
+      maxChance: 0,
+      summary:
+        locationCount > 0
+          ? `${locationCount} ${locationCount === 1 ? "location" : "locations"}`
+          : "No wild encounters",
+      __local: true,
+    });
+  }
+
+  normalized.sort(compareVersionEntries);
+  return normalized;
+}
+
+async function loadLocalPokedexEntriesForSpecies(speciesId, ...nameCandidates) {
+  const url = LOCAL_DATA_PATHS.pokedex;
+  const records = await loadLocalJsonl(url);
+  if (!Array.isArray(records) || records.length === 0) return [];
+
+  const idNum = Number(speciesId);
+  const idCandidates = Number.isFinite(idNum) ? [idNum] : [];
+  const nameSet = nameCandidates.filter(Boolean);
+  const collected = [];
+  const seen = new Set();
+
+  const pushEntry = (gameCode, text, language) => {
+    const versions = mapGameCodeToVersions(gameCode);
+    for (const version of versions) {
+      if (!version || !text) continue;
+      const key = `${version}::${text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push({ version, text, language: language || "en" });
+    }
+  };
+
+  for (const rec of records) {
+    const recId = rec?.species_id ?? rec?.speciesId ?? rec?.id ?? null;
+    let matches = false;
+    const recIdNum = Number(recId);
+    if (Number.isFinite(recIdNum) && idCandidates.length > 0) {
+      matches = idCandidates.includes(recIdNum);
+    }
+    if (!matches) {
+      const recNames = [rec?.name, rec?.pokemon, rec?.pokemon_name, rec?.pokemonName].filter(Boolean);
+      if (recNames.length > 0 && nameSet.length > 0) {
+        matches = recNames.some((value) => matchesAnyLocalName(value, nameSet));
+      }
+    }
+    if (!matches) continue;
+
+    const languageFallback = rec?.language || "en";
+
+    if (Array.isArray(rec?.entries) && rec.entries.length > 0) {
+      for (const entry of rec.entries) {
+        if (!entry) continue;
+        const game = entry?.game ?? entry?.version ?? rec?.game ?? rec?.version;
+        const text = entry?.text ?? entry?.entry ?? entry?.flavor_text ?? entry?.flavorText ?? rec?.entry ?? rec?.text;
+        const language = entry?.language || languageFallback;
+        if (!game || !text) continue;
+        pushEntry(game, text, language);
+      }
+    } else {
+      const game = rec?.game ?? rec?.version;
+      const text = rec?.text ?? rec?.entry ?? rec?.flavor_text ?? rec?.flavorText;
+      if (game && text) {
+        pushEntry(game, text, languageFallback);
+      }
+    }
+  }
+
+  return collected;
+}
+
 // moved to constants (FORM_ORDER)
 
 const getFormPriority = (entry) => {
@@ -850,18 +1127,15 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
   // Sort versions by release date
   const sortedVersions = useMemo(() => {
     return [...versions].sort((a, b) => {
-      const indexA = VERSION_RELEASE_SEQUENCE.indexOf(a.name);
-      const indexB = VERSION_RELEASE_SEQUENCE.indexOf(b.name);
-      
-      // If both in sequence, sort by index
-      if (indexA !== -1 && indexB !== -1) {
-        return indexA - indexB;
-      }
-      // If only one in sequence, prioritize it
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-      // If neither in sequence, maintain original order
-      return 0;
+      const orderA = VERSION_ORDER_LOOKUP.has(a.name)
+        ? VERSION_ORDER_LOOKUP.get(a.name)
+        : Number.NEGATIVE_INFINITY;
+      const orderB = VERSION_ORDER_LOOKUP.has(b.name)
+        ? VERSION_ORDER_LOOKUP.get(b.name)
+        : Number.NEGATIVE_INFINITY;
+
+      if (orderA !== orderB) return orderB - orderA;
+      return a.displayName.localeCompare(b.displayName);
     });
   }, [versions]);
 
@@ -1861,6 +2135,7 @@ function App() {
               dexNumber={selectedDexNumber}
               selectedDex={selectedDex}
               selectedGame={selectedGame}
+            pokemonIdLookup={pokemonIdLookup}
             />
             </ErrorBoundary>
           </section>
@@ -2029,7 +2304,14 @@ function queuedFetch(url, init) {
 
 // Moved to ./components/ErrorBoundary.jsx
 
-function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNumber, selectedDex, selectedGame }) {
+function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNumber, selectedDex, selectedGame, pokemonIdLookup }) {
+  const pokemonIdMap = useMemo(() => {
+    if (pokemonIdLookup instanceof Map) return pokemonIdLookup;
+    if (!pokemonIdLookup) return new Map();
+    if (Array.isArray(pokemonIdLookup)) return new Map(pokemonIdLookup);
+    if (typeof pokemonIdLookup === "object") return new Map(Object.entries(pokemonIdLookup));
+    return new Map();
+  }, [pokemonIdLookup]);
   const { id, name, url } = selected || {};
   const [details, setDetails] = useState(null);
   const [shiny, setShiny] = useState(() => {
@@ -2082,6 +2364,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   const [isAltFormsModalOpen, setIsAltFormsModalOpen] = useState(false);
   const [altFormsForModal, setAltFormsForModal] = useState([]);
   const [altFormsModalTitle, setAltFormsModalTitle] = useState("");
+  const [localFlavorEntries, setLocalFlavorEntries] = useState([]);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 768;
@@ -2126,22 +2409,56 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   
   // Compute available flavor text versions
   const flavorTextVersions = useMemo(() => {
-    if (!species?.flavor_text_entries || !Array.isArray(species.flavor_text_entries)) return [];
-    const englishEntries = species.flavor_text_entries.filter((entry) => entry?.language?.name === "en");
-    const versions = new Map();
-    englishEntries.forEach((entry) => {
-      const versionName = entry?.version?.name;
-      if (!versionName) return;
-      if (!versions.has(versionName)) {
-        versions.set(versionName, {
-          name: versionName,
-          displayName: humanizeName(versionName),
-          text: entry.flavor_text?.replace(/\s+/g, " ") || "",
-        });
+    const byVersion = new Map();
+    const pushEntry = (versionName, text, priority) => {
+      if (!versionName || !text) return;
+      const normalizedKey = normalizeLocalKey(versionName);
+      const slug = VERSION_ALIAS_LOOKUP.get(normalizedKey) || versionName;
+      const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+      if (!cleaned) return;
+      const existing = byVersion.get(slug);
+      if (existing && existing.priority <= priority) {
+        return;
       }
+      byVersion.set(slug, {
+        name: slug,
+        displayName: formatDisplayName(slug),
+        text: cleaned,
+        priority,
+        index: VERSION_ORDER_LOOKUP.has(slug)
+          ? VERSION_ORDER_LOOKUP.get(slug)
+          : Number.NEGATIVE_INFINITY,
+      });
+    };
+
+    if (Array.isArray(species?.flavor_text_entries)) {
+      for (const entry of species.flavor_text_entries) {
+        if (entry?.language?.name !== "en") continue;
+        pushEntry(entry?.version?.name, entry?.flavor_text, 1);
+      }
+    }
+
+    if (Array.isArray(localFlavorEntries)) {
+      for (const entry of localFlavorEntries) {
+        const versionName = entry?.version;
+        const lang = (entry?.language || "en").toLowerCase();
+        if (lang && lang !== "en") continue;
+        pushEntry(versionName, entry?.text, 0);
+      }
+    }
+
+    const result = Array.from(byVersion.values()).map(({ priority, index, ...rest }) => ({
+      ...rest,
+      priority,
+      index,
+    }));
+    result.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      if (a.index !== b.index) return b.index - a.index;
+      return a.displayName.localeCompare(b.displayName);
     });
-    return Array.from(versions.values()).sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [species]);
+    return result;
+  }, [species?.flavor_text_entries, localFlavorEntries]);
   
   // Auto-select flavor text version based on selectedDex/selectedGame
   useEffect(() => {
@@ -2149,45 +2466,42 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       setSelectedFlavorVersion(null);
       return;
     }
-    
-    // If national dex is selected and no game is selected, default to latest version
-    if (selectedDex === "national" && !selectedGame) {
-      // Get the latest version by generation number
-      const latest = flavorTextVersions[flavorTextVersions.length - 1];
-      setSelectedFlavorVersion(latest?.name || null);
-      return;
-    }
-    
-    // If a specific dex is selected, try to match the game
-    if (selectedDex && selectedDex !== "national") {
-      const dexFilter = DEX_FILTERS.find((dex) => dex.key === selectedDex);
-      if (dexFilter && selectedGame) {
-        // Try to find a matching game version
-        const matching = flavorTextVersions.find((v) => 
-          v.name.includes(selectedGame.toLowerCase())
-        );
+
+    // If a specific game is selected, use that game's entry when available
+    if (selectedGame) {
+      const targetVersions = mapGameCodeToVersions(selectedGame);
+      for (const version of targetVersions) {
+        const matching = flavorTextVersions.find((v) => v.name === version);
         if (matching) {
           setSelectedFlavorVersion(matching.name);
           return;
         }
       }
-      // If no game match, default to first available
-      setSelectedFlavorVersion(flavorTextVersions[0]?.name || null);
-      return;
+      const normalizedGame = normalizeLocalKey(selectedGame);
+      const fallbackMatch = flavorTextVersions.find((v) => {
+        const versionKey = normalizeLocalKey(v.name);
+        return (
+          versionKey === normalizedGame
+          || versionKey.includes(normalizedGame)
+          || normalizedGame.includes(versionKey)
+        );
+      });
+      if (fallbackMatch) {
+        setSelectedFlavorVersion(fallbackMatch.name);
+        return;
+      }
     }
-    
-    // Default to first available
+
+    // Otherwise default to the most recent release (first entry after sorting)
     setSelectedFlavorVersion(flavorTextVersions[0]?.name || null);
-  }, [flavorTextVersions, selectedDex, selectedGame, species?.id]);
+  }, [flavorTextVersions, selectedGame]);
   
   // Get the selected flavor text
   const selectedFlavorText = useMemo(() => {
-    if (!selectedFlavorVersion || !species?.flavor_text_entries) return null;
-    const entry = species.flavor_text_entries.find((e) => 
-      e?.language?.name === "en" && e?.version?.name === selectedFlavorVersion
-    );
-    return entry?.flavor_text?.replace(/\s+/g, " ") || null;
-  }, [species, selectedFlavorVersion]);
+    if (!selectedFlavorVersion) return null;
+    const entry = flavorTextVersions.find((v) => v.name === selectedFlavorVersion);
+    return entry?.text ?? null;
+  }, [flavorTextVersions, selectedFlavorVersion]);
   
   // Get logo for current version
   const currentVersionLogo = useMemo(() => {
@@ -2614,18 +2928,10 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     if (!details) return;
     let ignore = false;
 
-    const encounterUrl = details?.location_area_encounters;
-    if (encounterUrl) {
-      setGameAvailability([]);
-      setGameAvailabilityLoading(true);
-      setGameAvailabilityError(null);
-      setActiveGame(null);
-    } else {
-      setGameAvailability([]);
-      setGameAvailabilityLoading(false);
-      setGameAvailabilityError(null);
-      setActiveGame(null);
-    }
+    setGameAvailability([]);
+    setGameAvailabilityLoading(true);
+    setGameAvailabilityError(null);
+    setActiveGame(null);
 
     // Compute defensive multipliers by aggregating damage relations across all types
     const computeMultipliers = async () => {
@@ -2664,66 +2970,29 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     };
 
     const fetchEncounters = async () => {
-      if (!encounterUrl) return;
+      if (!details) return;
+      setGameAvailabilityLoading(true);
+      setGameAvailabilityError(null);
       try {
-        addLog('Fetching encounters', { encounterUrl });
-        const response = await queuedFetch(encounterUrl);
+        const defaultName = pokemonIdMap.get(Number(details?.id)) || details?.name;
+        const localNormalized = await loadLocalEncounterEntriesForPokemon(
+          details?.id,
+          details?.name,
+          defaultName,
+          details?.species?.name
+        );
         if (ignore) return;
-        if (!response?.ok) {
-          throw new Error(`Request failed with status ${response?.status ?? "unknown"}`);
-        }
-        const data = await response.json();
-        if (ignore) return;
-        let normalized = normalizeEncounterData(data);
-
-        // Fallback: if current form has no encounter data, try the default species variety
-        if (normalized.length === 0) {
-          try {
-            const speciesUrl = details?.species?.url;
-            if (speciesUrl) {
-              addLog('Encounter fallback: fetching species', { speciesUrl });
-              const speciesRes = await queuedFetch(speciesUrl);
-              if (speciesRes?.ok) {
-                const speciesData = await speciesRes.json();
-                const defaultVariety = Array.isArray(speciesData?.varieties)
-                  ? speciesData.varieties.find((v) => v?.is_default && v?.pokemon?.url)
-                  : null;
-                const defaultPokemonUrl = defaultVariety?.pokemon?.url || null;
-                // Avoid re-fetching the same form
-                if (defaultPokemonUrl && defaultPokemonUrl !== url) {
-                  addLog('Encounter fallback: fetching default variety details', { defaultPokemonUrl });
-                  const defaultRes = await queuedFetch(defaultPokemonUrl);
-                  if (defaultRes?.ok) {
-                    const defaultData = await defaultRes.json();
-                    const fallbackUrl = defaultData?.location_area_encounters;
-                    if (fallbackUrl) {
-                      addLog('Encounter fallback: fetching default variety encounters', { fallbackUrl });
-                      const fallbackRes = await queuedFetch(fallbackUrl);
-                      if (fallbackRes?.ok) {
-                        const fallbackJson = await fallbackRes.json();
-                        const fallbackNormalized = normalizeEncounterData(fallbackJson);
-                        if (fallbackNormalized.length > 0) {
-                          normalized = fallbackNormalized;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch {}
-        }
-
+        const normalized = Array.isArray(localNormalized) ? localNormalized : [];
         setGameAvailability(normalized);
         setGameAvailabilityError(null);
         setGameAvailabilityLoading(false);
-        addLog('Encounters loaded', { games: normalized.length });
+        addLog('Encounters loaded (local)', { games: normalized.length });
       } catch (error) {
         if (ignore) return;
+        addLog('Encounter load failed (local)', { message: error?.message || String(error) });
         setGameAvailability([]);
         setGameAvailabilityError("Unable to load encounter data.");
         setGameAvailabilityLoading(false);
-        addLog('Encounter fetch failed', { message: error?.message || String(error) });
       }
     };
 
@@ -2881,12 +3150,39 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
 
     computeMultipliers();
     fetchEvolution();
-    if (encounterUrl) {
-      fetchEncounters();
-    }
+    fetchEncounters();
 
     return () => { ignore = true; };
-  }, [details]);
+  }, [details, pokemonIdMap]);
+
+  // Load local pokedex entries (flavor text) for SV/ZA and prefer them when present
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const sid = species?.id;
+      if (sid == null) {
+        setLocalFlavorEntries([]);
+        return;
+      }
+      try {
+        const entries = await loadLocalPokedexEntriesForSpecies(
+          sid,
+          species?.name,
+          pokemonIdMap.get(Number(details?.id)),
+          details?.name
+        );
+        if (!cancelled) {
+          setLocalFlavorEntries(Array.isArray(entries) ? entries : []);
+        }
+      } catch {
+        if (!cancelled) setLocalFlavorEntries([]);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [species?.id, species?.name, details?.id, details?.name, pokemonIdMap]);
 
   useEffect(() => {
     if (!evolutionChainData) return;
@@ -4683,14 +4979,29 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSele
                         if (descriptors.length > 0) {
                           metaParts.push(descriptors.join(", "));
                         }
-                        return (
-                          <li key={`${area.name}-${methodLabel}-${idx}`} className="game-modal-method">
-                            <span className="game-modal-method-label">{methodLabel}</span>
-                            {metaParts.length > 0 && (
-                              <span className="game-modal-method-meta">{metaParts.join(" • ")}</span>
-                            )}
-                          </li>
-                        );
+        const description = method.description || null;
+        const formattedDescription = description
+          ? description
+              .split(/\s*[,;•]\s*/)
+              .flatMap((segment) => segment.split(/\s*\r?\n\s*/))
+              .map((segment) => segment.trim())
+              .filter(Boolean)
+          : [];
+        return (
+          <li key={`${area.name}-${methodLabel}-${idx}`} className="game-modal-method">
+            <span className="game-modal-method-label">{methodLabel}</span>
+            {metaParts.length > 0 && (
+              <span className="game-modal-method-meta">{metaParts.join(" • ")}</span>
+            )}
+            {formattedDescription.length > 0 && (
+              <ul className="game-modal-method-description">
+                {formattedDescription.map((line, lineIdx) => (
+                  <li key={`${area.name}-${methodLabel}-${idx}-desc-${lineIdx}`}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </li>
+        );
                       })}
                     </ul>
                   ) : (

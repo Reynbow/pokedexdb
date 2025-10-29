@@ -177,3 +177,4 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
 export default React.memo(PokemonCard);
 
 
+
