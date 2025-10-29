@@ -540,13 +540,13 @@ const normalizeEncounterData = (entries) => {
   return result;
 };
 
-// Local data support (JSONL) using single sources and game code mapping
-const LOCAL_DATA_PATHS = {
-  encounters: "/data/encounters.jsonl",
-  pokedex: "/data/pokedex_entries.jsonl",
+const LOCAL_COMBINED_DATA_PATH = "/data/encounter_and_pokedex.json";
+
+const combinedDataCache = {
+  map: null,
+  promise: null,
 };
 
-const localJsonlCache = new Map(); // url -> parsed array
 const normalizeLocalKey = (value) => {
   if (value == null) return "";
   let normalized = String(value)
@@ -633,82 +633,115 @@ const compareVersionEntries = (a, b) => {
   return labelA.localeCompare(labelB);
 };
 
-const matchesAnyLocalName = (value, candidates) => {
-  const normalized = normalizeLocalKey(value);
-  if (!normalized) return false;
-  for (const candidate of candidates) {
-    const normCandidate = normalizeLocalKey(candidate);
-    if (!normCandidate) continue;
-    if (normalized === normCandidate) return true;
-    if (normalized.startsWith(`${normCandidate}-`)) return true;
-    if (normCandidate.startsWith(`${normalized}-`)) return true;
+const loadCombinedDataMap = async () => {
+  if (combinedDataCache.map) return combinedDataCache.map;
+  if (!combinedDataCache.promise) {
+    combinedDataCache.promise = queuedFetch(LOCAL_COMBINED_DATA_PATH)
+      .then((response) => {
+        if (!response?.ok) {
+          throw new Error(`Failed to load ${LOCAL_COMBINED_DATA_PATH}: ${response?.status ?? "unknown"}`);
+        }
+        return response.json();
+      })
+      .then((json) => {
+        const source = json && typeof json === "object" ? json : {};
+        const map = new Map();
+        const register = (key, record) => {
+          const normalized = normalizeLocalKey(key);
+          if (!normalized || !record) return;
+          const bucket = map.get(normalized);
+          if (bucket) {
+            if (!bucket.includes(record)) bucket.push(record);
+          } else {
+            map.set(normalized, [record]);
+          }
+        };
+
+        Object.entries(source).forEach(([name, record]) => {
+          if (!record || typeof record !== "object") return;
+          register(name, record);
+          if (record?.pokedex_entry?.name) register(record.pokedex_entry.name, record);
+          if (Array.isArray(record?.encounters)) {
+            record.encounters.forEach((encounter) => {
+              if (encounter?.name) register(encounter.name, record);
+            });
+          }
+        });
+
+        combinedDataCache.map = map;
+        return map;
+      })
+      .catch((error) => {
+        combinedDataCache.map = null;
+        throw error;
+      })
+      .finally(() => {
+        combinedDataCache.promise = null;
+      });
   }
+  return combinedDataCache.promise;
+};
+
+const normalizedKeyMatches = (left, right) => {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (left.startsWith(`${right}-`)) return true;
+  if (right.startsWith(`${left}-`)) return true;
   return false;
 };
 
-async function loadLocalJsonl(url) {
-  try {
-    if (localJsonlCache.has(url)) return localJsonlCache.get(url);
-    const response = await queuedFetch(url);
-    if (!response?.ok) return [];
-    const text = await response.text();
-    const lines = String(text || "").split(/\r?\n/);
-    const parsed = [];
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      try {
-        parsed.push(JSON.parse(trimmed));
-      } catch {}
+const findCombinedRecords = async (nameCandidates = []) => {
+  const map = await loadCombinedDataMap();
+  if (!map || map.size === 0) return null;
+  const normalizedCandidates = (nameCandidates || []).map(normalizeLocalKey).filter(Boolean);
+  for (const candidate of normalizedCandidates) {
+    const bucket = map.get(candidate);
+    if (bucket && bucket.length > 0) return bucket;
+  }
+  for (const [key, bucket] of map.entries()) {
+    if (normalizedCandidates.some((candidate) => normalizedKeyMatches(key, candidate))) {
+      return bucket;
     }
-    localJsonlCache.set(url, parsed);
-    return parsed;
-  } catch {
+  }
+  return null;
+};
+
+async function loadLocalEncounterEntriesForPokemon(_pokemonId, ...nameCandidates) {
+  const candidates = nameCandidates.filter(Boolean);
+  const records = await findCombinedRecords(candidates);
+
+  if (!Array.isArray(records) || records.length === 0) {
     return [];
   }
-}
 
-async function loadLocalEncounterEntriesForPokemon(pokemonId, ...nameCandidates) {
-  const url = LOCAL_DATA_PATHS.encounters;
-  const records = await loadLocalJsonl(url);
-  if (!Array.isArray(records) || records.length === 0) return [];
+  const versionMap = new Map();
 
-  const idNum = Number(pokemonId);
-  const idCandidates = Number.isFinite(idNum) ? [idNum] : [];
-  const nameSet = nameCandidates.filter(Boolean);
+  for (const record of records) {
+    const encounters = Array.isArray(record?.encounters) ? record.encounters : [];
+    for (const encounter of encounters) {
+      const description = String(
+        encounter?.location ?? encounter?.details ?? encounter?.note ?? encounter?.notes ?? ""
+      ).trim();
+      if (!description) continue;
 
-  const versionMap = new Map(); // version -> Set(locations)
+      let games = [];
+      if (Array.isArray(encounter?.games) && encounter.games.length > 0) games = encounter.games;
+      else if (encounter?.game) games = [encounter.game];
+      if (games.length === 0) continue;
 
-  for (const rec of records) {
-    const recId = rec?.pokemon_id ?? rec?.pokemonId ?? rec?.id ?? null;
-    let matches = false;
-    const recIdNum = Number(recId);
-    if (Number.isFinite(recIdNum) && idCandidates.length > 0) {
-      matches = idCandidates.includes(recIdNum);
-    }
-    if (!matches) {
-      const recNames = [rec?.name, rec?.pokemon, rec?.pokemon_name, rec?.pokemonName].filter(Boolean);
-      if (recNames.length > 0 && nameSet.length > 0) {
-        matches = recNames.some((value) => matchesAnyLocalName(value, nameSet));
-      }
-    }
-    if (!matches) continue;
+      const versions = Array.from(
+        new Set(
+          games
+            .flatMap((gameCode) => mapGameCodeToVersions(gameCode))
+            .filter(Boolean)
+        )
+      );
 
-    const location = String(rec?.location ?? rec?.details ?? rec?.note ?? rec?.notes ?? "").trim();
-    if (!location) continue;
+      if (versions.length === 0) continue;
 
-    let games = [];
-    if (Array.isArray(rec?.games) && rec.games.length > 0) games = rec.games;
-    else if (Array.isArray(rec?.versions) && rec.versions.length > 0) games = rec.versions;
-    else if (rec?.game) games = [rec.game];
-    if (games.length === 0) continue;
-
-    for (const gameCode of games) {
-      const versions = mapGameCodeToVersions(gameCode);
       for (const version of versions) {
-        if (!version) continue;
         if (!versionMap.has(version)) versionMap.set(version, new Set());
-        versionMap.get(version).add(location);
+        versionMap.get(version).add(description);
       }
     }
   }
@@ -716,11 +749,11 @@ async function loadLocalEncounterEntriesForPokemon(pokemonId, ...nameCandidates)
   if (versionMap.size === 0) return [];
 
   const normalized = [];
-  for (const [version, locations] of versionMap.entries()) {
-    const locationList = Array.from(locations);
-    if (locationList.length === 0) continue;
+  for (const [version, descriptions] of versionMap.entries()) {
+    const descriptionList = Array.from(descriptions);
+    if (descriptionList.length === 0) continue;
     const logoFile = VERSION_LOGO_FILES.get(version);
-    const methods = locationList.map((location, idx) => ({
+    const methods = descriptionList.map((text, idx) => ({
       key: `local-${version}-${idx}`,
       method: null,
       label: `Location ${idx + 1}`,
@@ -728,9 +761,9 @@ async function loadLocalEncounterEntriesForPokemon(pokemonId, ...nameCandidates)
       minLevel: null,
       maxLevel: null,
       descriptors: [],
-      description: location,
+      description: text,
     }));
-    const locationCount = methods.length;
+    const count = methods.length;
     normalized.push({
       version,
       label: formatDisplayName(version),
@@ -742,13 +775,10 @@ async function loadLocalEncounterEntriesForPokemon(pokemonId, ...nameCandidates)
           methods,
         },
       ],
-      totalLocations: locationCount,
-      totalMethods: locationCount,
+      totalLocations: count,
+      totalMethods: count,
       maxChance: 0,
-      summary:
-        locationCount > 0
-          ? `${locationCount} ${locationCount === 1 ? "location" : "locations"}`
-          : "No wild encounters",
+      summary: count > 0 ? `${count} ${count === 1 ? "location" : "locations"}` : "No wild encounters",
       __local: true,
     });
   }
@@ -757,64 +787,51 @@ async function loadLocalEncounterEntriesForPokemon(pokemonId, ...nameCandidates)
   return normalized;
 }
 
-async function loadLocalPokedexEntriesForSpecies(speciesId, ...nameCandidates) {
-  const url = LOCAL_DATA_PATHS.pokedex;
-  const records = await loadLocalJsonl(url);
-  if (!Array.isArray(records) || records.length === 0) return [];
+async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) {
+  const candidates = nameCandidates.filter(Boolean);
+  const records = await findCombinedRecords(candidates);
 
-  const idNum = Number(speciesId);
-  const idCandidates = Number.isFinite(idNum) ? [idNum] : [];
-  const nameSet = nameCandidates.filter(Boolean);
-  const collected = [];
-  const seen = new Set();
-
-  const pushEntry = (gameCode, text, language) => {
-    const versions = mapGameCodeToVersions(gameCode);
-    for (const version of versions) {
-      if (!version || !text) continue;
-      const key = `${version}::${text}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      collected.push({ version, text, language: language || "en" });
-    }
-  };
-
-  for (const rec of records) {
-    const recId = rec?.species_id ?? rec?.speciesId ?? rec?.id ?? null;
-    let matches = false;
-    const recIdNum = Number(recId);
-    if (Number.isFinite(recIdNum) && idCandidates.length > 0) {
-      matches = idCandidates.includes(recIdNum);
-    }
-    if (!matches) {
-      const recNames = [rec?.name, rec?.pokemon, rec?.pokemon_name, rec?.pokemonName].filter(Boolean);
-      if (recNames.length > 0 && nameSet.length > 0) {
-        matches = recNames.some((value) => matchesAnyLocalName(value, nameSet));
-      }
-    }
-    if (!matches) continue;
-
-    const languageFallback = rec?.language || "en";
-
-    if (Array.isArray(rec?.entries) && rec.entries.length > 0) {
-      for (const entry of rec.entries) {
-        if (!entry) continue;
-        const game = entry?.game ?? entry?.version ?? rec?.game ?? rec?.version;
-        const text = entry?.text ?? entry?.entry ?? entry?.flavor_text ?? entry?.flavorText ?? rec?.entry ?? rec?.text;
-        const language = entry?.language || languageFallback;
-        if (!game || !text) continue;
-        pushEntry(game, text, language);
-      }
-    } else {
-      const game = rec?.game ?? rec?.version;
-      const text = rec?.text ?? rec?.entry ?? rec?.flavor_text ?? rec?.flavorText;
-      if (game && text) {
-        pushEntry(game, text, languageFallback);
-      }
-    }
+  if (!Array.isArray(records) || records.length === 0) {
+    return [];
   }
 
-  return collected;
+  const versionTextMap = new Map();
+
+  for (const record of records) {
+    const entry = record?.pokedex_entry;
+    if (!entry) continue;
+    const text = String(entry?.entry ?? entry?.text ?? "").trim();
+    if (!text) continue;
+
+    let games = [];
+    if (Array.isArray(entry?.games) && entry.games.length > 0) games = entry.games;
+    else if (entry?.game) games = [entry.game];
+    if (games.length === 0) continue;
+
+    const versions = Array.from(
+      new Set(
+        games
+          .flatMap((gameCode) => mapGameCodeToVersions(gameCode))
+          .filter(Boolean)
+      )
+    );
+
+    versions.forEach((version) => {
+      if (!version) return;
+      if (!versionTextMap.has(version)) {
+        versionTextMap.set(version, {
+          text,
+          language: (entry?.language || "en").toLowerCase(),
+        });
+      }
+    });
+  }
+
+  return Array.from(versionTextMap.entries()).map(([version, info]) => ({
+    version,
+    text: info.text,
+    language: info.language || "en",
+  }));
 }
 
 // moved to constants (FORM_ORDER)
