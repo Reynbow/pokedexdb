@@ -1708,7 +1708,10 @@
   color: #e5e7eb;
 }
 
-.about { padding: 4px 0 8px; }
+.about {
+  padding: 4px 0 8px;
+  margin-bottom: 16px;
+}
 .flavor-window {
   width: 100%;
   border-radius: 12px;
