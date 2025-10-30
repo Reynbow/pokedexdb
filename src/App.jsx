@@ -334,8 +334,16 @@ const stripMegaGmaxTokens = (rawName) => {
   return filtered.join("-");
 };
 
+const DISPLAY_NAME_OVERRIDES = new Map([
+  ["legends-za", "Legends: Z-A"],
+]);
+
 const formatDisplayName = (rawName) => {
   const stripped = stripMegaGmaxTokens(rawName);
+  const key = String(stripped || "").toLowerCase();
+  if (DISPLAY_NAME_OVERRIDES.has(key)) {
+    return DISPLAY_NAME_OVERRIDES.get(key);
+  }
   return toTitleCase(stripped);
 };
 
@@ -600,15 +608,99 @@ const VERSION_ALIAS_LOOKUP = (() => {
   return map;
 })();
 
-const SPECIAL_VERSION_GROUPS = new Map([
-  ["sv", ["scarlet", "violet"]],
-  ["bdsp", ["brilliant-diamond", "shining-pearl"]],
-  ["lza", ["legends-za"]],
-  ["pla", ["legends-arceus"]],
-  ["scarlet-violet", ["scarlet", "violet"]],
-  ["brilliant-diamond-shining-pearl", ["brilliant-diamond", "shining-pearl"]],
-  ["lets-go", ["lets-go-pikachu", "lets-go-eevee"]],
-]);
+const VERSION_PARTNER_GROUP_DEFS = [
+  ["scarlet", "violet"],
+  ["brilliant-diamond", "shining-pearl"],
+  ["sword", "shield"],
+  ["lets-go-pikachu", "lets-go-eevee"],
+  ["ultra-sun", "ultra-moon"],
+  ["sun", "moon"],
+  ["omega-ruby", "alpha-sapphire"],
+  ["x", "y"],
+  ["black-2", "white-2"],
+  ["black", "white"],
+  ["heartgold", "soulsilver"],
+  ["diamond", "pearl"],
+  ["firered", "leafgreen"],
+  ["ruby", "sapphire", "emerald"],
+  ["gold", "silver", "crystal"],
+  ["red", "blue", "yellow"],
+];
+
+const VERSION_PARTNER_GROUP_SLUGS = VERSION_PARTNER_GROUP_DEFS.map((names) => {
+  const slugs = Array.from(
+    new Set(
+      names
+        .map((name) => {
+          const normalized = normalizeLocalKey(name);
+          if (!normalized) return null;
+          return VERSION_ALIAS_LOOKUP.get(normalized) || normalized;
+        })
+        .filter(Boolean)
+    )
+  );
+  return slugs.length >= 2 ? Object.freeze(slugs) : null;
+}).filter(Boolean);
+
+const VERSION_PARTNER_GROUPS = (() => {
+  const map = new Map();
+  VERSION_PARTNER_GROUP_SLUGS.forEach((group) => {
+    group.forEach((slug) => {
+      if (!map.has(slug)) {
+        map.set(slug, group);
+      }
+    });
+  });
+  return map;
+})();
+
+const SPECIAL_VERSION_GROUPS = (() => {
+  const baseEntries = [
+    ["sv", ["scarlet", "violet"]],
+    ["bdsp", ["brilliant-diamond", "shining-pearl"]],
+    ["lza", ["legends-za"]],
+    ["pla", ["legends-arceus"]],
+    ["scarlet-violet", ["scarlet", "violet"]],
+    ["brilliant-diamond-shining-pearl", ["brilliant-diamond", "shining-pearl"]],
+    ["lets-go", ["lets-go-pikachu", "lets-go-eevee"]],
+  ];
+
+  const map = new Map();
+  const register = (alias, values) => {
+    if (!alias || !values || values.length === 0) return;
+    const key = normalizeLocalKey(alias);
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, values);
+    }
+  };
+
+  baseEntries.forEach(([alias, values]) => register(alias, values));
+
+  VERSION_PARTNER_GROUP_SLUGS.forEach((group) => {
+    if (!group || group.length === 0) return;
+    if (group.length === 1) {
+      register(group[0], group);
+      return;
+    }
+
+    const joinHyphen = group.join("-");
+    register(joinHyphen, group);
+
+    if (group.length === 2) {
+      register(`${group[0]} and ${group[1]}`, group);
+      register(`${group[0]} & ${group[1]}`, group);
+    } else {
+      const head = group.slice(0, -1).join("-");
+      const last = group[group.length - 1];
+      register(`${head} and ${last}`, group);
+      register(`${group.slice(0, -1).join(", ")} & ${last}`, group);
+      register(`${group.slice(0, -1).join(", ")} and ${last}`, group);
+    }
+  });
+
+  return map;
+})();
 
 const mapGameCodeToVersions = (code) => {
   const normalized = normalizeLocalKey(code);
@@ -617,7 +709,12 @@ const mapGameCodeToVersions = (code) => {
     return SPECIAL_VERSION_GROUPS.get(normalized) || [];
   }
   const slug = VERSION_ALIAS_LOOKUP.get(normalized);
-  return slug ? [slug] : [];
+  if (!slug) return [];
+  const partnerGroup = VERSION_PARTNER_GROUPS.get(slug);
+  if (partnerGroup && partnerGroup.length > 0) {
+    return partnerGroup;
+  }
+  return [slug];
 };
 
 const compareVersionEntries = (a, b) => {
@@ -2103,6 +2200,34 @@ function App() {
     return () => el.removeEventListener("wheel", onWheel);
   }, [selectedDex, availableGames.length]);
 
+  const shouldShowActiveFilters =
+    !showFilters && (selectedTypes.size + selectedTags.size > 0 || selectedDex || selectedGame);
+
+  const renderActiveFilterTokens = () => (
+    <>
+      {selectedDex && (
+        <span className="filter-token" key={`dex-${selectedDex}`}>
+          {DEX_FILTERS.find((d) => d.key === selectedDex)?.label || selectedDex}
+        </span>
+      )}
+      {selectedGame && (
+        <span className="filter-token" key={`game-${selectedGame}`}>
+          {(selectedDexConfig?.games || []).find((g) => g.key === selectedGame)?.label || selectedGame}
+        </span>
+      )}
+      {Array.from(selectedTypes).map((t) => (
+        <span key={`t-${t}`} className="filter-token">
+          {t}
+        </span>
+      ))}
+      {Array.from(selectedTags).map((tag) => (
+        <span key={`tag-${tag}`} className="filter-token">
+          {tag}
+        </span>
+      ))}
+    </>
+  );
+
   return (
     <div className="app-shell">
       <a
@@ -2155,29 +2280,12 @@ function App() {
             resolveLogoUrls={resolveLogoUrls}
           />
         )}
+        {shouldShowActiveFilters && (
+          <h2 className="active-filters-header">{renderActiveFilterTokens()}</h2>
+        )}
         {selected ? (
           <section className="content split">
             <div className="list-panel">
-              {!showFilters && (selectedTypes.size + selectedTags.size > 0 || selectedDex || selectedGame) && (
-                <h2 className="active-filters-header">
-                  {selectedDex && (
-                    <span className="filter-token" key={`dex-${selectedDex}`}>
-                      {DEX_FILTERS.find((d) => d.key === selectedDex)?.label || selectedDex}
-                    </span>
-                  )}
-                  {selectedGame && (
-                    <span className="filter-token" key={`game-${selectedGame}`}>
-                      {(selectedDexConfig?.games || []).find((g) => g.key === selectedGame)?.label || selectedGame}
-                    </span>
-                  )}
-                  {Array.from(selectedTypes).map((t) => (
-                    <span key={`t-${t}`} className="filter-token">{t}</span>
-                  ))}
-                  {Array.from(selectedTags).map((tag) => (
-                    <span key={`tag-${tag}`} className="filter-token">{tag}</span>
-                  ))}
-                </h2>
-              )}
               <div className="list-scroll">
                 {regularFiltered.length > 0 && (
                   <div className="list">
@@ -2264,26 +2372,6 @@ function App() {
           </section>
         ) : (
           <>
-            {!showFilters && (selectedTypes.size + selectedTags.size > 0 || selectedDex || selectedGame) && (
-              <h2 className="active-filters-header">
-                {selectedDex && (
-                  <span className="filter-token" key={`dex-${selectedDex}`}>
-                    {DEX_FILTERS.find((d) => d.key === selectedDex)?.label || selectedDex}
-                  </span>
-                )}
-                {selectedGame && (
-                  <span className="filter-token" key={`game-${selectedGame}`}>
-                    {(selectedDexConfig?.games || []).find((g) => g.key === selectedGame)?.label || selectedGame}
-                  </span>
-                )}
-                {Array.from(selectedTypes).map((t) => (
-                  <span key={`t-${t}`} className="filter-token">{t}</span>
-                ))}
-                {Array.from(selectedTags).map((tag) => (
-                  <span key={`tag-${tag}`} className="filter-token">{tag}</span>
-                ))}
-              </h2>
-            )}
             {regularFiltered.length > 0 && (
               <section className="grid">
                 {regularFiltered.map((p) => {
@@ -4364,7 +4452,14 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                         }}
                         title="View all Pokedex entries"
                       >
-                        <img src={currentVersionLogo} alt="" width={28} height={28} style={{ display: "block" }} />
+                        <img
+                          src={currentVersionLogo}
+                          alt=""
+                          width={28}
+                          height={28}
+                          className="pokedex-entry-logo"
+                          style={{ display: "block" }}
+                        />
                       </button>
                     )}
                   </div>

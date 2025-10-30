@@ -77,7 +77,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  margin: 4px auto 6px;
+  margin: 12px auto;
   color: #cbd5e1;
   font-size: 0.8rem;
   font-weight: 500;
@@ -103,7 +103,7 @@
 }
 
 .app-header {
-  padding: 48px 0 8px;
+  padding: 48px 0 0;
   text-align: center;
 }
 
@@ -553,6 +553,8 @@
   object-fit: contain;
   filter: drop-shadow(0 1px 3px rgba(8, 12, 32, 0.5));
   pointer-events: none;
+  border-radius: 6px;
+  clip-path: inset(0 round 6px);
 }
 .game-chip-label {
   font-size: 0.78rem;
@@ -2416,6 +2418,8 @@
   height: 36px;
   object-fit: contain;
   filter: drop-shadow(0 3px 8px rgba(8, 12, 24, 0.32));
+  border-radius: 8px;
+  clip-path: inset(0 round 8px);
 }
 
 .game-modal-title {
@@ -2551,6 +2555,8 @@
   height: 24px;
   object-fit: contain;
   filter: drop-shadow(0 2px 6px rgba(8, 12, 24, 0.4));
+  border-radius: 6px;
+  clip-path: inset(0 round 6px);
 }
 
 .game-modal-game-info {
@@ -3376,6 +3382,17 @@
   height: 28px;
   object-fit: contain;
   filter: drop-shadow(0 2px 6px rgba(8, 12, 24, 0.4));
+  border-radius: 7px;
+  clip-path: inset(0 round 7px);
+}
+
+.pokedex-entry-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(8, 12, 24, 0.4));
+  border-radius: 6px;
+  clip-path: inset(0 round 6px);
 }
 
 .catch-pill-text {
