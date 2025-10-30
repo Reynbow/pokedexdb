@@ -2511,13 +2511,86 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     if (!Array.isArray(gameAvailability) || gameAvailability.length === 0) {
       return null;
     }
+
+    if (selectedGame) {
+      const preferredVersions = [];
+      const mappedVersions = mapGameCodeToVersions(selectedGame);
+      if (Array.isArray(mappedVersions) && mappedVersions.length > 0) {
+        preferredVersions.push(...mappedVersions);
+      }
+      preferredVersions.push(selectedGame);
+
+      const normalizedTargets = new Set(
+        preferredVersions
+          .map((value) => normalizeLocalKey(value))
+          .filter(Boolean)
+      );
+
+      const match = gameAvailability.find((entry) => {
+        if (!entry) return false;
+        const version = normalizeLocalKey(entry.version);
+        if (version && normalizedTargets.has(version)) return true;
+        if (Array.isArray(entry.versions)) {
+          for (const value of entry.versions) {
+            const normalized = normalizeLocalKey(value);
+            if (normalized && normalizedTargets.has(normalized)) {
+              return true;
+            }
+          }
+        }
+        const code = normalizeLocalKey(entry.gameCode || entry.game);
+        if (code && normalizedTargets.has(code)) return true;
+        return false;
+      });
+
+      if (match) return match;
+    }
+
     return gameAvailability[gameAvailability.length - 1];
-  }, [gameAvailability]);
+  }, [gameAvailability, selectedGame]);
   const latestCatchLogos = useMemo(() => {
     if (!latestCatchGame) return [];
     return (latestCatchGame.logos || [])
       .map((logo) => GAME_LOGO_LOOKUP.get(logo))
       .filter(Boolean);
+  }, [latestCatchGame]);
+  const latestCatchLocationPreview = useMemo(() => {
+    if (!latestCatchGame) return "";
+    const areas = Array.isArray(latestCatchGame.areas) ? latestCatchGame.areas : [];
+    const entries = [];
+
+    areas.forEach((area) => {
+      const methods = Array.isArray(area?.methods) ? area.methods : [];
+      if (methods.length > 0) {
+        methods.forEach((method) => {
+          const description = String(method?.description || "").trim();
+          if (description) {
+            entries.push(description);
+            return;
+          }
+          const labelParts = [area?.label, method?.label]
+            .map((value) => (typeof value === "string" ? value.trim() : ""))
+            .filter(Boolean);
+          if (labelParts.length > 0) entries.push(labelParts.join(" - "));
+        });
+      } else {
+        const label = String(area?.label || "").trim();
+        if (label) entries.push(label);
+      }
+    });
+
+    const uniqueEntries = Array.from(new Set(entries.filter(Boolean)));
+    if (uniqueEntries.length === 0) {
+      const summary = String(latestCatchGame.summary || "").trim();
+      return summary;
+    }
+
+    const maxPreview = 3;
+    const previewEntries = uniqueEntries.slice(0, maxPreview);
+    const remaining = uniqueEntries.length - previewEntries.length;
+    return remaining > 0
+      ? `${previewEntries.join(" • ")} • +${remaining} more`
+      : previewEntries.join(" • ");
   }, [latestCatchGame]);
   const targetEvolutionGeneration = useMemo(() => {
     if (selectedGame) {
@@ -4203,19 +4276,19 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
             </section>
             {evoPaths.length > 0 && (
               <section className="evo-section">
+                {hasAnyAlternateForms && (
+                  <div className="evo-tree-actions">
+                    <button
+                      type="button"
+                      className="alt-forms-button"
+                      onClick={openAggregatedAltForms}
+                      title="Alt forms"
+                    >
+                      alt forms
+                    </button>
+                  </div>
+                )}
                 <div className="evo-tree">
-                  {hasAnyAlternateForms && (
-                    <div className="evo-tree-actions">
-                      <button
-                        type="button"
-                        className="alt-forms-button"
-                        onClick={openAggregatedAltForms}
-                        title="Alternate forms"
-                      >
-                        Alternate forms
-                      </button>
-                    </div>
-                  )}
                   {evolutionTree.length > 0 ? (
                     <ul className="evo-tree-roots">
                       {evolutionTree.map((entry, idx) =>
@@ -4238,7 +4311,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                   type="button"
                   className="catch-pill catch-trigger-button"
                   onClick={handleCatchModalOpen}
-                  aria-label={`View catch locations for ${name || "this Pokemon"} across ${gameAvailability.length} ${gameAvailability.length === 1 ? "game" : "games"}`}
+                  aria-label={`View catch locations for ${name || "this Pokemon"} in ${latestCatchGame.label || "the latest game"}`}
                 >
                   {latestCatchLogos.length > 0 && (
                     <span className="catch-pill-logos" aria-hidden="true">
@@ -4248,16 +4321,12 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                     </span>
                   )}
                   <span className="catch-trigger-text">
-                    <span className="catch-trigger-primary">View Catch Locations</span>
-                    <span className="catch-trigger-secondary">
-                      {gameAvailability.length === 1
-                        ? `Available in ${latestCatchGame.label}`
-                        : `Latest: ${latestCatchGame.label}`}
-                    </span>
+                    <span className="catch-trigger-primary">{latestCatchGame.label}</span>
+                    {latestCatchLocationPreview ? (
+                      <span className="catch-trigger-secondary">{latestCatchLocationPreview}</span>
+                    ) : null}
                   </span>
-                  <span className="catch-trigger-count">
-                    {gameAvailability.length} {gameAvailability.length === 1 ? "game" : "games"}
-                  </span>
+                  <span className="catch-trigger-count">catch locations</span>
                 </button>
               ) : (
                 <div className="catch-empty">No wild encounter data for this Pokemon.</div>

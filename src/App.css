@@ -3208,11 +3208,10 @@
 }
 .evo-tree { position: relative; }
 .evo-tree-actions {
-  position: absolute;
-  top: 6px;
-  right: 8px;
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
+  margin-bottom: 10px;
 }
 .alt-forms-button {
   display: inline-flex;
