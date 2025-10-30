@@ -1463,7 +1463,10 @@ function AlternateFormsModal({ forms, onClose, onSelectPokemon, title }) {
                     key={formId}
                     type="button"
                     className="form-card"
-                    onClick={() => onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`)}
+                    onClick={() => {
+                      onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`);
+                      onClose();
+                    }}
                     title={formName}
                   >
                     <SpriteImage id={form.id} alt={form.name} width={72} height={72} loading="lazy" />
@@ -4047,8 +4050,11 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         const result = await findRecommendedNature(alias, { generationHint });
         if (cancelled) return;
         const hasNature = Boolean(result?.nature);
+        const formatKey = String(result?.format || "").toLowerCase();
+        const isBalancedHackmons =
+          formatKey === "balancedhackmons" || formatKey.endsWith("balancedhackmons");
         const evs =
-          result?.evs && typeof result.evs === "object" && Object.keys(result.evs).length > 0
+          !isBalancedHackmons && result?.evs && typeof result.evs === "object" && Object.keys(result.evs).length > 0
             ? result.evs
             : null;
         setSmogonNature(hasNature ? result.nature : null);
