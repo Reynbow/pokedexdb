@@ -1793,6 +1793,31 @@
   background: rgba(250,204,21,0.24);
   border-color: rgba(250,204,21,0.55);
 }
+.ability-chip.toggle-chip {
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 14px;
+}
+.ability-chip.toggle-chip .toggle-label {
+  pointer-events: none;
+}
+.ability-chip.toggle-chip.gender-toggle {
+  width: 48px;
+  padding: 6px;
+  justify-content: center;
+}
+.ability-chip.toggle-chip.is-on {
+  background: rgba(59,130,246,0.24);
+  border-color: rgba(59,130,246,0.55);
+  color: #f8fafc;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.4);
+}
+.ability-chip.toggle-chip.is-on:hover,
+.ability-chip.toggle-chip.is-on:focus-visible {
+  background: rgba(59,130,246,0.3);
+  border-color: rgba(59,130,246,0.65);
+  box-shadow: 0 8px 20px rgba(15,23,42,0.5);
+}
 .nature-value { min-height: 24px; }
 .nature-chip {
   display: inline-flex;

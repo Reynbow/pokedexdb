@@ -4123,7 +4123,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
               <div className="toggle-group">
                 <button
                   type="button"
-                  className={`pill-button stat-total-pill${animated ? " is-on" : ""}`}
+                  className={`ability-chip toggle-chip${animated ? " is-on" : ""}`}
                   onClick={() => setAnimated((v) => !v)}
                   onMouseUp={(e) => e.currentTarget.blur()}
                   aria-pressed={animated}
@@ -4134,7 +4134,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 </button>
                 <button
                   type="button"
-                  className={`pill-button stat-total-pill${shiny ? " is-on" : ""}`}
+                  className={`ability-chip toggle-chip${shiny ? " is-on" : ""}`}
                   onClick={() => setShiny((v) => !v)}
                   onMouseUp={(e) => e.currentTarget.blur()}
                   aria-pressed={shiny}
@@ -4146,7 +4146,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 {hasGenderVariants && (
                   <button
                     type="button"
-                    className={`pill-button stat-total-pill${female ? " is-on" : ""}`}
+                    className={`ability-chip toggle-chip gender-toggle${female ? " is-on" : ""}`}
                     onClick={() => setFemale((v) => !v)}
                     onMouseUp={(e) => e.currentTarget.blur()}
                     aria-pressed={female}
