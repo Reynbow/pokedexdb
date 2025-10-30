@@ -42,3 +42,6 @@ export default function SpriteImage({ id, alt, onError, ...rest }) {
 
 
 
+
+
+

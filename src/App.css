@@ -1448,6 +1448,7 @@
 .matchup-box.pokedex-entry-box {
   background: rgba(59, 130, 246, 0.12);
   border-color: rgba(59, 130, 246, 0.28);
+  padding: 14px 18px;
 }
 .matchup-title { font-weight: 700; color: #e5e7eb; margin-bottom: 6px; }
 .weak-resist .types {
@@ -2456,6 +2457,11 @@
   overflow: hidden;
 }
 
+.game-modal-body.game-modal-body--single {
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+}
+
 .game-modal-column {
   display: flex;
   flex-direction: column;
@@ -2609,6 +2615,26 @@
   gap: 8px;
 }
 
+.game-modal-method-game {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.game-modal-method-game-logos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-modal-method-game-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #bfdbfe;
+  letter-spacing: 0.01em;
+}
+
 .game-modal-method {
   display: flex;
   flex-direction: column;
@@ -2638,6 +2664,10 @@
   border: 1px dashed rgba(148, 163, 184, 0.26);
   border-radius: 12px;
   padding: 12px 14px;
+}
+
+.game-modal-methods-empty .game-modal-method-game {
+  margin-bottom: 4px;
 }
 
 .game-modal-empty {

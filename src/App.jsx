@@ -540,7 +540,7 @@ const normalizeEncounterData = (entries) => {
   return result;
 };
 
-const LOCAL_COMBINED_DATA_PATH = "/data/encounter_and_pokedex.json";
+const LOCAL_COMBINED_DATA_PATH = "/data/pokemon_all.json";
 
 const combinedDataCache = {
   map: null,
@@ -644,8 +644,8 @@ const loadCombinedDataMap = async () => {
         return response.json();
       })
       .then((json) => {
-        const source = json && typeof json === "object" ? json : {};
         const map = new Map();
+
         const register = (key, record) => {
           const normalized = normalizeLocalKey(key);
           if (!normalized || !record) return;
@@ -657,16 +657,43 @@ const loadCombinedDataMap = async () => {
           }
         };
 
-        Object.entries(source).forEach(([name, record]) => {
+        const processRecord = (record, fallbackName) => {
           if (!record || typeof record !== "object") return;
-          register(name, record);
+          if (fallbackName) register(fallbackName, record);
+          if (typeof record.name === "string") register(record.name, record);
+          if (typeof record.slug === "string") register(record.slug, record);
+
+          if (Array.isArray(record.names)) {
+            record.names.forEach((value) => {
+              if (typeof value === "string") register(value, record);
+            });
+          }
+
+          if (Array.isArray(record.aliases)) {
+            record.aliases.forEach((value) => {
+              if (typeof value === "string") register(value, record);
+            });
+          }
+
           if (record?.pokedex_entry?.name) register(record.pokedex_entry.name, record);
+
           if (Array.isArray(record?.encounters)) {
             record.encounters.forEach((encounter) => {
               if (encounter?.name) register(encounter.name, record);
             });
           }
-        });
+        };
+
+        if (Array.isArray(json)) {
+          json.forEach((record) => {
+            const fallbackName = typeof record?.name === "string" ? record.name : null;
+            processRecord(record, fallbackName);
+          });
+        } else if (json && typeof json === "object") {
+          Object.entries(json).forEach(([name, record]) => {
+            processRecord(record, name);
+          });
+        }
 
         combinedDataCache.map = map;
         return map;
@@ -717,8 +744,50 @@ async function loadLocalEncounterEntriesForPokemon(_pokemonId, ...nameCandidates
   const versionMap = new Map();
 
   for (const record of records) {
-    const encounters = Array.isArray(record?.encounters) ? record.encounters : [];
-    for (const encounter of encounters) {
+    const encounterSources = [];
+
+    if (Array.isArray(record?.encounters)) {
+      encounterSources.push(...record.encounters);
+    }
+
+    if (record?.locations && typeof record.locations === "object" && !Array.isArray(record.locations)) {
+      Object.entries(record.locations).forEach(([gameName, info]) => {
+        if (!gameName) return;
+        let description;
+        if (Array.isArray(info)) {
+          description = info
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean)
+            .join("; ");
+        } else if (info && typeof info === "object") {
+          const candidates = ["text", "description", "details", "location", "note", "notes", "value"];
+          let maybeText = null;
+          for (const key of candidates) {
+            const candidate = info?.[key];
+            if (typeof candidate === "string" && candidate.trim()) {
+              maybeText = candidate;
+              break;
+            }
+          }
+          if (!maybeText) {
+            const joined = Object.values(info || {})
+              .filter((value) => typeof value === "string")
+              .map((value) => value.trim())
+              .filter(Boolean)
+              .join("; ");
+            maybeText = joined || null;
+          }
+          description = String(maybeText ?? "").trim();
+        } else {
+          description = String(info ?? "").trim();
+        }
+
+        if (!description) return;
+        encounterSources.push({ location: description, games: [gameName] });
+      });
+    }
+
+    for (const encounter of encounterSources) {
       const description = String(
         encounter?.location ?? encounter?.details ?? encounter?.note ?? encounter?.notes ?? ""
       ).trim();
@@ -797,35 +866,72 @@ async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) 
 
   const versionTextMap = new Map();
 
-  for (const record of records) {
-    const entry = record?.pokedex_entry;
-    if (!entry) continue;
-    const text = String(entry?.entry ?? entry?.text ?? "").trim();
-    if (!text) continue;
+  const addVersionText = (version, text, language) => {
+    const cleaned = String(text ?? "").trim();
+    if (!cleaned) return;
+    const normalizedVersion = normalizeLocalKey(version) || String(version ?? "").trim();
+    if (!normalizedVersion) return;
+    if (!versionTextMap.has(normalizedVersion)) {
+      versionTextMap.set(normalizedVersion, {
+        text: cleaned,
+        language: (language || "en").toLowerCase(),
+      });
+    }
+  };
 
-    let games = [];
-    if (Array.isArray(entry?.games) && entry.games.length > 0) games = entry.games;
-    else if (entry?.game) games = [entry.game];
-    if (games.length === 0) continue;
+  const addTextForGames = (games, text, language) => {
+    const cleaned = String(text ?? "").trim();
+    if (!cleaned) return;
+    const list = Array.isArray(games) ? games.filter(Boolean) : games ? [games] : [];
+    if (list.length === 0) return;
 
-    const versions = Array.from(
-      new Set(
-        games
-          .flatMap((gameCode) => mapGameCodeToVersions(gameCode))
-          .filter(Boolean)
-      )
-    );
-
-    versions.forEach((version) => {
-      if (!version) return;
-      if (!versionTextMap.has(version)) {
-        versionTextMap.set(version, {
-          text,
-          language: (entry?.language || "en").toLowerCase(),
-        });
-      }
+    list.forEach((gameCode) => {
+      const versions = mapGameCodeToVersions(gameCode);
+      const normalizedGame = normalizeLocalKey(gameCode);
+      const targets = versions.length > 0 ? versions : normalizedGame ? [normalizedGame] : [];
+      targets.forEach((version) => addVersionText(version, cleaned, language));
     });
-  }
+  };
+
+  const processRecord = (record) => {
+    if (!record || typeof record !== "object") return;
+
+    const entry = record?.pokedex_entry;
+    if (entry) {
+      const text = entry?.entry ?? entry?.text;
+      addTextForGames(entry?.games ?? entry?.game, text, entry?.language);
+    }
+
+    const entries = record?.entries;
+    if (Array.isArray(entries)) {
+      entries.forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        const text = item?.text ?? item?.entry;
+        const language = item?.language;
+        const targets = [];
+        if (item?.version) targets.push(item.version);
+        if (item?.versions && Array.isArray(item.versions)) targets.push(...item.versions);
+        if (targets.length > 0) {
+          targets.forEach((version) => addVersionText(version, text, language));
+        }
+        addTextForGames(item?.games ?? item?.game, text, language);
+      });
+    } else if (entries && typeof entries === "object") {
+      Object.entries(entries).forEach(([gameName, value]) => {
+        if (!gameName) return;
+        let text = value;
+        let language = "en";
+        if (value && typeof value === "object") {
+          if (typeof value.text === "string") text = value.text;
+          else if (typeof value.entry === "string") text = value.entry;
+          if (typeof value.language === "string") language = value.language;
+        }
+        addTextForGames(gameName, text, language);
+      });
+    }
+  };
+
+  records.forEach(processRecord);
 
   return Array.from(versionTextMap.entries()).map(([version, info]) => ({
     version,
@@ -3616,11 +3722,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     setActiveGame(latestCatchGame);
   }, [latestCatchGame]);
 
-  const handleGameSelection = useCallback((game) => {
-    if (!game) return;
-    setActiveGame(game);
-  }, []);
-
   const closeGameModal = useCallback(() => {
     setActiveGame(null);
   }, []);
@@ -4100,47 +4201,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 })}
               </div>
             </section>
-            {flavorTextVersions.length > 0 && (
-              <section className="catch-section single-col" style={{ padding: "0 16px 16px", marginTop: "0px" }}>
-                <div className="matchup-box pokedex-entry-box">
-                  <div className="matchup-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                    <span>Pokedex Entry</span>
-                    {flavorTextVersions.length > 1 && currentVersionLogo && (
-                      <button
-                        type="button"
-                        onClick={openFlavorModal}
-                        style={{
-                          background: "transparent",
-                          border: "1px solid rgba(255,255,255,0.2)",
-                          borderRadius: "8px",
-                          padding: "4px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          transition: "border-color 0.15s ease, transform 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
-                          e.currentTarget.style.transform = "translateY(-1px)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                        title="View all Pokedex entries"
-                      >
-                        <img src={currentVersionLogo} alt="" width={28} height={28} style={{ display: "block" }} />
-                      </button>
-                    )}
-                  </div>
-                  {selectedFlavorText && (
-                    <div style={{ fontSize: "0.9rem", color: "#cbd5f5", lineHeight: "1.5", fontStyle: "italic" }}>
-                      {selectedFlavorText}
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
             {evoPaths.length > 0 && (
               <section className="evo-section">
                 <div className="evo-tree">
@@ -4203,6 +4263,50 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 <div className="catch-empty">No wild encounter data for this Pokemon.</div>
               )}
             </section>
+            {flavorTextVersions.length > 0 && (
+              <section
+                className="catch-section single-col"
+                style={{ padding: "0 16px 16px", marginTop: "-16px" }}
+              >
+                <div className="matchup-box pokedex-entry-box">
+                  <div className="matchup-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <span>Pokedex Entry</span>
+                    {flavorTextVersions.length > 1 && currentVersionLogo && (
+                      <button
+                        type="button"
+                        onClick={openFlavorModal}
+                        style={{
+                          background: "transparent",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          borderRadius: "8px",
+                          padding: "4px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "border-color 0.15s ease, transform 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                        title="View all Pokedex entries"
+                      >
+                        <img src={currentVersionLogo} alt="" width={28} height={28} style={{ display: "block" }} />
+                      </button>
+                    )}
+                  </div>
+                  {selectedFlavorText && (
+                    <div style={{ fontSize: "0.9rem", color: "#cbd5f5", lineHeight: "1.5", fontStyle: "italic" }}>
+                      {selectedFlavorText}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
         </div>
         {details && (
@@ -4225,7 +4329,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           activeGame={activeGame}
           pokemonName={name}
           onClose={closeGameModal}
-          onSelectGame={handleGameSelection}
         />
       )}
       {isEvModalOpen && hasRecommendedEvs && (
@@ -4882,15 +4985,62 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
   );
 }
 
-function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSelectGame }) {
+function GameAvailabilityModal({ games, activeGame, pokemonName, onClose }) {
   const gameList = Array.isArray(games) ? games : [];
-  const activeVersion = activeGame?.version;
-  const selectedGame =
-    activeVersion != null
-      ? gameList.find((entry) => entry.version === activeVersion) || activeGame
-      : gameList[gameList.length - 1] || activeGame || null;
-  const titleId = selectedGame?.version ? `game-modal-title-${selectedGame.version}` : undefined;
+  const activeVersion = activeGame?.version ?? null;
   const displayPokemonName = pokemonName ? formatDisplayName(pokemonName) : "";
+  const titleId = "game-modal-title";
+  const sortedGameList = useMemo(() => {
+    const copy = gameList.slice();
+    if (copy.length <= 1) return copy;
+
+    const toOrderValue = (value) => {
+      if (!value) return -1;
+      if (VERSION_ORDER_LOOKUP.has(value)) return VERSION_ORDER_LOOKUP.get(value);
+      const normalized = normalizeLocalKey(value);
+      if (normalized && VERSION_ORDER_LOOKUP.has(normalized)) {
+        return VERSION_ORDER_LOOKUP.get(normalized);
+      }
+      return -1;
+    };
+
+    const toGameOrder = (game) => {
+      if (!game) return -1;
+
+      const version = game.version;
+      if (version) {
+        const order = toOrderValue(version);
+        if (order >= 0) return order;
+      }
+
+      if (Array.isArray(game.versions) && game.versions.length > 0) {
+        const values = game.versions.map(toOrderValue).filter((value) => value >= 0);
+        if (values.length > 0) return Math.max(...values);
+      }
+
+      const labelOrder = toOrderValue(game.label);
+      if (labelOrder >= 0) return labelOrder;
+
+      return -1;
+    };
+
+    copy.sort((a, b) => {
+      const orderA = toGameOrder(a);
+      const orderB = toGameOrder(b);
+      if (orderA !== orderB) return orderB - orderA;
+
+      const labelA = String(a?.label ?? "").toLowerCase();
+      const labelB = String(b?.label ?? "").toLowerCase();
+      if (labelA && labelB) return labelA.localeCompare(labelB);
+      if (labelA) return -1;
+      if (labelB) return 1;
+      return 0;
+    });
+
+    return copy;
+  }, [gameList]);
+  const totalGames = sortedGameList.length;
+  const activeSectionRef = useRef(null);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -4903,7 +5053,15 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSele
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  if (!selectedGame) return null;
+  useEffect(() => {
+    if (!activeVersion) return;
+    if (!activeSectionRef.current) return;
+    try {
+      activeSectionRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
+    } catch {
+      activeSectionRef.current.scrollIntoView();
+    }
+  }, [activeVersion]);
 
   const handleBackdropMouseDown = (event) => {
     event.stopPropagation();
@@ -4914,26 +5072,17 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSele
     event.stopPropagation();
   };
 
-  const handleSelectGame = useCallback(
-    (entry) => {
-      if (!entry || entry.version === selectedGame.version) return;
-      onSelectGame?.(entry);
-    },
-    [onSelectGame, selectedGame?.version],
-  );
-
-  const logoUrls = useMemo(() => {
-    if (!Array.isArray(selectedGame?.logos)) return [];
-    return selectedGame.logos
-      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-      .filter(Boolean);
-  }, [selectedGame?.logos]);
-
-  const areaList = Array.isArray(selectedGame.areas) ? selectedGame.areas : [];
-  const locationSummary =
-    selectedGame.totalLocations > 0 && selectedGame.totalMethods > 0
-      ? `${selectedGame.totalLocations} ${selectedGame.totalLocations === 1 ? "location" : "locations"}`
-      : "No wild encounters";
+  let summaryText;
+  if (totalGames === 0) {
+    summaryText = "No wild encounter data available.";
+  } else if (totalGames === 1) {
+    summaryText = `Encounter data available in ${sortedGameList[0]?.label ?? "this game"}.`;
+  } else {
+    summaryText = `Encounter data across ${totalGames} games.`;
+    if (activeGame?.label) {
+      summaryText += ` Latest: ${activeGame.label}.`;
+    }
+  }
 
   return (
     <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
@@ -4952,122 +5101,147 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose, onSele
             {displayPokemonName && (
               <>
                 <span className="game-modal-title-name">{displayPokemonName}</span>
-                <span className="game-modal-title-sep"> in </span>
+                <span className="game-modal-title-sep"> – </span>
               </>
             )}
-            <span className="game-modal-title-game">{selectedGame.label}</span>
+            <span className="game-modal-title-game">Encounter Locations</span>
           </h2>
-          {logoUrls.length > 0 && (
-            <span className="game-modal-logos" aria-hidden="true">
-              {logoUrls.map((src) => (
-                <img key={src} src={src} alt="" className="game-modal-logo" />
-              ))}
-            </span>
-          )}
-          <p className="game-modal-subtitle">{locationSummary}</p>
+          <p className="game-modal-subtitle">{summaryText}</p>
         </header>
-        <div className="game-modal-body">
-          <div className="game-modal-column game-modal-column-left">
-            {areaList.length > 0 ? (
+        <div className="game-modal-body game-modal-body--single">
+          {totalGames > 0 ? (
             <ul className="game-modal-area-list">
-              {areaList.map((area) => (
-                <li key={area.name} className="game-modal-area">
-                  <h3 className="game-modal-area-name">{area.label}</h3>
-                  {Array.isArray(area.methods) && area.methods.length > 0 ? (
-                    <ul className="game-modal-methods">
-                      {area.methods.map((method, idx) => {
-                        const methodLabel = method.label || "Encounter";
-                        const descriptors = Array.isArray(method.descriptors) ? method.descriptors : [];
-                        const minLevel = method.minLevel ?? null;
-                        const maxLevel = method.maxLevel ?? null;
-                        const metaParts = [];
-                        if (minLevel != null || maxLevel != null) {
-                          if (minLevel != null && maxLevel != null) {
-                            metaParts.push(minLevel === maxLevel ? `Lv. ${minLevel}` : `Lv. ${minLevel}-${maxLevel}`);
-                          } else if (minLevel != null) {
-                            metaParts.push(`Lv. ${minLevel}+`);
-                          } else if (maxLevel != null) {
-                            metaParts.push(`Up to Lv. ${maxLevel}`);
+              {sortedGameList.map((game, gameIndex) => {
+                const logos = Array.isArray(game?.logos)
+                  ? game.logos
+                      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
+                      .filter(Boolean)
+                  : [];
+                const methodEntries = [];
+                const areas = Array.isArray(game?.areas) ? game.areas : [];
+                areas.forEach((area, areaIndex) => {
+                  const methods = Array.isArray(area?.methods) ? area.methods : [];
+                  methods.forEach((method, methodIndex) => {
+                    methodEntries.push({
+                      method: method || {},
+                      areaLabel: area?.label || "",
+                      key: `${game.version || game.label || gameIndex}-${areaIndex}-${methodIndex}`,
+                    });
+                  });
+                });
+                const isActive = activeVersion != null && game.version === activeVersion;
+
+                return (
+                  <li
+                    key={game.version || game.label || gameIndex}
+                    className={`game-modal-area game-modal-game-area${isActive ? " is-active" : ""}`}
+                    ref={isActive ? activeSectionRef : undefined}
+                  >
+                    {methodEntries.length > 0 ? (
+                      <ul className="game-modal-methods">
+                        {methodEntries.map(({ method, areaLabel, key }, methodIndex) => {
+                          const descriptors = Array.isArray(method?.descriptors) ? method.descriptors : [];
+                          const minLevel = method?.minLevel ?? method?.min_level ?? null;
+                          const maxLevel = method?.maxLevel ?? method?.max_level ?? null;
+                          const chance = method?.chance ?? null;
+                          const metaParts = [];
+                          if (minLevel != null || maxLevel != null) {
+                            if (minLevel != null && maxLevel != null) {
+                              metaParts.push(
+                                minLevel === maxLevel ? `Lv. ${minLevel}` : `Lv. ${minLevel}-${maxLevel}`
+                              );
+                            } else if (minLevel != null) {
+                              metaParts.push(`Lv. ${minLevel}+`);
+                            } else if (maxLevel != null) {
+                              metaParts.push(`Up to Lv. ${maxLevel}`);
+                            }
                           }
-                        }
-                        if (method.chance != null) {
-                          metaParts.push(`${method.chance}%`);
-                        }
-                        if (descriptors.length > 0) {
-                          metaParts.push(descriptors.join(", "));
-                        }
-        const description = method.description || null;
-        const formattedDescription = description
-          ? description
-              .split(/\s*[,;•]\s*/)
-              .flatMap((segment) => segment.split(/\s*\r?\n\s*/))
-              .map((segment) => segment.trim())
-              .filter(Boolean)
-          : [];
-        return (
-          <li key={`${area.name}-${methodLabel}-${idx}`} className="game-modal-method">
-            <span className="game-modal-method-label">{methodLabel}</span>
-            {metaParts.length > 0 && (
-              <span className="game-modal-method-meta">{metaParts.join(" • ")}</span>
-            )}
-            {formattedDescription.length > 0 && (
-              <ul className="game-modal-method-description">
-                {formattedDescription.map((line, lineIdx) => (
-                  <li key={`${area.name}-${methodLabel}-${idx}-desc-${lineIdx}`}>{line}</li>
-                ))}
-              </ul>
-            )}
-          </li>
-        );
-                      })}
-                    </ul>
-                  ) : (
-                    <div className="game-modal-methods-empty">Encounter details unavailable.</div>
-                  )}
-                </li>
-              ))}
+                          if (chance != null) {
+                            metaParts.push(`${chance}%`);
+                          }
+                          if (descriptors.length > 0) {
+                            metaParts.push(descriptors.join(", "));
+                          }
+                          const areaTitle =
+                            areaLabel &&
+                            areaLabel.trim() &&
+                            areaLabel.trim().toLowerCase() !== "locations"
+                              ? areaLabel.trim()
+                              : null;
+                          const rawLabel = String(method?.label || "").trim();
+                          const isGenericLabel = /^location\s+\d+$/i.test(rawLabel);
+                          const labelParts = [];
+                          if (areaTitle) labelParts.push(areaTitle);
+                          if (rawLabel && !isGenericLabel) labelParts.push(rawLabel);
+                          const displayLabel = labelParts.join(" • ");
+                          const descriptionText = String(method?.description || "").trim();
+                          const formattedDescription = descriptionText
+                            ? descriptionText
+                                .split(/\s*[,;•]\s*/)
+                                .flatMap((segment) => segment.split(/\s*\r?\n\s*/))
+                                .map((segment) => segment.trim())
+                                .filter(Boolean)
+                            : [];
+                          const showEmptyState =
+                            formattedDescription.length === 0 && !displayLabel && metaParts.length === 0;
+                          const isFirstMethod = methodIndex === 0;
+
+                          return (
+                            <li key={key} className="game-modal-method">
+                              {isFirstMethod && (
+                                <div className="game-modal-method-game">
+                                  {logos.length > 0 && (
+                                    <span className="game-modal-method-game-logos" aria-hidden="true">
+                                      {logos.map((src) => (
+                                        <img key={src} src={src} alt="" className="game-modal-logo" />
+                                      ))}
+                                    </span>
+                                  )}
+                                  <span className="game-modal-method-game-name">{game.label}</span>
+                                </div>
+                              )}
+                              {displayLabel && (
+                                <span className="game-modal-method-label">{displayLabel}</span>
+                              )}
+                              {metaParts.length > 0 && (
+                                <span className="game-modal-method-meta">{metaParts.join(" • ")}</span>
+                              )}
+                              {formattedDescription.length > 0 && (
+                                <ul className="game-modal-method-description">
+                                  {formattedDescription.map((line, lineIdx) => (
+                                    <li key={`${key}-desc-${lineIdx}`}>{line}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              {showEmptyState && (
+                                <div className="game-modal-methods-empty">Encounter details unavailable.</div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="game-modal-methods-empty">
+                        <div className="game-modal-method-game">
+                          {logos.length > 0 && (
+                            <span className="game-modal-method-game-logos" aria-hidden="true">
+                              {logos.map((src) => (
+                                <img key={src} src={src} alt="" className="game-modal-logo" />
+                              ))}
+                            </span>
+                          )}
+                          <span className="game-modal-method-game-name">{game.label}</span>
+                        </div>
+                        <div>No encounter details available.</div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <div className="game-modal-empty">No wild encounter data for this game.</div>
+            <div className="game-modal-empty">No wild encounter data available.</div>
           )}
-          </div>
-          <aside className="game-modal-column game-modal-column-right">
-            <h3 className="game-modal-games-title">Available Games</h3>
-            {gameList.length > 0 ? (
-              <ul className="game-modal-game-options">
-                {gameList.map((entry) => {
-                  const isActive = entry.version === selectedGame.version;
-                  const optionLogos = (entry.logos || [])
-                    .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-                    .filter(Boolean);
-                  return (
-                    <li key={entry.version}>
-                      <button
-                        type="button"
-                        className={`game-modal-game-button${isActive ? " is-active" : ""}`}
-                        onClick={() => handleSelectGame(entry)}
-                        aria-current={isActive ? "true" : undefined}
-                      >
-                        {optionLogos.length > 0 && (
-                          <span className="game-modal-game-logos" aria-hidden="true">
-                            {optionLogos.map((src) => (
-                              <img key={src} src={src} alt="" className="game-modal-game-logo" />
-                            ))}
-                          </span>
-                        )}
-                        <span className="game-modal-game-info">
-                          <span className="game-modal-game-name">{entry.label}</span>
-                          <span className="game-modal-game-summary">{entry.summary}</span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="game-modal-game-empty">No other games available.</div>
-            )}
-          </aside>
         </div>
       </div>
     </div>
