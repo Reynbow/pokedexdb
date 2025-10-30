@@ -8,6 +8,7 @@ import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
+import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation } from "./utils/url.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS, LEGENDARY_NAMES, MYTHICAL_NAMES } from "./constants/species.js";
 import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
 import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
@@ -1500,9 +1501,19 @@ function App() {
   const gameFiltersRef = useRef(null);
   const pokedexCacheRef = useRef(new Map());
   const pokedexPromiseRef = useRef(new Map());
-  const [bootParam, setBootParam] = useState(() => {
-    const u = new URL(window.location.href);
-    return u.searchParams.get("p");
+  const [bootSelection, setBootSelection] = useState(() => {
+    try {
+      const current = new URL(window.location.href);
+      const slug = getPokemonSlugFromPath(current.pathname);
+      if (slug) {
+        return { type: "slug", value: slug };
+      }
+      const legacy = current.searchParams.get("p");
+      if (legacy) {
+        return { type: "legacy", value: legacy };
+      }
+    } catch {}
+    return null;
   });
 
   // Ensure URL only carries Pokemon param when on Pokemon page
@@ -1549,6 +1560,34 @@ function App() {
     }
     return map;
   }, [pokemon]);
+
+  const findPokemonBySlug = useCallback(
+    (slug) => {
+      const normalized = normalizePokemonSlug(slug);
+      if (!normalized) return null;
+      return pokemon.find((entry) => normalizePokemonSlug(entry?.name) === normalized) || null;
+    },
+    [pokemon]
+  );
+
+  const findPokemonById = useCallback(
+    (id) => {
+      const idStr = String(id || "").trim();
+      if (!idStr) return null;
+      return pokemon.find((entry) => getIdFromUrl(entry?.url) === idStr) || null;
+    },
+    [pokemon]
+  );
+
+  const findPokemonByIdentifier = useCallback(
+    (value) => {
+      if (value == null) return null;
+      const bySlug = findPokemonBySlug(value);
+      if (bySlug) return bySlug;
+      return findPokemonById(value);
+    },
+    [findPokemonBySlug, findPokemonById]
+  );
 
   const resolveSpeciesId = useCallback(
     (name, fallback = null) => {
@@ -1800,36 +1839,89 @@ function App() {
     };
   }, [selectedGame, gameIndexes, loadEntryMap]);
 
-  // Apply URL param selection after data loads
+  // Apply initial selection derived from URL once data loads
   useEffect(() => {
     if (!pokemon.length) return;
-    if (!bootParam) return;
-    const id = String(bootParam);
-    const match = pokemon.find((p) => p.url.split("/").filter(Boolean).pop() === id);
-    const name = match?.name;
-    const url = match?.url || `https://pokeapi.co/api/v2/pokemon/${id}`;
-    setSelected({ id, name: name || `pokemon-${id}`, url });
-    setBootParam(null);
-  }, [pokemon, bootParam]);
+    if (!bootSelection) return;
+
+    const finalizeSelection = (entry, shouldReplace) => {
+      if (!entry) {
+        setSelected(null);
+        setBootSelection(null);
+        return;
+      }
+      const id = getIdFromUrl(entry.url);
+      const name = entry.name || `pokemon-${id}`;
+      setSelected({ id, name, url: entry.url });
+      if (shouldReplace) {
+        updatePokemonLocation(name, { replace: true, pruneKeys: ["i", "m", "a", "p"] });
+      }
+      setBootSelection(null);
+    };
+
+    if (bootSelection.type === "slug") {
+      const match = findPokemonByIdentifier(bootSelection.value);
+      const shouldReplace = !!(match && normalizePokemonSlug(bootSelection.value) !== normalizePokemonSlug(match.name));
+      finalizeSelection(match, shouldReplace);
+      return;
+    }
+
+    if (bootSelection.type === "legacy") {
+      const match = findPokemonByIdentifier(bootSelection.value);
+      finalizeSelection(match, true);
+      return;
+    }
+
+    setBootSelection(null);
+  }, [pokemon, bootSelection, findPokemonBySlug, findPokemonByIdentifier]);
+
+  const resolveSelectionFromLocation = useCallback(() => {
+    try {
+      const slug = getPokemonSlugFromLocation();
+      if (slug) {
+        const match = findPokemonByIdentifier(slug);
+        if (match) {
+          const id = getIdFromUrl(match.url);
+          const name = match.name || `pokemon-${id}`;
+          if (normalizePokemonSlug(slug) !== normalizePokemonSlug(name)) {
+            updatePokemonLocation(name, { replace: true, pruneKeys: ["i", "m", "a", "p"] });
+            return;
+          }
+          setSelected({ id, name, url: match.url });
+          return;
+        }
+      }
+
+      const u = new URL(window.location.href);
+      const legacy = u.searchParams.get("p");
+      if (legacy) {
+        const match = findPokemonByIdentifier(legacy);
+        if (match) {
+          const id = getIdFromUrl(match.url);
+          const name = match.name || `pokemon-${id}`;
+          setSelected({ id, name, url: match.url });
+          updatePokemonLocation(name, { replace: true, pruneKeys: ["i", "m", "a", "p"] });
+          return;
+        }
+      }
+    } catch {}
+    setSelected(null);
+  }, [findPokemonByIdentifier, updatePokemonLocation, normalizePokemonSlug]);
 
   // Handle back/forward navigation to sync selection
   useEffect(() => {
     const onPop = () => {
-      const u = new URL(window.location.href);
-      const pid = u.searchParams.get("p");
-      if (!pid) {
-        setSelected(null);
-        return;
-      }
-      const id = String(pid);
-      const match = pokemon.find((p) => p.url.split("/").filter(Boolean).pop() === id);
-      const name = match?.name;
-      const url = match?.url || `https://pokeapi.co/api/v2/pokemon/${id}`;
-      setSelected({ id, name: name || `pokemon-${id}`, url });
+      resolveSelectionFromLocation();
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [pokemon]);
+  }, [resolveSelectionFromLocation]);
+
+  useEffect(() => {
+    if (!pokemon.length) return;
+    if (bootSelection) return;
+    resolveSelectionFromLocation();
+  }, [pokemon, bootSelection, resolveSelectionFromLocation]);
 
   const selectPokemon = (id, name, url, options) => {
     const opts = options || {};
@@ -1849,17 +1941,13 @@ function App() {
     }
     const parts = (target.url || "").split("/").filter(Boolean);
     const prefId = parts[parts.length - 1] || id;
-    const u = new URL(window.location.href);
-    ["i", "m", "a"].forEach((k) => u.searchParams.delete(k));
-    u.searchParams.set("p", prefId);
-    window.history.pushState({}, "", u);
-    setSelected({ id: prefId, name: target.name, url: target.url || url });
+    const targetName = target.name || name || `pokemon-${prefId}`;
+    updatePokemonLocation(targetName, { pruneKeys: ["i", "m", "a", "p"] });
+    setSelected({ id: prefId, name: targetName, url: target.url || url });
   };
 
   const clearSelection = () => {
-    const u = new URL(window.location.href);
-    u.searchParams.delete("p");
-    window.history.pushState({}, "", u);
+    updatePokemonLocation(null, { pruneKeys: ["i", "m", "a", "p"] });
     setSelected(null);
   };
 
@@ -1872,9 +1960,7 @@ function App() {
     if (pref && pref.url && pref.url !== url) {
       const parts = pref.url.split("/").filter(Boolean);
       const prefId = parts[parts.length - 1] || id;
-      const u = new URL(window.location.href);
-      u.searchParams.set("p", prefId);
-      window.history.pushState({}, "", u);
+      updatePokemonLocation(pref.name, { pruneKeys: ["i", "m", "a", "p"] });
       setSelected({ id: prefId, name: pref.name, url: pref.url });
     }
   }, [activeRegionKey]);

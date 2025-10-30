@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
+import { updatePokemonLocation } from "./utils/url.js";
 
 export default function MovesPage() {
   const [query, setQuery] = useState("");
@@ -474,15 +475,19 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
         if (!cancelled) setLearnersLoading(false);
       }
     }
-  function goToPokemonById(id) {
-    const u = new URL(window.location.href);
-    u.searchParams.set("p", String(id));
-    window.history.replaceState({}, "", u);
-    window.location.hash = ""; // navigate to main Pokemon page
-  }
     loadLearners();
     return () => { cancelled = true; };
   }, [data?.learned_by_pokemon]);
+
+  const goToPokemon = useCallback((pokemon) => {
+    if (!pokemon) return;
+    const slug = pokemon.name || String(pokemon.id || "").trim();
+    if (!slug) return;
+    updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
+    try {
+      window.location.hash = "";
+    } catch {}
+  }, []);
 
   // Load types for learners to render type pills
   useEffect(() => {
@@ -675,7 +680,7 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                           <button
                             type="button"
                             className="side-poke-button"
-                            onClick={() => goToPokemonById(p.id)}
+                            onClick={() => goToPokemon(p)}
                             title={`Open ${humanize(p.name)}`}
                           >
                             <img
