@@ -33,222 +33,6 @@ import {
   REGION_FEATURES,
 } from "./constants/games.js";
 
-
-// FEATHER_VARIANTS moved to ./constants/evItems.js
-
-// POWER_ITEM_VARIANTS moved to ./constants/evItems.js
-
-// DEX_FILTERS moved to ./constants/dex.js
-/* const DEX_FILTERS = [
-  { key: "national", label: "National", apiNames: ["national"], pad: 4, games: [] },
-  {
-    key: "kanto",
-    label: "Kanto",
-    apiNames: ["kanto"],
-    pad: 3,
-    games: [
-      {
-        key: "red-blue-yellow",
-        label: "Red, Blue & Yellow",
-        apiNames: ["kanto"],
-        logos: ["red.png", "blue.png", "yellow.png"],
-      },
-      {
-        key: "lets-go",
-        label: "Let's Go Pikachu & Let's Go Eevee",
-        apiNames: ["letsgo-kanto"],
-        logos: ["letsgopikachu.png", "letsgoeevee.png"],
-      },
-      {
-        key: "firered-leafgreen",
-        label: "FireRed & LeafGreen",
-        apiNames: ["kanto"],
-        logos: ["firered.png", "leafgreen.png"],
-      },
-    ],
-  },
-  {
-    key: "johto",
-    label: "Johto",
-    apiNames: ["original-johto", "updated-johto"],
-    pad: 3,
-    games: [
-      {
-        key: "gold-silver-crystal",
-        label: "Gold, Silver & Crystal",
-        apiNames: ["original-johto"],
-        logos: ["gold.png", "silver.png", "crystal.png"],
-      },
-      {
-        key: "heartgold-soulsilver",
-        label: "HeartGold & SoulSilver",
-        apiNames: ["updated-johto"],
-        logos: ["heartgold.png", "soulsilver.png"],
-      },
-    ],
-  },
-  {
-    key: "hoenn",
-    label: "Hoenn",
-    apiNames: ["hoenn", "updated-hoenn"],
-    pad: 3,
-    games: [
-      {
-        key: "ruby-sapphire-emerald",
-        label: "Ruby, Sapphire & Emerald",
-        apiNames: ["hoenn"],
-        logos: ["ruby.png", "sapphire.png", "emerald.png"],
-      },
-      {
-        key: "omega-ruby-alpha-sapphire",
-        label: "Omega Ruby & Alpha Sapphire",
-        apiNames: ["updated-hoenn"],
-        logos: ["omegaruby.png", "alphasapphire.png"],
-      },
-    ],
-  },
-  {
-    key: "sinnoh",
-    label: "Sinnoh",
-    apiNames: ["original-sinnoh", "extended-sinnoh"],
-    pad: 3,
-    games: [
-      {
-        key: "diamond-pearl",
-        label: "Diamond & Pearl",
-        apiNames: ["original-sinnoh"],
-        logos: ["diamond.png", "pearl.png"],
-      },
-      {
-        key: "platinum",
-        label: "Platinum",
-        apiNames: ["extended-sinnoh"],
-        logos: ["platinum.png"],
-      },
-      {
-        key: "brilliant-diamond-shining-pearl",
-        label: "Brilliant Diamond & Shining Pearl",
-        apiNames: ["original-sinnoh"],
-        logos: ["brilliantdiamond.png", "shiningpearl.png"],
-      },
-    ],
-  },
-  {
-    key: "unova",
-    label: "Unova",
-    apiNames: ["original-unova", "updated-unova"],
-    pad: 3,
-    games: [
-      {
-        key: "black-white",
-        label: "Black & White",
-        apiNames: ["original-unova"],
-        logos: ["black.png", "white.png"],
-      },
-      {
-        key: "black-2-white-2",
-        label: "Black 2 & White 2",
-        apiNames: ["updated-unova"],
-        logos: ["black2.png", "white2.png"],
-      },
-    ],
-  },
-  {
-    key: "kalos",
-    label: "Kalos",
-    apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain", "lumiose-city"],
-    pad: 3,
-    games: [
-      {
-        key: "x-y",
-        label: "X & Y",
-        apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
-        logos: ["x.png", "y.png"],
-      },
-      {
-        key: "legends-za",
-        label: "Legends: Z-A",
-        apiNames: ["lumiose-city"],
-        logos: ["za.png"],
-      },
-    ],
-  },
-  {
-    key: "alola",
-    label: "Alola",
-    apiNames: ["original-alola", "updated-alola"],
-    pad: 3,
-    games: [
-      {
-        key: "sun-moon",
-        label: "Sun & Moon",
-        apiNames: ["original-alola"],
-        logos: ["sun.png", "moon.png"],
-      },
-      {
-        key: "ultra-sun-ultra-moon",
-        label: "Ultra Sun & Ultra Moon",
-        apiNames: ["updated-alola"],
-        logos: ["ultrasun.png", "ultramoon.png"],
-      },
-    ],
-  },
-  {
-    key: "galar",
-    label: "Galar",
-    apiNames: ["galar"],
-    pad: 3,
-    games: [
-      {
-        key: "sword-shield",
-        label: "Sword & Shield",
-        apiNames: ["galar"],
-        logos: ["sword.png", "shield.png"],
-      },
-    ],
-  },
-  {
-    key: "hisui",
-    label: "Hisui",
-    apiNames: ["hisui"],
-    pad: 3,
-    games: [
-      {
-        key: "legends-arceus",
-        label: "Legends: Arceus",
-        apiNames: ["hisui"],
-        logos: ["arceus.png"],
-      },
-    ],
-  },
-  {
-    key: "paldea",
-    label: "Paldea",
-    apiNames: ["paldea"],
-    pad: 3,
-    games: [
-      {
-        key: "scarlet-violet",
-        label: "Scarlet & Violet",
-        apiNames: ["paldea"],
-        logos: ["scarlet.png", "violet.png"],
-      },
-    ],
-  },
-]; */
-
-// moved to ./constants/games.js (GAME_LOGO_IMPORTS, GAME_LOGO_LOOKUP)
-
-// moved to ./constants/games.js (VERSION_LOGO_FILES)
-
-// moved to ./constants/games.js (VERSION_RELEASE_SEQUENCE, VERSION_ORDER_LOOKUP)
-
-// moved to ./constants/games.js (NATIONAL_GAME_ORDER, GAME_METADATA, ALL_GAME_OPTIONS, NATIONAL_GAME_OPTIONS, GAME_LOOKUP)
-
-// moved to ./constants/games.js (GENERATION_* and *_GENERATION_LOOKUP)
-
-// moved to ./constants/games.js (GAME_FEATURES, REGION_FEATURES)
-
 const itemGenerationCache = new Map();
 const locationGenerationCache = new Map();
 const moveGenerationCache = new Map();
@@ -265,13 +49,6 @@ const getRegionGeneration = (regionName) => {
   const normalized = String(regionName).toLowerCase();
   return REGION_GENERATION_LOOKUP.get(normalized) ?? null;
 };
-
-// moved to constants (DEX_LOOKUP)
-// moved to constants (LEGENDARY_NAMES)
-
-// moved to constants (MYTHICAL_NAMES)
-
-// moved to constants (SPECIAL_FILTERS, SPECIAL_TAG_META)
 
 const humanizeName = (s) => String(s || "").replace(/-/g, " ");
 
@@ -306,8 +83,6 @@ const isRegionalFormName = (name) => {
 
 const isCapFormName = (name) => {
   const lower = String(name || "").toLowerCase();
-  // Match 'cap' as a standalone token or at the very end of the name.
-  // Avoid matching inside larger words like 'capsicum'.
   return /(?:^|[-_\s])cap(?:$|[-_\s])/.test(lower) || lower.endsWith("cap");
 };
 
@@ -326,7 +101,6 @@ const toTitleCase = (value) => {
   return base.replace(/\b\w/g, (char) => char.toUpperCase()).trim();
 };
 
-// Remove visual noise from names for display while keeping underlying slug intact
 const stripMegaGmaxTokens = (rawName) => {
   const lower = String(rawName || "").toLowerCase();
   if (!lower) return "";
@@ -347,8 +121,6 @@ const formatDisplayName = (rawName) => {
   }
   return toTitleCase(stripped);
 };
-
-// moved to constants (CONDITION_LABEL_OVERRIDES, TIME_OF_DAY_LABELS, METHOD_LABEL_OVERRIDES)
 
 const formatEncounterDescriptor = (name) => {
   if (!name) return null;
@@ -1038,8 +810,6 @@ async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) 
   }));
 }
 
-// moved to constants (FORM_ORDER)
-
 const getFormPriority = (entry) => {
   if (!entry?.tags || entry.tags.length === 0) return 99;
   const priorities = entry.tags.map((tag) => FORM_ORDER.get(tag) ?? 99);
@@ -1067,7 +837,6 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
         const formName = variant?.pokemon?.name;
         const formUrl = variant?.pokemon?.url;
         if (!formName || !formUrl) return null;
-        // Exclude Totem forms entirely
         if (String(formName).toLowerCase().includes("totem")) return null;
         const formId = getIdFromUrl(formUrl);
         if (!formId) return null;
@@ -1107,8 +876,7 @@ function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
   
   if (!data) return null;
 
-  // Check if current form is a regional/alternate form
-  const isAlternateForm = currentForm?.tags?.some(tag => 
+    const isAlternateForm = currentForm?.tags?.some(tag => 
     tag === 'Alolan' || tag === 'Galarian' || tag === 'Hisuian' || 
     tag === 'Paldean' || tag === 'Regional' || tag === 'Mega' || 
     tag === 'Primal' || tag === 'Gigantamax'
@@ -1345,7 +1113,6 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
     return logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
   };
 
-  // Sort versions by release date
   const sortedVersions = useMemo(() => {
     return [...versions].sort((a, b) => {
       const orderA = VERSION_ORDER_LOOKUP.has(a.name)
@@ -1483,8 +1250,6 @@ function AlternateFormsModal({ forms, onClose, onSelectPokemon, title }) {
   );
 }
 
-// Moved to ./sections/FilterTabs.jsx
-
 function App() {
   const [pokemon, setPokemon] = useState([]);
   const [query, setQuery] = useState("");
@@ -1496,8 +1261,8 @@ function App() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
   const [gameIndexes, setGameIndexes] = useState(() => new Map());
-  const typeIndexRef = useRef(new Map()); // type -> Set(names)
-  const specialTagCacheRef = useRef(new Map()); // name -> cached tag array
+  const typeIndexRef = useRef(new Map());
+  const specialTagCacheRef = useRef(new Map());
   const gameFiltersRef = useRef(null);
   const pokedexCacheRef = useRef(new Map());
   const pokedexPromiseRef = useRef(new Map());
@@ -1516,7 +1281,6 @@ function App() {
     return null;
   });
 
-  // Ensure URL only carries Pokemon param when on Pokemon page
   useEffect(() => {
     try {
       const u = new URL(window.location.href);
@@ -1609,7 +1373,6 @@ function App() {
     [speciesIdLookup]
   );
 
-  // Normalize regional tokens to canonical region keys
   const REGION_CANON_MAP = useMemo(() => new Map([
     ["alola", "alola"],
     ["alolan", "alola"],
@@ -1621,7 +1384,6 @@ function App() {
     ["paldean", "paldea"],
   ]), []);
 
-  // Determine the active region key from selection
   const activeRegionKey = useMemo(() => {
     if (selectedDex && selectedDex !== "national") return selectedDex;
     if (selectedGame) {
@@ -1631,7 +1393,6 @@ function App() {
     return null;
   }, [selectedDex, selectedGame]);
 
-  // Map: speciesId -> Map(regionKey | "default" -> entry)
   const regionFormsBySpecies = useMemo(() => {
     const result = new Map();
     for (const entry of pokemon) {
@@ -5431,13 +5192,60 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose }) {
                           if (rawLabel && !isGenericLabel) labelParts.push(rawLabel);
                           const displayLabel = labelParts.join(" • ");
                           const descriptionText = String(method?.description || "").trim();
-                          const formattedDescription = descriptionText
-                            ? descriptionText
-                                .split(/\s*[,;•]\s*/)
-                                .flatMap((segment) => segment.split(/\s*\r?\n\s*/))
-                                .map((segment) => segment.trim())
-                                .filter(Boolean)
-                            : [];
+                          const formattedDescription = (() => {
+                            if (!descriptionText) return [];
+
+                            const segments = [];
+                            let buffer = "";
+                            let parenDepth = 0;
+
+                            const commit = () => {
+                              const trimmed = buffer.trim();
+                              if (trimmed) {
+                                segments.push(trimmed);
+                              }
+                              buffer = "";
+                            };
+
+                            for (let idx = 0; idx < descriptionText.length; idx += 1) {
+                              const char = descriptionText[idx];
+
+                              if (char === "\r") {
+                                continue;
+                              }
+
+                              if (char === "(") {
+                                parenDepth += 1;
+                                buffer += char;
+                                continue;
+                              }
+
+                              if (char === ")") {
+                                parenDepth = Math.max(0, parenDepth - 1);
+                                buffer += char;
+                                continue;
+                              }
+
+                              if (char === "\n" || char === ";" || char === "•") {
+                                commit();
+                                continue;
+                              }
+
+                              if (char === ",") {
+                                if (parenDepth > 0) {
+                                  buffer += char;
+                                  continue;
+                                }
+                                commit();
+                                continue;
+                              }
+
+                              buffer += char;
+                            }
+
+                            commit();
+                            return segments;
+                          })();
                           const showEmptyState =
                             formattedDescription.length === 0 && !displayLabel && metaParts.length === 0;
                           const isFirstMethod = methodIndex === 0;

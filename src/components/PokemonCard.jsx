@@ -182,3 +182,4 @@ export default React.memo(PokemonCard);
 
 
 
+

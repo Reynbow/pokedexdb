@@ -1293,7 +1293,11 @@
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
-  transform: none;
+  transform: scale(2.5);
+  transform-origin: center bottom;
+  width: auto;
+  height: auto;
+  align-self: flex-end;
 }
 
 .detail-title h2 {
