@@ -288,11 +288,36 @@
 }
 
 /* Type filters row under the search */
-.filters-stack { display: grid; gap: 10px; margin: 16px 0 0; }
+.filters-stack {
+  --filter-chip-height: 35px;
+  --filter-chip-padding-block: 6px;
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+}
 .filters-row { display: flex; gap: 10px; }
 .type-filters { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
 .special-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
 .dex-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+
+.type-filters > *,
+.special-filters > *,
+.dex-filters > * {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: var(--filter-chip-height);
+}
+
+.filters-stack .type-chip,
+.filters-stack .special-filter-chip,
+.filters-stack .filter-chip {
+  height: var(--filter-chip-height);
+  padding: var(--filter-chip-padding-block) 14px;
+  box-sizing: border-box;
+}
 
 /* Filter boxes */
 .filters-desktop .filters-row {
@@ -350,21 +375,6 @@
   gap: 8px;
   padding-top: 0;
   margin-top: 0;
-}
-
-/* Ensure all buttons in desktop filter boxes size correctly - exactly 3 per row */
-.filters-desktop .filters-row > div button,
-.filters-desktop .filters-row > div span[role="button"] {
-  width: 100%;
-  max-width: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 35px;
-  max-height: none;
-  position: relative;
-  z-index: 10;
-  box-sizing: border-box;
 }
 
 /* Filter tabs container */
@@ -4224,8 +4234,10 @@
 .filters-desktop .filters-row > div span[role="button"] {
   width: 100%;
   max-width: none;
-  height: auto;
-  min-height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--filter-chip-height);
   max-height: none;
   position: relative;
   z-index: 10;
