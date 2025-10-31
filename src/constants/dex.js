@@ -183,14 +183,30 @@ export const DEX_FILTERS = [
   {
     key: "paldea",
     label: "Paldea",
-    apiNames: ["paldea"],
+    apiNames: ["paldea", "kitakami", "blueberry"],
     pad: 3,
     games: [
       {
         key: "scarlet-violet",
         label: "Scarlet & Violet",
-        apiNames: ["paldea"],
+        apiNames: ["paldea", "kitakami", "blueberry"],
         logos: ["scarlet.png", "violet.png"],
+        sections: [
+          {
+            key: "paldea",
+            apiNames: ["paldea"],
+          },
+          {
+            key: "kitakami",
+            label: "The Land of Kitakami",
+            apiNames: ["kitakami"],
+          },
+          {
+            key: "blueberry-academy",
+            label: "Blueberry Academy",
+            apiNames: ["blueberry"],
+          },
+        ],
       },
     ],
   },

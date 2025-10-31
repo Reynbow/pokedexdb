@@ -1551,14 +1551,32 @@ function App() {
         const gameEntries = new Map();
         await Promise.all(
           (cfg.games || []).map(async (game) => {
-            const entryMap = await loadEntryMap(
-              (game.apiNames && game.apiNames.length > 0) ? game.apiNames : cfg.apiNames
-            );
+            const baseApiNames =
+              game.apiNames && game.apiNames.length > 0 ? game.apiNames : cfg.apiNames;
+            const entryMap = await loadEntryMap(baseApiNames);
+            let sections = null;
+            if (Array.isArray(game.sections) && game.sections.length > 0) {
+              const sectionResults = await Promise.all(
+                game.sections.map(async (section, index) => {
+                  const sectionApiNames =
+                    section?.apiNames && section.apiNames.length > 0 ? section.apiNames : baseApiNames;
+                  const sectionEntryMap = await loadEntryMap(sectionApiNames);
+                  return {
+                    key: section?.key || section?.label || `section-${index}`,
+                    label: section?.label ?? null,
+                    apiNames: sectionApiNames,
+                    entryMap: sectionEntryMap,
+                  };
+                })
+              );
+              sections = sectionResults;
+            }
             if (!cancelled) {
               gameEntries.set(game.key, {
                 key: game.key,
                 label: game.label,
                 entryMap,
+                sections,
               });
             }
           })
@@ -1573,7 +1591,7 @@ function App() {
         setGameIndexes((prev) => {
           const next = new Map(prev);
           for (const [gameKey, info] of gameEntries) {
-            next.set(gameKey, info.entryMap);
+            next.set(gameKey, { entryMap: info.entryMap, sections: info.sections || null });
           }
           return next;
         });
@@ -1589,18 +1607,40 @@ function App() {
 
   useEffect(() => {
     if (!selectedGame) return;
-    if (gameIndexes.has(selectedGame)) return;
     const cfg = GAME_LOOKUP.get(selectedGame);
     if (!cfg) return;
+    const needsSections = Array.isArray(cfg.sections) && cfg.sections.length > 0;
+    const existing = gameIndexes.get(selectedGame);
+    const existingEntryMap = existing instanceof Map ? existing : existing?.entryMap ?? null;
+    const existingSections = existing instanceof Map ? null : existing?.sections ?? null;
+    if (existingEntryMap && (!needsSections || (existingSections && existingSections.length > 0))) {
+      return;
+    }
     let cancelled = false;
     const loadGame = async () => {
       try {
-        const entryMap = await loadEntryMap(cfg.apiNames || []);
+        const entryMap = existingEntryMap || (await loadEntryMap(cfg.apiNames || []));
+        let sections = existingSections;
+        if (needsSections && (!sections || sections.length === 0)) {
+          const sectionResults = await Promise.all(
+            cfg.sections.map(async (section, index) => {
+              const sectionApiNames =
+                section?.apiNames && section.apiNames.length > 0 ? section.apiNames : cfg.apiNames;
+              const sectionEntryMap = await loadEntryMap(sectionApiNames || []);
+              return {
+                key: section?.key || section?.label || `section-${index}`,
+                label: section?.label ?? null,
+                apiNames: sectionApiNames,
+                entryMap: sectionEntryMap,
+              };
+            })
+          );
+          sections = sectionResults;
+        }
         if (cancelled) return;
         setGameIndexes((prev) => {
-          if (prev.has(selectedGame)) return prev;
           const next = new Map(prev);
-          next.set(selectedGame, entryMap);
+          next.set(selectedGame, { entryMap, sections: sections || null });
           return next;
         });
       } catch (err) {
@@ -1750,15 +1790,28 @@ function App() {
       return [];
     }
     const combinedMap = selectedDex === "national" ? null : dexData?.combined ?? null;
-    const regionGameEntryMap =
-      selectedDex !== "national" && selectedGame ? dexData?.games?.get(selectedGame)?.entryMap ?? null : null;
-    const nationalGameEntryMap =
-      selectedDex === "national" && selectedGame ? gameIndexes.get(selectedGame) ?? null : null;
+    const regionGameEntry =
+      selectedDex !== "national" && selectedGame ? dexData?.games?.get(selectedGame) ?? null : null;
+    const regionGameEntryMap = regionGameEntry?.entryMap ?? null;
+    let nationalGameEntry = null;
+    if (selectedDex === "national" && selectedGame) {
+      const stored = gameIndexes.get(selectedGame) ?? null;
+      if (stored instanceof Map) {
+        nationalGameEntry = { entryMap: stored, sections: null };
+      } else if (stored) {
+        nationalGameEntry = stored;
+      }
+    }
+    const nationalGameEntryMap = nationalGameEntry?.entryMap ?? null;
     if (selectedDex === "national" && selectedGame && !nationalGameEntryMap) {
       return [];
     }
     const activeEntryMap =
       selectedDex === "national" ? nationalGameEntryMap : regionGameEntryMap ?? combinedMap;
+    const activeSections =
+      selectedDex === "national"
+        ? nationalGameEntry?.sections ?? null
+        : regionGameEntry?.sections ?? null;
     if (selectedDex !== "national" && !activeEntryMap) {
       return [];
     }
@@ -1926,14 +1979,70 @@ function App() {
     sortMatches(regularMatches);
     sortMatches(megaGmaxMatches);
 
+    let primarySectionGroups = null;
+    const normalizedSections = Array.isArray(activeSections)
+      ? activeSections
+          .map((section, index) => {
+            if (!section) return null;
+            const entryMap = section.entryMap instanceof Map ? section.entryMap : null;
+            if (!entryMap) return null;
+            return {
+              key: section.key || section.label || `section-${index}`,
+              label: section.label ?? null,
+              entryMap,
+            };
+          })
+          .filter(Boolean)
+      : [];
+    if (normalizedSections.length > 0) {
+      const sectionBuckets = normalizedSections.map(() => []);
+      const fallbackEntries = [];
+      const resolveLookupId = (match) => {
+        const preferred = match.speciesId ?? (match.idNum < 10000 ? match.idNum : null);
+        return preferred ?? match.idNum;
+      };
+      for (const match of regularMatches) {
+        const lookupId = resolveLookupId(match);
+        let assigned = false;
+        for (let idx = 0; idx < normalizedSections.length; idx++) {
+          const sectionMap = normalizedSections[idx].entryMap;
+          if (sectionMap?.has(lookupId)) {
+            sectionBuckets[idx].push(match.entry);
+            assigned = true;
+            break;
+          }
+        }
+        if (!assigned) {
+          fallbackEntries.push(match.entry);
+        }
+      }
+      const groups = [];
+      if (fallbackEntries.length > 0) {
+        groups.push({ key: "ungrouped", label: null, entries: fallbackEntries });
+      }
+      normalizedSections.forEach((section, index) => {
+        const entries = sectionBuckets[index];
+        if (!entries || entries.length === 0) return;
+        groups.push({ key: section.key || `section-${index}`, label: section.label ?? null, entries });
+      });
+      if (groups.length > 0) {
+        primarySectionGroups = groups;
+      }
+    }
+
     return {
       primary: regularMatches.map((item) => item.entry),
       megaGigantamax: megaGmaxMatches.map((item) => item.entry),
+      primarySectionGroups,
     };
   }, [pokemon, query, selectedTypes, selectedTags, selectedDex, selectedGame, dexIndexes, gameIndexes, resolveSpeciesId]);
 
   const regularFiltered = filteredLists.primary ?? [];
   const megaGigantamaxFiltered = filteredLists.megaGigantamax ?? [];
+  const regularSectionGroups = filteredLists.primarySectionGroups ?? null;
+  const sectionGroups = Array.isArray(regularSectionGroups) ? regularSectionGroups : null;
+  const hasPrimaryContent =
+    (sectionGroups && sectionGroups.some((group) => (group.entries?.length ?? 0) > 0)) || regularFiltered.length > 0;
 
   const formatDexNumber = useCallback(
     (value) => {
@@ -1952,7 +2061,8 @@ function App() {
         if (!selectedGame) {
           return `#${String(lookupId).padStart(pad, "0")}`;
         }
-        const entryMap = gameIndexes.get(selectedGame);
+        const entryInfo = gameIndexes.get(selectedGame);
+        const entryMap = entryInfo instanceof Map ? entryInfo : entryInfo?.entryMap ?? null;
         if (!entryMap) return "-";
         const entry = entryMap.get(lookupId);
         if (entry == null) return "-";
@@ -2091,6 +2201,92 @@ function App() {
     </>
   );
 
+  const renderListEntries = (entries) => {
+    if (!entries || entries.length === 0) return null;
+    return (
+      <div className="list">
+        {entries.map((p) => {
+          const pref = getRegionPreferredEntry(p);
+          const parts = pref.url.split("/").filter(Boolean);
+          const id = parts[parts.length - 1];
+          const idNum = Number(id);
+          const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+          return (
+            <PokemonCard
+              key={pref.name}
+              id={id}
+              name={pref.name}
+              url={pref.url}
+              onSelect={() => selectPokemon(id, pref.name, pref.url)}
+              selected={selected ? String(selected.id) === String(id) : undefined}
+              dexNumber={dexDisplay}
+              shiny={shiny}
+              detailsCache={detailsCache}
+            />
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderGridEntries = (entries, className = "grid") => {
+    if (!entries || entries.length === 0) return null;
+    return (
+      <section className={className}>
+        {entries.map((p) => {
+          const pref = getRegionPreferredEntry(p);
+          const parts = pref.url.split("/").filter(Boolean);
+          const id = parts[parts.length - 1];
+          const idNum = Number(id);
+          const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+          return (
+            <PokemonCard
+              key={pref.name}
+              id={id}
+              name={pref.name}
+              url={pref.url}
+              onSelect={() => selectPokemon(id, pref.name, pref.url)}
+              dexNumber={dexDisplay}
+              shiny={shiny}
+              detailsCache={detailsCache}
+            />
+          );
+        })}
+      </section>
+    );
+  };
+
+  const listPrimaryContent = sectionGroups && sectionGroups.length > 0
+    ? sectionGroups
+        .map((group, index) => {
+          const content = renderListEntries(group.entries);
+          if (!content) return null;
+          return (
+            <div key={group.key || `section-${index}`} className="list-section">
+              {index > 0 && <div className="list-divider" role="separator" />}
+              {group.label && <h3 className="list-subheading">{group.label}</h3>}
+              {content}
+            </div>
+          );
+        })
+        .filter(Boolean)
+    : renderListEntries(regularFiltered);
+
+  const gridPrimaryContent = sectionGroups && sectionGroups.length > 0
+    ? sectionGroups
+        .map((group, index) => {
+          const content = renderGridEntries(group.entries);
+          if (!content) return null;
+          return (
+            <React.Fragment key={group.key || `section-${index}`}>
+              {group.label && <h2 className="grid-subheading">{group.label}</h2>}
+              {content}
+            </React.Fragment>
+          );
+        })
+        .filter(Boolean)
+    : renderGridEntries(regularFiltered);
+
   return (
     <div className="app-shell">
       <a
@@ -2150,33 +2346,10 @@ function App() {
           <section className="content split">
             <div className="list-panel">
               <div className="list-scroll">
-                {regularFiltered.length > 0 && (
-                  <div className="list">
-                    {regularFiltered.map((p) => {
-                      const pref = getRegionPreferredEntry(p);
-                      const parts = pref.url.split("/").filter(Boolean);
-                      const id = parts[parts.length - 1];
-                      const idNum = Number(id);
-                      const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
-                      return (
-                        <PokemonCard
-                          key={pref.name}
-                          id={id}
-                          name={pref.name}
-                          url={pref.url}
-                          onSelect={() => selectPokemon(id, pref.name, pref.url)}
-                          selected={String(selected.id) === String(id)}
-                          dexNumber={dexDisplay}
-                          shiny={shiny}
-                          detailsCache={detailsCache}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+                {listPrimaryContent}
                 {megaGigantamaxFiltered.length > 0 && (
                   <div className="list-special">
-                    {regularFiltered.length > 0 && <div className="list-divider" role="separator" />}
+                    {hasPrimaryContent && <div className="list-divider" role="separator" />}
                     <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
                     <div className="list">
                       {megaGigantamaxFiltered.map((p) => {
@@ -2202,7 +2375,7 @@ function App() {
                     </div>
                   </div>
                 )}
-                {regularFiltered.length === 0 && megaGigantamaxFiltered.length === 0 && (
+                {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
                   <div className="list-empty">No Pokémon found.</div>
                 )}
               </div>
@@ -2239,29 +2412,7 @@ function App() {
           </section>
         ) : (
           <>
-            {regularFiltered.length > 0 && (
-              <section className="grid">
-                {regularFiltered.map((p) => {
-                  const pref = getRegionPreferredEntry(p);
-                  const parts = pref.url.split("/").filter(Boolean);
-                  const id = parts[parts.length - 1];
-                  const idNum = Number(id);
-                  const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
-                  return (
-                    <PokemonCard
-                      key={pref.name}
-                      id={id}
-                      name={pref.name}
-                      url={pref.url}
-                      onSelect={() => selectPokemon(id, pref.name, pref.url)}
-                      dexNumber={dexDisplay}
-                      shiny={shiny}
-                      detailsCache={detailsCache}
-                    />
-                  );
-                })}
-              </section>
-            )}
+            {gridPrimaryContent}
             {megaGigantamaxFiltered.length > 0 && (
               <>
                 <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
@@ -2288,7 +2439,7 @@ function App() {
                 </section>
               </>
             )}
-            {regularFiltered.length === 0 && megaGigantamaxFiltered.length === 0 && (
+            {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
               <section className="grid">
                 <div className="dex-loading">No Pokémon found.</div>
               </section>
