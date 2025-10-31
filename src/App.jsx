@@ -1191,7 +1191,7 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
   );
 }
 
-function AlternateFormsModal({ forms, onClose, onSelectPokemon, title }) {
+function AlternateFormsModal({ forms, onClose, onSelectPokemon, title, shiny = false }) {
   const handleBackdropMouseDown = (event) => {
     event.stopPropagation();
     onClose();
@@ -1237,7 +1237,7 @@ function AlternateFormsModal({ forms, onClose, onSelectPokemon, title }) {
                     }}
                     title={formName}
                   >
-                    <SpriteImage id={form.id} alt={form.name} width={72} height={72} loading="lazy" />
+                    <SpriteImage id={form.id} alt={form.name} width={72} height={72} loading="lazy" shiny={shiny} />
                     <div className="form-name">{formName}</div>
                   </button>
                 );
@@ -1259,6 +1259,13 @@ function App() {
   const [selectedTags, setSelectedTags] = useState(() => new Set());
   const [selectedDex, setSelectedDex] = useState("national");
   const [selectedGame, setSelectedGame] = useState(null);
+  const [shiny, setShiny] = useState(() => {
+    try {
+      return localStorage.getItem("pref:shiny") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
   const [gameIndexes, setGameIndexes] = useState(() => new Map());
   const typeIndexRef = useRef(new Map());
@@ -1288,6 +1295,12 @@ function App() {
       window.history.replaceState({}, "", u);
     } catch {}
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pref:shiny", shiny ? "1" : "0");
+    } catch {}
+  }, [shiny]);
 
   const getTagsForName = (name) => {
     const lower = String(name || "").toLowerCase();
@@ -2154,6 +2167,7 @@ function App() {
                           onSelect={() => selectPokemon(id, pref.name, pref.url)}
                           selected={String(selected.id) === String(id)}
                           dexNumber={dexDisplay}
+                          shiny={shiny}
                           detailsCache={detailsCache}
                         />
                       );
@@ -2180,6 +2194,7 @@ function App() {
                             onSelect={() => selectPokemon(id, pref.name, pref.url)}
                             selected={String(selected.id) === String(id)}
                             dexNumber={dexDisplay}
+                            shiny={shiny}
                             detailsCache={detailsCache}
                           />
                         );
@@ -2217,6 +2232,8 @@ function App() {
               selectedDex={selectedDex}
               selectedGame={selectedGame}
             pokemonIdLookup={pokemonIdLookup}
+            shiny={shiny}
+            setShiny={setShiny}
             />
             </ErrorBoundary>
           </section>
@@ -2238,6 +2255,7 @@ function App() {
                       url={pref.url}
                       onSelect={() => selectPokemon(id, pref.name, pref.url)}
                       dexNumber={dexDisplay}
+                      shiny={shiny}
                       detailsCache={detailsCache}
                     />
                   );
@@ -2262,6 +2280,7 @@ function App() {
                         url={pref.url}
                         onSelect={() => selectPokemon(id, pref.name, pref.url)}
                         dexNumber={dexDisplay}
+                        shiny={shiny}
                         detailsCache={detailsCache}
                       />
                     );
@@ -2365,7 +2384,18 @@ function queuedFetch(url, init) {
 
 // Moved to ./components/ErrorBoundary.jsx
 
-function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNumber, selectedDex, selectedGame, pokemonIdLookup }) {
+function DetailPanel({
+  selected,
+  onClose,
+  onSelectPokemon,
+  onActivateType,
+  dexNumber,
+  selectedDex,
+  selectedGame,
+  pokemonIdLookup,
+  shiny = false,
+  setShiny,
+}) {
   const pokemonIdMap = useMemo(() => {
     if (pokemonIdLookup instanceof Map) return pokemonIdLookup;
     if (!pokemonIdLookup) return new Map();
@@ -2375,13 +2405,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   }, [pokemonIdLookup]);
   const { id, name, url } = selected || {};
   const [details, setDetails] = useState(null);
-  const [shiny, setShiny] = useState(() => {
-    try {
-      return localStorage.getItem("pref:shiny") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [animated, setAnimated] = useState(() => {
     try {
       return localStorage.getItem("pref:animated") === "1";
@@ -2687,6 +2710,12 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   };
   const displayDexNumber = dexNumber || (id ? `#${id}` : "-");
 
+  const handleShinyToggle = useCallback(() => {
+    if (typeof setShiny === "function") {
+      setShiny((prev) => !prev);
+    }
+  }, [setShiny]);
+
   const evolutionTree = useMemo(() => {
     if (!Array.isArray(evoPaths) || evoPaths.length === 0) return [];
     const nodeMap = new Map();
@@ -2843,7 +2872,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
     const inner = (
       <>
         <span className="evo-tree-icon">
-          <SpriteImage id={node.id} alt={node.name} width={size} height={size} loading="lazy" />
+          <SpriteImage id={node.id} alt={node.name} width={size} height={size} loading="lazy" shiny={shiny} />
         </span>
         <span className="evo-tree-name text-capitalize">{nodeName}</span>
       </>
@@ -3004,7 +3033,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                       aria-pressed={isActiveForm}
                       title={formName}
                     >
-                      <SpriteImage id={form.id} alt={form.name} width={30} height={30} loading="lazy" />
+                      <SpriteImage id={form.id} alt={form.name} width={30} height={30} loading="lazy" shiny={shiny} />
                       <span className="evo-tree-form-name">{formName}</span>
                     </button>
                   );
@@ -3023,10 +3052,6 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
       </li>
     );
   };
-
-  useEffect(() => {
-    try { localStorage.setItem("pref:shiny", shiny ? "1" : "0"); } catch {}
-  }, [shiny]);
 
   useEffect(() => {
     try { localStorage.setItem("pref:animated", animated ? "1" : "0"); } catch {}
@@ -4091,7 +4116,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 <button
                   type="button"
                   className={`ability-chip toggle-chip${shiny ? " is-on" : ""}`}
-                  onClick={() => setShiny((v) => !v)}
+                  onClick={handleShinyToggle}
                   onMouseUp={(e) => e.currentTarget.blur()}
                   aria-pressed={shiny}
                   title={shiny ? "Show default variant" : "Show shiny variant"}
@@ -4499,6 +4524,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
           onClose={() => setIsAltFormsModalOpen(false)}
           onSelectPokemon={onSelectPokemon}
           title={altFormsModalTitle}
+          shiny={shiny}
         />
       )}
     </aside>
@@ -5771,7 +5797,14 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                           onClick={() => handleLearnerClick(pokemon)}
                           title={humanizeName(pokemon.name)}
                         >
-                          <SpriteImage id={pokemon.id} alt={pokemon.name} width={44} height={44} loading="lazy" />
+                          <SpriteImage
+                            id={pokemon.id}
+                            alt={pokemon.name}
+                            width={44}
+                            height={44}
+                            loading="lazy"
+                            shiny={shiny}
+                          />
                           <div className="ability-learner-meta">
                             <div className="ability-learner-top">
                               <span className="ability-learner-name text-capitalize">{pokemon.name}</span>

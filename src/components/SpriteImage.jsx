@@ -6,7 +6,7 @@ const SPRITE_PLACEHOLDER =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
 
 const buildSpriteSources = (id, variant, options = {}) => {
-  const { formName, speciesId, pokemonUrl, dexNumber } = options;
+  const { formName, speciesId, pokemonUrl, dexNumber, shiny = false } = options;
   const clean = String(id ?? "").trim();
   const lowerName = String(formName || "").toLowerCase();
   const sources = [];
@@ -20,8 +20,14 @@ const buildSpriteSources = (id, variant, options = {}) => {
   };
 
   if (clean) {
+    if (shiny && variant === "home") {
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${clean}.png`);
+    }
     if (variant === "home") {
       push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${clean}.png`);
+    }
+    if (shiny) {
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${clean}.png`);
     }
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.png`);
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${clean}.png`);
@@ -113,17 +119,18 @@ export default function SpriteImage({
   speciesId = null,
   pokemonUrl = null,
   dexNumber = null,
+  shiny = false,
   ...rest
 }) {
   const sources = useMemo(
-    () => buildSpriteSources(id, variant, { formName, speciesId, pokemonUrl, dexNumber }),
-    [id, variant, formName, speciesId, pokemonUrl, dexNumber]
+    () => buildSpriteSources(id, variant, { formName, speciesId, pokemonUrl, dexNumber, shiny }),
+    [id, variant, formName, speciesId, pokemonUrl, dexNumber, shiny]
   );
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     setIndex(0);
-  }, [id]);
+  }, [id, shiny]);
 
   const handleError = (event) => {
     setIndex((prev) => {

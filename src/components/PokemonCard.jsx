@@ -53,7 +53,7 @@ const deriveSpecialTags = (name) => {
   return tags;
 };
 
-function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache }) {
+function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false }) {
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
   const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
@@ -173,6 +173,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
           speciesId={baseSpeciesId}
           pokemonUrl={url}
           dexNumber={dexNumber}
+          shiny={shiny}
         />
       ) : (
         <div style={{ width: 144, height: 144 }} />
