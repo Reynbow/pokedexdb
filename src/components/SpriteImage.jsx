@@ -3,10 +3,13 @@ import React, { useEffect, useMemo, useState } from "react";
 const SPRITE_PLACEHOLDER =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
 
-const buildSpriteSources = (id) => {
+const buildSpriteSources = (id, variant) => {
   const clean = String(id ?? "").trim();
   const sources = [];
   if (clean) {
+    if (variant === "home") {
+      sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${clean}.png`);
+    }
     // Use higher resolution Showdown sprites for better pixel art quality
     sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.png`);
     sources.push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${clean}.png`);
@@ -15,8 +18,8 @@ const buildSpriteSources = (id) => {
   return sources;
 };
 
-export default function SpriteImage({ id, alt, onError, ...rest }) {
-  const sources = useMemo(() => buildSpriteSources(id), [id]);
+export default function SpriteImage({ id, alt, onError, variant = null, ...rest }) {
+  const sources = useMemo(() => buildSpriteSources(id, variant), [id, variant]);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

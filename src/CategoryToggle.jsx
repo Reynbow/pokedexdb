@@ -4,6 +4,7 @@ const CATEGORIES = [
   { key: "pokemon", label: "Pokemon", hash: "" },
   { key: "moves", label: "Moves", hash: "#/moves" },
   { key: "abilities", label: "Abilities", hash: "#/abilities" },
+  { key: "whosthat", label: "Who's That?", hash: "#/whosthat" },
 ];
 
 function getActiveCategory() {
@@ -11,6 +12,7 @@ function getActiveCategory() {
   if (hash.startsWith("#/items")) return "items";
   if (hash.startsWith("#/moves")) return "moves";
   if (hash.startsWith("#/abilities")) return "abilities";
+  if (hash.startsWith("#/whosthat")) return "whosthat";
   return "pokemon";
 }
 

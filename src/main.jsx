@@ -7,6 +7,7 @@ import TestPage from './TestPage.jsx'
 import ItemsPage from './ItemsPage.jsx'
 import MovesPage from './MovesPage.jsx'
 import AbilitiesPage from './AbilitiesPage.jsx'
+import MinigamePage from './MinigamePage.jsx'
 
 const pathSegments = window.location.pathname.toLowerCase().split('/').filter(Boolean)
 const lastSegment = pathSegments[pathSegments.length - 1] || ''
@@ -94,6 +95,7 @@ function RootRouter() {
   if (hash.startsWith('#/items')) return <ItemsPage />
   if (hash.startsWith('#/moves')) return <MovesPage />
   if (hash.startsWith('#/abilities')) return <AbilitiesPage />
+  if (hash.startsWith('#/whosthat')) return <MinigamePage />
   return <App />
 }
 
