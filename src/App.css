@@ -100,11 +100,16 @@
   --split-gap: 28px;
   --list-gap: calc(var(--gap) * 1.25);
   --pill-radius: 10px;
+  --filters-games-gap: 16px;
 }
 
 .app-header {
   padding: 48px 0 0;
   text-align: center;
+}
+
+.app-header.has-filters > .container {
+  padding-bottom: var(--filters-games-gap);
 }
 
 .title {
@@ -283,7 +288,7 @@
 }
 
 /* Type filters row under the search */
-.filters-stack { display: grid; gap: 10px; margin: 16px 0 8px; }
+.filters-stack { display: grid; gap: 10px; margin: 16px 0 0; }
 .filters-row { display: flex; gap: 10px; }
 .type-filters { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
 .special-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
@@ -292,10 +297,17 @@
 /* Filter boxes */
 .filters-desktop .filters-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   gap: 16px;
   width: 100%;
   align-items: start;
+}
+
+.filters-desktop .filters-row:not(.moves-filters) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.filters-desktop .filters-row:not(.moves-filters) > .filter-box-wrap:first-child {
+  grid-column: span 2;
 }
 
 /* Neutral wrapper: no frame/border here; frame is on .filter-box only */
@@ -345,8 +357,10 @@
 .filters-desktop .filters-row > div span[role="button"] {
   width: 100%;
   max-width: none;
-  height: auto;
-  min-height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 35px;
   max-height: none;
   position: relative;
   z-index: 10;
@@ -473,7 +487,7 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 6px 0 16px; /* small positive gap, no cropping */
+  margin: 0 0 var(--filters-games-gap);
   position: relative;   /* anchor for overlaid label */
   z-index: 20;          /* render above frames above */
 }
@@ -672,6 +686,7 @@
   position: relative;
   overflow: hidden;
 }
+
 
 .type-chip::before {
   content: '';
@@ -3523,6 +3538,7 @@
   /* Adjust card size for mobile */
   :root {
     --card-size: 140px;
+    --filters-games-gap: 12px;
   }
   
   /* Hide list panel on mobile */
@@ -3727,7 +3743,7 @@
   
   /* Adjust filters on mobile */
   .filters-stack {
-    margin: 8px 0 4px;
+    margin: 8px 0 0;
   }
   
   /* Adjust game filters on mobile */
@@ -3737,7 +3753,7 @@
   }
   
   .game-filters-row {
-    margin: 6px 0 16px;
+    margin: 0 0 var(--filters-games-gap);
   }
   
   .filter-chip.game-chip {
@@ -4183,7 +4199,8 @@
   margin-top: 0;
 }
 /* Types: 4 columns */
-.filters-desktop .type-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.filters-desktop .type-filters { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.filters-desktop .special-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* Moves filters layout: stretch type group across two columns, category on the right */
 .moves-filters {

@@ -13,7 +13,7 @@ function HeaderSection({
   filterTabsProps,
 }) {
   return (
-    <header className="app-header">
+    <header className={`app-header${showFilters ? " has-filters" : ""}`}>
       <div className="container">
         <h1 className="title">{title}</h1>
         <p className="subtitle">{subtitle}</p>
