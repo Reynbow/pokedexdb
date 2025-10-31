@@ -57,6 +57,14 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
   const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
+  const baseSpeciesId = useMemo(() => {
+    if (!dexNumber) return null;
+    const match = String(dexNumber).match(/\d+/);
+    if (!match) return null;
+    const value = Number(match[0]);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value;
+  }, [dexNumber]);
   const specialTags = useMemo(() => {
     const tags = deriveSpecialTags(name) || [];
     return tags
@@ -154,7 +162,18 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       )}
       <div className="dexno">{dexNo}</div>
       {inView ? (
-        <SpriteImage className="sprite" id={id} alt={name} width={144} height={144} loading="lazy" />
+        <SpriteImage
+          className="sprite"
+          id={id}
+          alt={name}
+          width={144}
+          height={144}
+          loading="lazy"
+          formName={name}
+          speciesId={baseSpeciesId}
+          pokemonUrl={url}
+          dexNumber={dexNumber}
+        />
       ) : (
         <div style={{ width: 144, height: 144 }} />
       )}

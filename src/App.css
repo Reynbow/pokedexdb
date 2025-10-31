@@ -3865,6 +3865,8 @@
   .sprite {
     width: 112px;
     height: 112px;
+    object-fit: contain;
+    object-position: center;
   }
   
   /* Compact spacing */
@@ -4099,6 +4101,8 @@
 .sprite {
   width: 144px;
   height: 144px;
+  object-fit: contain;
+  object-position: center;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;

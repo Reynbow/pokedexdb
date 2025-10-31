@@ -8,7 +8,7 @@ import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
-import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation } from "./utils/url.js";
+import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation, getBasePath } from "./utils/url.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS, LEGENDARY_NAMES, MYTHICAL_NAMES } from "./constants/species.js";
 import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
 import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
@@ -3795,9 +3795,19 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
   }, [details, species]);
   const isFemaleActive = hasGenderVariants && female;
 
-  const detailImg = (() => {
+  const detailArtSources = useMemo(() => {
     const d = details?.sprites?.other || {};
     const v = details?.sprites?.versions || {};
+    const sources = [];
+    const seen = new Set();
+    const push = (value) => {
+      const str = typeof value === "string" ? value.trim() : "";
+      if (!str) return;
+      if (seen.has(str)) return;
+      seen.add(str);
+      sources.push(str);
+    };
+
     const pixel = (() => {
       if (shiny && isFemaleActive) {
         return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/${id}.png`;
@@ -3816,44 +3826,142 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
         ? (isFemaleActive ? "front_shiny_female" : "front_shiny")
         : (isFemaleActive ? "front_female" : "front_default");
       const showdown = d?.showdown?.[showdownKey] || d?.showdown?.[shiny ? "front_shiny" : "front_default"];
-      if (showdown) return showdown;
-      // fall through to HD static if no animated available
+      push(showdown);
     }
 
-    // If gendered variant requested, prefer HOME female artwork first, then static female sprite
     if (isFemaleActive) {
       const homeFem = d?.home?.[shiny ? "front_shiny_female" : "front_female"];
-      if (homeFem) return homeFem;
       const femStatic = details?.sprites?.[shiny ? "front_shiny_female" : "front_female"];
-      if (femStatic) return femStatic;
+      push(homeFem);
+      if (femStatic && femStatic !== homeFem) {
+        push(femStatic);
+      }
     }
 
-    // Prefer HOME high-res sprites for default (non-female) cases
     const home = d?.home?.[shiny ? "front_shiny" : "front_default"];
-    if (home) return home;
+    push(home);
 
     const art = d?.["official-artwork"]?.[shiny ? "front_shiny" : "front_default"];
-    if (art) return art;
-    
-    // Generation 6 sprites: Omega Ruby/Alpha Sapphire and X/Y
+    push(art);
+
     const gen6 = v?.["generation-vi"] || {};
     const oras = gen6?.["omega-ruby-alpha-sapphire"]?.[shiny ? "front_shiny" : "front_default"];
-    if (oras) return oras;
     const xy = gen6?.["x-y"]?.[shiny ? "front_shiny" : "front_default"];
-    if (xy) return xy;
-    
+    push(oras);
+    push(xy);
+
     if (!shiny) {
       const dream = d?.dream_world?.front_default;
-      if (dream) return dream;
+      push(dream);
     }
 
-    // Prefer explicit female static sprite if requested and available
+    if (!animated && !shiny && !isFemaleActive) {
+      const detailName = String(details?.name || name || "").toLowerCase();
+      const speciesName = String(species?.name || details?.species?.name || "").toLowerCase();
+      if (detailName.includes("mega")) {
+        const toTitleToken = (token) => {
+          if (!token) return "";
+          if (/^\d+$/.test(token)) return token;
+          return token.charAt(0).toUpperCase() + token.slice(1);
+        };
+
+        const baseId = (() => {
+          const speciesUrl = details?.species?.url || species?.url;
+          if (typeof speciesUrl === "string") {
+            const parts = speciesUrl.split("/").filter(Boolean);
+            const maybe = Number(parts[parts.length - 1]);
+            if (Number.isFinite(maybe)) return maybe;
+          }
+          const speciesId = Number(species?.id);
+          if (Number.isFinite(speciesId) && speciesId > 0) return speciesId;
+          const detailIdNum = Number(details?.id);
+          if (Number.isFinite(detailIdNum) && detailIdNum < 10000) return detailIdNum;
+          const fallbackIdNum = Number(id);
+          if (Number.isFinite(fallbackIdNum) && fallbackIdNum > 0 && fallbackIdNum < 10000) return fallbackIdNum;
+          return null;
+        })();
+
+        if (baseId != null) {
+          const padded = String(baseId).padStart(4, "0");
+          const basePath = getBasePath();
+          const buildPath = (suffix) => {
+            const cleanSuffix = suffix.startsWith("/") ? suffix.slice(1) : suffix;
+            return `${basePath}${cleanSuffix}`;
+          };
+
+          const speciesTokens = speciesName.split("-").filter(Boolean);
+          const detailTokens = detailName.split("-").filter(Boolean);
+          let variantTokens = detailTokens.slice();
+          if (
+            speciesTokens.length &&
+            speciesTokens.every((token, idx) => detailTokens[idx] === token)
+          ) {
+            variantTokens = detailTokens.slice(speciesTokens.length);
+          } else if (detailTokens.length > 1) {
+            variantTokens = detailTokens.slice(1);
+          }
+
+          if (!variantTokens.includes("mega")) {
+            variantTokens = [...variantTokens, "mega"];
+          }
+
+          const formattedTokens = variantTokens
+            .map((token) => token.replace(/[^a-z0-9]/g, ""))
+            .filter(Boolean)
+            .map(toTitleToken);
+
+          const labels = new Set();
+          if (formattedTokens.length) {
+            labels.add(formattedTokens.join("."));
+            labels.add(formattedTokens[0]);
+            labels.add(formattedTokens.join(""));
+          }
+          labels.add("Mega");
+
+          const sanitizedDetail = detailName
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+/, "")
+            .replace(/-+$/, "");
+
+          labels.forEach((label) => {
+            if (!label) return;
+            push(buildPath(`/sprites/${padded}.${label}.png`));
+            push(buildPath(`/sprites/${padded}.${label}.1.png`));
+            push(buildPath(`/sprites/${padded}.${label}.2.png`));
+          });
+
+          if (sanitizedDetail) {
+            push(buildPath(`/sprites/${sanitizedDetail}.png`));
+          }
+        }
+      }
+    }
+
     if (isFemaleActive) {
       const fem = details?.sprites?.[shiny ? "front_shiny_female" : "front_female"];
-      if (fem) return fem;
+      push(fem);
     }
-    return pixel;
-  })();
+
+    push(pixel);
+    return sources.length > 0 ? sources : [pixel];
+  }, [details, species, id, shiny, animated, isFemaleActive, name]);
+
+  const [detailArtIndex, setDetailArtIndex] = useState(0);
+
+  useEffect(() => {
+    setDetailArtIndex(0);
+  }, [detailArtSources]);
+
+  const detailImg = detailArtSources.length > 0 ? detailArtSources[Math.min(detailArtIndex, detailArtSources.length - 1)] : "";
+
+  const handleDetailArtError = useCallback(() => {
+    setDetailArtIndex((prev) => {
+      if (prev >= detailArtSources.length - 1) {
+        return prev;
+      }
+      return prev + 1;
+    });
+  }, [detailArtSources.length]);
 
   const specialTags = useMemo(() => {
     if (!details && !species) return [];
@@ -3964,6 +4072,7 @@ function DetailPanel({ selected, onClose, onSelectPokemon, onActivateType, dexNu
                 src={detailImg}
                 alt={name}
                 loading="lazy"
+                onError={handleDetailArtError}
               />
             </div>
             <div className="hero-controls">
