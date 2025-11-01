@@ -53,6 +53,31 @@ const getRegionGeneration = (regionName) => {
 
 const humanizeName = (s) => String(s || "").replace(/-/g, " ");
 
+// Type color mapping - using the primary (first) color from the gradient
+const getTypeColor = (typeName) => {
+  const typeColors = {
+    normal: "#b0aa79",
+    fire: "#d17f56",
+    water: "#5d8ed2",
+    electric: "#c09c38",
+    grass: "#6ea964",
+    ice: "#6baab4",
+    fighting: "#bb544c",
+    poison: "#955b9a",
+    ground: "#bd975f",
+    flying: "#8f84d1",
+    psychic: "#c0668f",
+    bug: "#8fa43a",
+    rock: "#aa9150",
+    ghost: "#7768a3",
+    dragon: "#7158cc",
+    dark: "#826a52",
+    steel: "#a6a8c2",
+    fairy: "#bd82a7",
+  };
+  return typeColors[typeName?.toLowerCase()] || "#b0aa79"; // Default to normal if type not found
+};
+
 const getStatLabel = (statName, isMobile) => {
   const label = humanizeName(statName);
   if (isMobile) {
@@ -1325,6 +1350,154 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
                 );
               })}
             </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetailsMap }) {
+  const handleBackdropMouseDown = (event) => {
+    event.stopPropagation();
+    onClose();
+  };
+
+  const handleModalMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  const renderMoveItem = (move, category) => {
+    const details = moveDetailsMap.get(move.name);
+    const moveType = details?.type || 'normal';
+    const typeColor = getTypeColor(moveType);
+    
+    return (
+      <li key={move.name} className="learnset-item-single">
+        <div className="learnset-move-row">
+          <div className={`learnset-move-pill type-${moveType}`} style={{
+            background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
+            borderColor: `${typeColor}cc`,
+          }}>
+            <div className="learnset-move-name-wrapper">
+              {details?.type && (
+                <img 
+                  src={getTypeIconUrl(details.type)} 
+                  alt={details.type} 
+                  className="learnset-move-type-icon"
+                />
+              )}
+              <span className="learnset-move-name">{move.label}</span>
+            </div>
+            {category === 'levelUp' && move.levelLabel && (
+              <span className="learnset-move-level-badge">{move.levelLabel}</span>
+            )}
+            {category === 'tm' && <span className="learnset-move-badge">TM</span>}
+            {category === 'hm' && <span className="learnset-move-badge">HM</span>}
+          </div>
+          <div className="learnset-move-details">
+            <span className="learnset-move-detail">
+              <span className="learnset-detail-label">Power</span>
+              <span className="learnset-detail-value">
+                {details?.power != null ? details.power : '—'}
+              </span>
+            </span>
+            <span className="learnset-move-detail">
+              <span className="learnset-detail-label">Acc</span>
+              <span className="learnset-detail-value">
+                {details?.accuracy != null ? `${details.accuracy}%` : '—'}
+              </span>
+            </span>
+            <span className="learnset-move-detail">
+              <span className="learnset-detail-label">PP</span>
+              <span className="learnset-detail-value">
+                {details?.pp != null ? details.pp : '—'}
+              </span>
+            </span>
+            <span className="learnset-move-detail">
+              <span className="learnset-detail-label">Class</span>
+              <span className={`learnset-detail-value learnset-damage-class learnset-damage-class-${details?.damage_class || ''}`}>
+                {details?.damage_class ? (
+                  <>
+                    <img 
+                      src={`/moves/${details.damage_class}.png`} 
+                      alt={details.damage_class}
+                      className="learnset-damage-class-icon"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    {details.damage_class}
+                  </>
+                ) : '—'}
+              </span>
+            </span>
+          </div>
+        </div>
+      </li>
+    );
+  };
+
+  return (
+    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
+      <div
+        className="game-modal"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={handleModalMouseDown}
+        style={{ width: "min(800px, 92vw)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+      >
+        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close learned moves">
+          X
+        </button>
+        <div className="game-modal-header">
+          <h2 className="game-modal-title">
+            Learned Moves for <span className="game-modal-title-name text-capitalize">{formatDisplayName(pokemonName)}</span>
+          </h2>
+          {learnsetMeta.versionGroupLabel ? (
+            <p className="game-modal-subtitle">
+              {learnsetMeta.hasMixedSources ? "Latest data: " : "Data source: "}
+              {learnsetMeta.versionGroupLabel}
+            </p>
+          ) : null}
+        </div>
+        <div className="game-modal-body" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div className="game-modal-column game-modal-column-left" style={{ flex: 1, overflowY: "auto", paddingRight: "8px" }}>
+            <div className="learnset-modal-content">
+              {learnset.levelUp.length > 0 && (
+                <div className="learnset-section">
+                  <div className="learnset-section-title">
+                    Level Up Moves ({learnsetMeta.levelCount})
+                  </div>
+                  <ul className="learnset-list-single">
+                    {learnset.levelUp.map((move) => renderMoveItem(move, 'levelUp'))}
+                  </ul>
+                </div>
+              )}
+              {learnset.tm && learnset.tm.length > 0 && (
+                <div className="learnset-section">
+                  <div className="learnset-section-title">
+                    TM Moves ({learnsetMeta.tmCount})
+                  </div>
+                  <ul className="learnset-list-single">
+                    {learnset.tm.map((move) => renderMoveItem(move, 'tm'))}
+                  </ul>
+                </div>
+              )}
+              {learnset.hm && learnset.hm.length > 0 && (
+                <div className="learnset-section">
+                  <div className="learnset-section-title">
+                    HM Moves ({learnsetMeta.hmCount})
+                  </div>
+                  <ul className="learnset-list-single">
+                    {learnset.hm.map((move) => renderMoveItem(move, 'hm'))}
+                  </ul>
+                </div>
+              )}
+              {learnsetMeta.hasMixedSources && (
+                <div className="learnset-footnote">Includes moves from multiple game versions.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -2735,20 +2908,24 @@ function DetailPanel({
   const [selectedFlavorVersion, setSelectedFlavorVersion] = useState(null);
   const [isFlavorModalOpen, setIsFlavorModalOpen] = useState(false);
   const [isEvolutionDetailModalOpen, setIsEvolutionDetailModalOpen] = useState(false);
+  const [isLearnsetModalOpen, setIsLearnsetModalOpen] = useState(false);
   const [evolutionDetailData, setEvolutionDetailData] = useState(null);
   const [currentPokemonForm, setCurrentPokemonForm] = useState(null);
   const [isAltFormsModalOpen, setIsAltFormsModalOpen] = useState(false);
   const [altFormsForModal, setAltFormsForModal] = useState([]);
   const [altFormsModalTitle, setAltFormsModalTitle] = useState("");
   const [localFlavorEntries, setLocalFlavorEntries] = useState([]);
-  const [learnset, setLearnset] = useState({ levelUp: [], machine: [] });
+  const [learnset, setLearnset] = useState({ levelUp: [], machine: [], tm: [], hm: [] });
   const [learnsetMeta, setLearnsetMeta] = useState({
     versionGroup: null,
     versionGroupLabel: null,
     hasMixedSources: false,
     levelCount: 0,
     machineCount: 0,
+    tmCount: 0,
+    hmCount: 0,
   });
+  const [moveDetailsMap, setMoveDetailsMap] = useState(() => new Map()); // move name -> {type, power, accuracy, pp, damage_class}
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 768;
@@ -3628,13 +3805,15 @@ function DetailPanel({
 
   useEffect(() => {
     if (!details) {
-      setLearnset({ levelUp: [], machine: [] });
+      setLearnset({ levelUp: [], machine: [], tm: [], hm: [] });
       setLearnsetMeta({
         versionGroup: null,
         versionGroupLabel: null,
         hasMixedSources: false,
         levelCount: 0,
         machineCount: 0,
+        tmCount: 0,
+        hmCount: 0,
       });
       return;
     }
@@ -3768,15 +3947,97 @@ function DetailPanel({
       return next.done ? null : next.value;
     })();
 
-    setLearnset({ levelUp: levelUpList, machine: machineList });
+    // Separate TM and HM moves
+    const hmMoves = machineList.filter((move) => {
+      const name = String(move.name || "").toLowerCase();
+      return name.startsWith("hm") || name.includes("-hm");
+    });
+    const tmMoves = machineList.filter((move) => {
+      const name = String(move.name || "").toLowerCase();
+      return !name.startsWith("hm") && !name.includes("-hm");
+    });
+
+    setLearnset({ levelUp: levelUpList, machine: machineList, tm: tmMoves, hm: hmMoves });
     setLearnsetMeta({
       versionGroup: primaryVersionGroup,
       versionGroupLabel: formatVersionGroupLabel(primaryVersionGroup),
       hasMixedSources: usedGroups.size > 1,
       levelCount: levelUpList.length,
       machineCount: machineList.length,
+      tmCount: tmMoves.length,
+      hmCount: hmMoves.length,
     });
   }, [details, selectedGame, selectedDex]);
+
+  // Fetch move details for learnset moves
+  useEffect(() => {
+    if (!shouldShowLearnset) {
+      setMoveDetailsMap(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    const allMoves = [
+      ...(learnset.levelUp || []).map(m => m.name),
+      ...(learnset.machine || []).map(m => m.name),
+    ];
+    const toFetch = allMoves.filter(name => !moveDetailsMap.has(name));
+    
+    if (toFetch.length === 0) return;
+
+    (async () => {
+      const chunks = [];
+      for (let i = 0; i < toFetch.length; i += 10) {
+        chunks.push(toFetch.slice(i, i + 10));
+      }
+      
+      for (const chunk of chunks) {
+        if (cancelled) return;
+        
+        const results = await Promise.all(
+          chunk.map(async (name) => {
+            try {
+              const response = await fetch(`https://pokeapi.co/api/v2/move/${name}`);
+              const data = await response.json();
+              return {
+                name,
+                type: data?.type?.name || null,
+                power: data?.power ?? null,
+                accuracy: data?.accuracy ?? null,
+                pp: data?.pp ?? null,
+                priority: data?.priority ?? 0,
+                damage_class: data?.damage_class?.name || null,
+              };
+            } catch {
+              return {
+                name,
+                type: null,
+                power: null,
+                accuracy: null,
+                pp: null,
+                priority: 0,
+                damage_class: null,
+              };
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setMoveDetailsMap((prev) => {
+            const next = new Map(prev);
+            for (const result of results) {
+              next.set(result.name, result);
+            }
+            return next;
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [learnset, shouldShowLearnset, moveDetailsMap]);
 
   // Load local pokedex entries (flavor text) for SV/ZA and prefer them when present
   useEffect(() => {
@@ -4543,9 +4804,95 @@ function DetailPanel({
     };
   }, [name, species?.generation?.name]);
 
+  // Calculate learnset summary stats
+  const learnsetSummary = useMemo(() => {
+    const allMoves = [...(learnset.levelUp || []), ...(learnset.machine || [])];
+    const movesWithDetails = allMoves
+      .map(move => {
+        const details = moveDetailsMap.get(move.name);
+        return { ...move, details };
+      })
+      .filter(m => m.details);
+
+    if (movesWithDetails.length === 0) {
+      return {
+        strongestMove: null,
+        typeCoverage: new Set(),
+        avgPower: null,
+        physicalCount: 0,
+        specialCount: 0,
+        statusCount: 0,
+      };
+    }
+
+    const strongestMove = movesWithDetails.reduce((best, move) => {
+      const power = move.details.power ?? 0;
+      const bestPower = best?.details?.power ?? 0;
+      return power > bestPower ? move : best;
+    }, null);
+
+    const typeCoverage = new Set();
+    const damageClassCounts = { physical: 0, special: 0, status: 0 };
+    let totalPower = 0;
+    let powerCount = 0;
+
+    movesWithDetails.forEach(move => {
+      if (move.details.type) typeCoverage.add(move.details.type);
+      const damageClass = move.details.damage_class;
+      if (damageClass === 'physical') damageClassCounts.physical++;
+      else if (damageClass === 'special') damageClassCounts.special++;
+      else if (damageClass === 'status') damageClassCounts.status++;
+      
+      if (move.details.power != null) {
+        totalPower += move.details.power;
+        powerCount++;
+      }
+    });
+
+    return {
+      strongestMove,
+      typeCoverage,
+      avgPower: powerCount > 0 ? Math.round(totalPower / powerCount) : null,
+      physicalCount: damageClassCounts.physical,
+      specialCount: damageClassCounts.special,
+      statusCount: damageClassCounts.status,
+    };
+  }, [learnset, moveDetailsMap]);
+
+  // Get primary type and create gradient style
+  const heroGradientStyle = useMemo(() => {
+    if (!details?.types || details.types.length === 0) {
+      return {};
+    }
+    
+    // Get primary type (slot 1 or first type)
+    const primaryType = details.types
+      .slice()
+      .sort((a, b) => a.slot - b.slot)[0];
+    
+    if (!primaryType?.type?.name) {
+      return {};
+    }
+    
+    const typeColor = getTypeColor(primaryType.type.name);
+    
+    // Create radial gradient from top-left corner (0% 0%) outward
+    // Using rgba for transparency
+    const rgb = typeColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
+    if (!rgb) return {};
+    
+    const r = parseInt(rgb[1], 16);
+    const g = parseInt(rgb[2], 16);
+    const b = parseInt(rgb[3], 16);
+    
+    return {
+      background: `radial-gradient(circle at 0% 0%, rgba(${r}, ${g}, ${b}, 0.25) 0%, rgba(${r}, ${g}, ${b}, 0.1) 40%, transparent 70%)`,
+    };
+  }, [details?.types]);
+
   return (
     <aside className="detail-panel">
-      <div className="detail-inner">
+      <div className="detail-inner" style={heroGradientStyle}>
         <button className="close" onClick={onClose} aria-label="Close">
           <span className="close-icon" aria-hidden="true" />
         </button>
@@ -4718,63 +5065,6 @@ function DetailPanel({
                 </div>
               </div>
             </section>
-            {shouldShowLearnset && (
-              <section className="learnset-panel">
-                <div className="matchup-box learnset-box">
-                  <div className="learnset-header">
-                    <span className="matchup-title">Learned Moves</span>
-                    {learnsetMeta.versionGroupLabel ? (
-                      <span className="learnset-meta">
-                        {learnsetMeta.hasMixedSources ? "Latest data: " : "Data source: "}
-                        {learnsetMeta.versionGroupLabel}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="learnset-columns">
-                    <div className="learnset-column">
-                      <div className="learnset-column-title">
-                        Level Up
-                        <span className="learnset-count">{learnsetMeta.levelCount}</span>
-                      </div>
-                      {learnset.levelUp.length > 0 ? (
-                        <ul className="learnset-list">
-                          {learnset.levelUp.map((move) => (
-                            <li key={move.name} className="learnset-item">
-                              <span className="move-name">{move.label}</span>
-                              {move.levelLabel ? (
-                                <span className="move-level">{move.levelLabel}</span>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="learnset-empty">No level-up moves recorded.</div>
-                      )}
-                    </div>
-                    <div className="learnset-column">
-                      <div className="learnset-column-title">
-                        TM / HM
-                        <span className="learnset-count">{learnsetMeta.machineCount}</span>
-                      </div>
-                      {learnset.machine.length > 0 ? (
-                        <ul className="learnset-list">
-                          {learnset.machine.map((move) => (
-                            <li key={move.name} className="learnset-item">
-                              <span className="move-name">{move.label}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="learnset-empty">No TM or HM moves recorded.</div>
-                      )}
-                    </div>
-                  </div>
-                  {learnsetMeta.hasMixedSources && (
-                    <div className="learnset-footnote">Includes moves from multiple game versions.</div>
-                  )}
-                </div>
-              </section>
-            )}
             <div className="weak-resist">
               <div className="matchup-box weak-matchup">
                 <div className="matchup-title">Weak To</div>
@@ -4962,7 +5252,7 @@ function DetailPanel({
             {flavorTextVersions.length > 0 && (
               <section
                 className="catch-section single-col"
-                style={{ padding: "0 16px 16px", marginTop: "-16px" }}
+                style={{ padding: "0 16px 0", marginTop: "-16px" }}
               >
                 <div className="matchup-box pokedex-entry-box">
                   <div className="matchup-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
@@ -5008,6 +5298,46 @@ function DetailPanel({
                     </div>
                   )}
                 </div>
+              </section>
+            )}
+            {shouldShowLearnset && (
+              <section className="learnset-panel">
+                <button
+                  type="button"
+                  className="learnset-summary-button"
+                  onClick={() => setIsLearnsetModalOpen(true)}
+                  aria-label="View learned moves"
+                >
+                  <div className="learnset-summary-content">
+                    <span className="learnset-summary-title">Learned Moves</span>
+                    <div className="learnset-summary-stats">
+                      <span className="learnset-summary-stat">
+                        <span className="learnset-summary-label">Strongest</span>
+                        <span className="learnset-summary-value">
+                          {learnsetSummary.strongestMove 
+                            ? `${learnsetSummary.strongestMove.label} (${learnsetSummary.strongestMove.details?.power ?? '—'})`
+                            : '—'}
+                        </span>
+                      </span>
+                      <span className="learnset-summary-stat">
+                        <span className="learnset-summary-label">Types</span>
+                        <span className="learnset-summary-value">{learnsetSummary.typeCoverage.size}</span>
+                      </span>
+                      {learnsetSummary.avgPower != null && (
+                        <span className="learnset-summary-stat">
+                          <span className="learnset-summary-label">Avg Power</span>
+                          <span className="learnset-summary-value">{learnsetSummary.avgPower}</span>
+                        </span>
+                      )}
+                      <span className="learnset-summary-stat">
+                        <span className="learnset-summary-label">Total Moves</span>
+                        <span className="learnset-summary-value">
+                          {learnsetMeta.levelCount + learnsetMeta.machineCount}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
               </section>
             )}
           </div>
@@ -5077,6 +5407,15 @@ function DetailPanel({
           onSelectPokemon={onSelectPokemon}
           title={altFormsModalTitle}
           shiny={shiny}
+        />
+      )}
+      {isLearnsetModalOpen && shouldShowLearnset && (
+        <LearnsetModal
+          learnset={learnset}
+          learnsetMeta={learnsetMeta}
+          pokemonName={name}
+          moveDetailsMap={moveDetailsMap}
+          onClose={() => setIsLearnsetModalOpen(false)}
         />
       )}
     </aside>
