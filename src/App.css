@@ -3909,6 +3909,32 @@
   transform: translateY(0);
   box-shadow: 0 3px 12px rgba(15,23,42,0.35);
 }
+.alt-forms-button.mega {
+  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  border-color: rgba(59, 130, 246, 0.6);
+  color: #ffffff;
+}
+.alt-forms-button.mega:hover,
+.alt-forms-button.mega:focus-visible {
+  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  border-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.45);
+  transform: translateY(-1px);
+  outline: none;
+}
+.alt-forms-button.gmax {
+  background: linear-gradient(135deg, #f472b6, #f97316);
+  border-color: rgba(249, 115, 22, 0.55);
+  color: #ffffff;
+}
+.alt-forms-button.gmax:hover,
+.alt-forms-button.gmax:focus-visible {
+  background: linear-gradient(135deg, #f472b6, #f97316);
+  border-color: rgba(249, 115, 22, 0.75);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.45);
+  transform: translateY(-1px);
+  outline: none;
+}
 .evo-tree-forms {
   display: flex;
   flex-wrap: wrap;

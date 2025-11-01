@@ -3308,6 +3308,7 @@ function DetailPanel({
   }, [evoPaths]);
 
   // Collect all non-regional, non-default alternate forms across the entire evolution tree
+  // Excludes Mega and GMax forms (they have their own buttons)
   const aggregatedAlternateForms = useMemo(() => {
     const seen = new Set();
     const results = [];
@@ -3317,6 +3318,9 @@ function DetailPanel({
       const isRegional = Array.isArray(f?.tags) && f.tags.includes("Regional");
       const isCap = isCapFormName(f?.name);
       if (isRegional && !isCap) return; // exclude regionals except Pikachu cap variants
+      const isMega = Array.isArray(f?.tags) && f.tags.includes("Mega");
+      const isGmax = Array.isArray(f?.tags) && f.tags.includes("Gigantamax");
+      if (isMega || isGmax) return; // exclude Mega and GMax forms
       if (seen.has(fid)) return;
       seen.add(fid);
       results.push(f);
@@ -3334,6 +3338,56 @@ function DetailPanel({
 
   const hasAnyAlternateForms = aggregatedAlternateForms.length > 0;
 
+  // Collect Mega and GMax forms separately from the evolution tree
+  const megaForms = useMemo(() => {
+    const seen = new Set();
+    const results = [];
+    const pushForm = (f) => {
+      const fid = f?.id != null ? String(f.id) : null;
+      if (!fid || f.isDefault) return;
+      const isMega = Array.isArray(f?.tags) && f.tags.includes("Mega");
+      if (!isMega) return;
+      if (seen.has(fid)) return;
+      seen.add(fid);
+      results.push(f);
+    };
+    const walkEntry = (entry) => {
+      if (!entry) return;
+      const forms = Array.isArray(entry.forms) ? entry.forms : [];
+      forms.forEach(pushForm);
+      const children = Array.isArray(entry.children) ? entry.children : [];
+      children.forEach((edge) => walkEntry(edge.child));
+    };
+    evolutionTree.forEach(walkEntry);
+    return results;
+  }, [evolutionTree]);
+
+  const gmaxForms = useMemo(() => {
+    const seen = new Set();
+    const results = [];
+    const pushForm = (f) => {
+      const fid = f?.id != null ? String(f.id) : null;
+      if (!fid || f.isDefault) return;
+      const isGmax = Array.isArray(f?.tags) && f.tags.includes("Gigantamax");
+      if (!isGmax) return;
+      if (seen.has(fid)) return;
+      seen.add(fid);
+      results.push(f);
+    };
+    const walkEntry = (entry) => {
+      if (!entry) return;
+      const forms = Array.isArray(entry.forms) ? entry.forms : [];
+      forms.forEach(pushForm);
+      const children = Array.isArray(entry.children) ? entry.children : [];
+      children.forEach((edge) => walkEntry(edge.child));
+    };
+    evolutionTree.forEach(walkEntry);
+    return results;
+  }, [evolutionTree]);
+
+  const hasMegaForms = megaForms.length > 0;
+  const hasGmaxForms = gmaxForms.length > 0;
+
   const openAggregatedAltForms = useCallback(() => {
     if (!aggregatedAlternateForms.length) return;
     const titleBase = formatDisplayName(name || selected?.name || "");
@@ -3341,6 +3395,24 @@ function DetailPanel({
     setAltFormsForModal(aggregatedAlternateForms);
     setIsAltFormsModalOpen(true);
   }, [aggregatedAlternateForms, name, selected]);
+
+  // Handler to navigate directly to Mega form (first one if multiple)
+  const handleMegaClick = useCallback(() => {
+    if (megaForms.length === 0) return;
+    const firstMega = megaForms[0];
+    const formId = firstMega?.id != null ? String(firstMega.id) : null;
+    if (!formId) return;
+    onSelectPokemon?.(formId, firstMega.name, `https://pokeapi.co/api/v2/pokemon/${formId}`);
+  }, [megaForms, onSelectPokemon]);
+
+  // Handler to navigate directly to GMax form (first one if multiple)
+  const handleGmaxClick = useCallback(() => {
+    if (gmaxForms.length === 0) return;
+    const firstGmax = gmaxForms[0];
+    const formId = firstGmax?.id != null ? String(firstGmax.id) : null;
+    if (!formId) return;
+    onSelectPokemon?.(formId, firstGmax.name, `https://pokeapi.co/api/v2/pokemon/${formId}`);
+  }, [gmaxForms, onSelectPokemon]);
 
   // Preferred region for evolution tree based on the currently selected form name
   const selectedEvolutionRegion = useMemo(() => {
@@ -5367,16 +5439,38 @@ function DetailPanel({
             </section>
             {evoPaths.length > 0 && (
               <section className="evo-section">
-                {hasAnyAlternateForms && (
+                {(hasAnyAlternateForms || hasMegaForms || hasGmaxForms) && (
                   <div className="evo-tree-actions">
-                    <button
-                      type="button"
-                      className="alt-forms-button"
-                      onClick={openAggregatedAltForms}
-                      title="Alt forms"
-                    >
-                      alt forms
-                    </button>
+                    {hasMegaForms && (
+                      <button
+                        type="button"
+                        className="alt-forms-button mega"
+                        onClick={handleMegaClick}
+                        title="Mega"
+                      >
+                        mega
+                      </button>
+                    )}
+                    {hasGmaxForms && (
+                      <button
+                        type="button"
+                        className="alt-forms-button gmax"
+                        onClick={handleGmaxClick}
+                        title="Gigantamax"
+                      >
+                        gmax
+                      </button>
+                    )}
+                    {hasAnyAlternateForms && (
+                      <button
+                        type="button"
+                        className="alt-forms-button"
+                        onClick={openAggregatedAltForms}
+                        title="Alt forms"
+                      >
+                        alt forms
+                      </button>
+                    )}
                   </div>
                 )}
                 <div className="evo-tree">
