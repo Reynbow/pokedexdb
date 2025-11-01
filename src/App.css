@@ -695,6 +695,21 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   position: relative;
   overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.type-chip .type-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.type-chip .type-name {
+  display: inline-block;
 }
 
 

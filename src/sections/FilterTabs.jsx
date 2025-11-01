@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ALL_TYPES } from "../constants/types.js";
 import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "../constants/tags.js";
 import { DEX_FILTERS } from "../constants/dex.js";
+import { getTypeIconUrl } from "../utils/typeIcons.js";
 
 export default function FilterTabs({
   selectedTypes,
@@ -53,7 +54,16 @@ export default function FilterTabs({
                         });
                       }}
                     >
-                      {t}
+                      <img 
+                        src={getTypeIconUrl(t)} 
+                        alt={t} 
+                        className="type-icon"
+                        onError={(e) => {
+                          // Hide icon if it fails to load
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <span className="type-name">{t}</span>
                     </span>
                   ))}
                 </div>
@@ -180,7 +190,16 @@ export default function FilterTabs({
                       });
                     }}
                   >
-                    {t}
+                    <img 
+                      src={getTypeIconUrl(t)} 
+                      alt={t} 
+                      className="type-icon"
+                      onError={(e) => {
+                        // Hide icon if it fails to load
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    <span className="type-name">{t}</span>
                   </span>
                 ))}
               </div>

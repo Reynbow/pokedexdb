@@ -9,6 +9,7 @@ import "./App.css";
 import { findRecommendedNature } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation, getBasePath } from "./utils/url.js";
+import { getTypeIconUrl } from "./utils/typeIcons.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS, LEGENDARY_NAMES, MYTHICAL_NAMES } from "./constants/species.js";
 import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
 import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
@@ -4611,7 +4612,15 @@ function DetailPanel({
                           title={`Filter by ${t.type.name}`}
                           onClick={() => onActivateType?.(t.type.name)}
                         >
-                          {t.type.name}
+                          <img 
+                            src={getTypeIconUrl(t.type.name)} 
+                            alt={t.type.name} 
+                            className="type-icon"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                          <span className="type-name">{t.type.name}</span>
                         </span>
                       ))}
                   </div>
@@ -4762,8 +4771,18 @@ function DetailPanel({
                   ) : (
                     weaknesses.map((w) => (
                       <span key={w.type} className={`type-chip type-${w.type}`} title={`x${w.mult}`}>
-                        {w.type}
-                        {w.mult >= 4 ? " x4" : w.mult > 1 ? " x2" : ""}
+                        <img 
+                          src={getTypeIconUrl(w.type)} 
+                          alt={w.type} 
+                          className="type-icon"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <span className="type-name">
+                          {w.type}
+                          {w.mult >= 4 ? " x4" : w.mult > 1 ? " x2" : ""}
+                        </span>
                       </span>
                     ))
                   )}
@@ -4777,8 +4796,18 @@ function DetailPanel({
                   ) : (
                     resistances.map((r) => (
                       <span key={r.type} className={`type-chip type-${r.type}`} title={`x${r.mult}`}>
-                        {r.type}
-                        {r.mult === 0 ? " x0" : r.mult <= 0.25 ? " x0.25" : " x0.5"}
+                        <img 
+                          src={getTypeIconUrl(r.type)} 
+                          alt={r.type} 
+                          className="type-icon"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <span className="type-name">
+                          {r.type}
+                          {r.mult === 0 ? " x0" : r.mult <= 0.25 ? " x0.25" : " x0.5"}
+                        </span>
                       </span>
                     ))
                   )}
@@ -6259,7 +6288,15 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                       onClick={() => toggleType(type)}
                       aria-pressed={isActive}
                     >
-                      {type}
+                      <img 
+                        src={getTypeIconUrl(type)} 
+                        alt={type} 
+                        className="type-icon"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <span className="type-name">{type}</span>
                     </button>
                   );
                 })}
@@ -6322,7 +6359,15 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                             <div className="ability-learner-types">
                               {typeList.map((type) => (
                                 <span key={`${pokemon.url}-${type}`} className={`ability-learner-type type-${type}`}>
-                                  {type}
+                                  <img 
+                                    src={getTypeIconUrl(type)} 
+                                    alt={type} 
+                                    className="type-icon"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                    }}
+                                  />
+                                  <span className="type-name">{type}</span>
                                 </span>
                               ))}
                             </div>

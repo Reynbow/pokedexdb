@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { updatePokemonLocation } from "./utils/url.js";
+import { getTypeIconUrl } from "./utils/typeIcons.js";
 
 export default function MovesPage() {
   const [query, setQuery] = useState("");
@@ -290,7 +291,15 @@ export default function MovesPage() {
                         onClick={() => onClickType(t)}
                         title={isLoading ? "Loading…" : undefined}
                       >
-                        {t}
+                        <img 
+                          src={getTypeIconUrl(t)} 
+                          alt={t} 
+                          className="type-icon"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <span className="type-name">{t}</span>
                       </button>
                     );
                   })}
@@ -545,7 +554,17 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                       <div className="label">Type</div>
                       <div className="value">
                         {data?.type?.name ? (
-                          <span className={`type-chip type-${data.type.name}`}>{humanize(data.type.name)}</span>
+                          <span className={`type-chip type-${data.type.name}`}>
+                            <img 
+                              src={getTypeIconUrl(data.type.name)} 
+                              alt={data.type.name} 
+                              className="type-icon"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                            <span className="type-name">{humanize(data.type.name)}</span>
+                          </span>
                         ) : (
                           <span>Unknown</span>
                         )}
@@ -692,7 +711,17 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                             <span className="label">{humanize(p.name)}</span>
                             <span className="types-vertical">
                               {types.map((t) => (
-                                <span key={t} className={`type-chip type-${t}`}>{t}</span>
+                                <span key={t} className={`type-chip type-${t}`}>
+                                  <img 
+                                    src={getTypeIconUrl(t)} 
+                                    alt={t} 
+                                    className="type-icon"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                    }}
+                                  />
+                                  <span className="type-name">{t}</span>
+                                </span>
                               ))}
                             </span>
                           </button>
