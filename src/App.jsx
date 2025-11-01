@@ -6,7 +6,7 @@ import SpriteImage from "./components/SpriteImage.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
-import { findRecommendedNature } from "./smogonApi";
+import { findRecommendedNature, fetchSmogonStats, normalizeSpeciesName } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation, getBasePath } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
@@ -1357,7 +1357,7 @@ function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pok
   );
 }
 
-function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetailsMap }) {
+function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetailsMap, pokemonTypes }) {
   const handleBackdropMouseDown = (event) => {
     event.stopPropagation();
     onClose();
@@ -1367,13 +1367,22 @@ function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetai
     event.stopPropagation();
   };
 
+  // Extract Pokemon type names for STAB checking
+  const pokemonTypeNames = useMemo(() => {
+    if (!pokemonTypes || !Array.isArray(pokemonTypes)) return [];
+    return pokemonTypes
+      .map(t => t?.type?.name)
+      .filter(Boolean);
+  }, [pokemonTypes]);
+
   const renderMoveItem = (move, category) => {
     const details = moveDetailsMap.get(move.name);
     const moveType = details?.type || 'normal';
     const typeColor = getTypeColor(moveType);
+    const isStab = pokemonTypeNames.includes(moveType);
     
     return (
-      <li key={move.name} className="learnset-item-single">
+      <li key={move.name} className={`learnset-item-single ${isStab ? 'is-stab' : ''}`}>
         <div className="learnset-move-row">
           <div className={`learnset-move-pill type-${moveType}`} style={{
             background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
@@ -1432,6 +1441,11 @@ function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetai
                 ) : '—'}
               </span>
             </span>
+            {isStab && (
+              <span className="learnset-move-stab-indicator" title="STAB (Same Type Attack Bonus)" aria-label="STAB move">
+                ⭐
+              </span>
+            )}
           </div>
         </div>
       </li>
@@ -1451,15 +1465,23 @@ function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetai
           X
         </button>
         <div className="game-modal-header">
-          <h2 className="game-modal-title">
-            Learned Moves for <span className="game-modal-title-name text-capitalize">{formatDisplayName(pokemonName)}</span>
-          </h2>
-          {learnsetMeta.versionGroupLabel ? (
-            <p className="game-modal-subtitle">
-              {learnsetMeta.hasMixedSources ? "Latest data: " : "Data source: "}
-              {learnsetMeta.versionGroupLabel}
-            </p>
-          ) : null}
+          <div className="game-modal-header-left">
+            <h2 className="game-modal-title">
+              Learned Moves for <span className="game-modal-title-name text-capitalize">{formatDisplayName(pokemonName)}</span>
+            </h2>
+            {learnsetMeta.versionGroupLabel ? (
+              <p className="game-modal-subtitle">
+                {learnsetMeta.hasMixedSources ? "Latest data: " : "Data source: "}
+                {learnsetMeta.versionGroupLabel}
+              </p>
+            ) : null}
+          </div>
+          <div className="learnset-stab-info">
+            <div className="learnset-stab-icon">⭐</div>
+            <div className="learnset-stab-text">
+              <strong>STAB (Same Type Attack Bonus):</strong> Moves that match this Pokémon's type deal 1.5× damage. Highlighted moves are STAB moves.
+            </div>
+          </div>
         </div>
         <div className="game-modal-body" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <div className="game-modal-column game-modal-column-left" style={{ flex: 1, overflowY: "auto", paddingRight: "8px" }}>
@@ -2926,6 +2948,8 @@ function DetailPanel({
     hmCount: 0,
   });
   const [moveDetailsMap, setMoveDetailsMap] = useState(() => new Map()); // move name -> {type, power, accuracy, pp, damage_class}
+  const [moveUsageMap, setMoveUsageMap] = useState(() => new Map()); // move name -> usage percentage
+  const [moveUsageLoading, setMoveUsageLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 768;
@@ -4039,6 +4063,169 @@ function DetailPanel({
     };
   }, [learnset, shouldShowLearnset, moveDetailsMap]);
 
+  // Fetch Smogon move usage statistics
+  useEffect(() => {
+    if (!shouldShowLearnset || !name || !species) {
+      setMoveUsageMap(new Map());
+      setMoveUsageLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const generationHint = species?.generation?.name || null;
+    const normalizedName = normalizeSpeciesName(name);
+
+    (async () => {
+      if (!normalizedName) {
+        setMoveUsageLoading(false);
+        return;
+      }
+
+      setMoveUsageLoading(true);
+      addLog("Fetching Smogon move usage", { name, normalizedName, generationHint });
+
+      // Try common formats based on generation
+      const formats = [];
+      if (generationHint) {
+        const genMatch = /generation-(\d+)/i.exec(generationHint);
+        const genNum = genMatch ? genMatch[1] : '9';
+        formats.push(`gen${genNum}ou`, `gen${genNum}uu`, `gen${genNum}ru`, `gen${genNum}nu`, `gen${genNum}pu`);
+      } else {
+        // Default to gen 9 formats
+        formats.push('gen9ou', 'gen9uu', 'gen9ru', 'gen9nu', 'gen9pu');
+      }
+
+      for (const format of formats) {
+        if (cancelled) return;
+        
+        try {
+          addLog(`Trying format: ${format}`, {});
+          const statsData = await fetchSmogonStats(format);
+          if (cancelled) return;
+
+          const pokemonStats = statsData?.pokemon || {};
+          // Find the Pokemon entry (handle different naming conventions)
+          let pokemonEntry = null;
+          let pokemonKey = null;
+          
+          // First try exact match
+          for (const [key, value] of Object.entries(pokemonStats)) {
+            const normalizedKey = normalizeSpeciesName(key);
+            if (normalizedKey === normalizedName) {
+              pokemonEntry = value;
+              pokemonKey = key;
+              break;
+            }
+          }
+
+          // If not found, try without form suffixes (e.g., "pikachu" matches "pikachu-alola")
+          if (!pokemonEntry) {
+            for (const [key, value] of Object.entries(pokemonStats)) {
+              const normalizedKey = normalizeSpeciesName(key);
+              // Check if normalizedName is a prefix of normalizedKey or vice versa
+              if (normalizedKey.startsWith(normalizedName + '-') || normalizedName.startsWith(normalizedKey + '-')) {
+                pokemonEntry = value;
+                pokemonKey = key;
+                break;
+              }
+            }
+          }
+
+          if (pokemonEntry) {
+            addLog(`Found Pokemon entry: ${pokemonKey}`, { 
+              hasMoves: !!pokemonEntry.Moves,
+              hasMovesLower: !!pokemonEntry.moves,
+              keys: Object.keys(pokemonEntry).slice(0, 10) // First 10 keys for debugging
+            });
+            
+            // Try both "Moves" and "moves" (case-sensitive)
+            const movesData = pokemonEntry.Moves || pokemonEntry.moves;
+            
+            if (movesData) {
+              // Extract move usage data
+              const usageMap = new Map();
+              const moves = movesData;
+              
+              if (typeof moves === 'object' && moves !== null) {
+                let processedCount = 0;
+                for (const [moveName, moveData] of Object.entries(moves)) {
+                  if (cancelled) return;
+                  processedCount++;
+                  
+                  // Move usage can be in different formats:
+                  // - Direct number: { "move-name": 45.2 }
+                  // - Object with usage: { "move-name": { usage: 45.2 } }
+                  // - String percentage: { "move-name": "45.2%" }
+                  let usage = null;
+                  if (typeof moveData === 'number') {
+                    usage = moveData;
+                  } else if (typeof moveData === 'object' && moveData !== null) {
+                    // Try common property names for usage
+                    usage = moveData.usage ?? moveData[''] ?? moveData.percent ?? moveData.Usage ?? null;
+                    if (usage == null) {
+                      // Sometimes it's the first numeric value
+                      const values = Object.values(moveData);
+                      const numValue = values.find(v => typeof v === 'number');
+                      if (numValue != null) usage = numValue;
+                    }
+                  } else if (typeof moveData === 'string') {
+                    // Extract number from string like "45.2%" or "45.2"
+                    const cleaned = moveData.replace(/%/g, '').trim();
+                    const numMatch = parseFloat(cleaned);
+                    usage = isNaN(numMatch) ? null : numMatch;
+                  }
+
+                  if (usage != null && typeof usage === 'number' && usage > 0) {
+                    // Normalize move name to match learnset format (kebab-case)
+                    const normalizedMove = normalizeSpeciesName(moveName);
+                    usageMap.set(normalizedMove, usage);
+                    // Also store with original name in case it matches directly
+                    if (normalizedMove !== moveName.toLowerCase()) {
+                      usageMap.set(moveName.toLowerCase(), usage);
+                    }
+                  }
+                }
+                
+                addLog(`Processed ${processedCount} moves, found ${usageMap.size} with usage > 0`, { format, pokemonKey });
+
+                if (!cancelled && usageMap.size > 0) {
+                  addLog(`Loaded ${usageMap.size} moves with usage data`, { format, pokemonKey, sampleMoves: Array.from(usageMap.keys()).slice(0, 5) });
+                  setMoveUsageMap(usageMap);
+                  setMoveUsageLoading(false);
+                  return; // Successfully found data, exit
+                } else if (!cancelled) {
+                  addLog(`No moves with usage data found`, { format, pokemonKey, processedCount });
+                }
+              } else {
+                addLog(`Moves data is not an object`, { format, pokemonKey, type: typeof movesData });
+              }
+            } else {
+              addLog(`Pokemon entry found but no Moves/moves property`, { format, pokemonKey, keys: Object.keys(pokemonEntry) });
+            }
+          } else {
+            addLog(`Pokemon not found in format ${format}`, { normalizedName, totalPokemon: Object.keys(pokemonStats).length });
+          }
+        } catch (error) {
+          addLog(`Error fetching format ${format}`, { error: String(error) });
+          // Try next format
+          continue;
+        }
+      }
+
+      // If no data found in any format, clear the map
+      if (!cancelled) {
+        addLog(`No usage data found for ${name}`, { formats: formats.join(', ') });
+        setMoveUsageMap(new Map());
+        setMoveUsageLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      setMoveUsageLoading(false);
+    };
+  }, [name, species, shouldShowLearnset]);
+
   // Load local pokedex entries (flavor text) for SV/ZA and prefer them when present
   useEffect(() => {
     let cancelled = false;
@@ -4804,60 +4991,47 @@ function DetailPanel({
     };
   }, [name, species?.generation?.name]);
 
-  // Calculate learnset summary stats
+  // Calculate learnset summary stats - type distribution for level-up moves
   const learnsetSummary = useMemo(() => {
-    const allMoves = [...(learnset.levelUp || []), ...(learnset.machine || [])];
-    const movesWithDetails = allMoves
-      .map(move => {
-        const details = moveDetailsMap.get(move.name);
-        return { ...move, details };
-      })
-      .filter(m => m.details);
-
-    if (movesWithDetails.length === 0) {
+    const levelUpMoves = learnset.levelUp || [];
+    
+    if (levelUpMoves.length === 0) {
       return {
-        strongestMove: null,
-        typeCoverage: new Set(),
-        avgPower: null,
-        physicalCount: 0,
-        specialCount: 0,
-        statusCount: 0,
+        typeStats: [],
+        totalTypes: 0,
+        totalMoves: 0,
       };
     }
 
-    const strongestMove = movesWithDetails.reduce((best, move) => {
-      const power = move.details.power ?? 0;
-      const bestPower = best?.details?.power ?? 0;
-      return power > bestPower ? move : best;
-    }, null);
+    // Get move details and count types
+    const typeCounts = new Map();
+    let movesWithTypes = 0;
 
-    const typeCoverage = new Set();
-    const damageClassCounts = { physical: 0, special: 0, status: 0 };
-    let totalPower = 0;
-    let powerCount = 0;
-
-    movesWithDetails.forEach(move => {
-      if (move.details.type) typeCoverage.add(move.details.type);
-      const damageClass = move.details.damage_class;
-      if (damageClass === 'physical') damageClassCounts.physical++;
-      else if (damageClass === 'special') damageClassCounts.special++;
-      else if (damageClass === 'status') damageClassCounts.status++;
-      
-      if (move.details.power != null) {
-        totalPower += move.details.power;
-        powerCount++;
+    levelUpMoves.forEach(move => {
+      const details = moveDetailsMap.get(move.name);
+      if (details?.type) {
+        const type = details.type;
+        const currentCount = typeCounts.get(type) || 0;
+        typeCounts.set(type, currentCount + 1);
+        movesWithTypes++;
       }
     });
 
+    // Convert to array and sort by count (descending)
+    const typeStats = Array.from(typeCounts.entries())
+      .map(([type, count]) => ({
+        type,
+        count,
+        percentage: Math.round((count / levelUpMoves.length) * 100),
+      }))
+      .sort((a, b) => b.count - a.count);
+
     return {
-      strongestMove,
-      typeCoverage,
-      avgPower: powerCount > 0 ? Math.round(totalPower / powerCount) : null,
-      physicalCount: damageClassCounts.physical,
-      specialCount: damageClassCounts.special,
-      statusCount: damageClassCounts.status,
+      typeStats,
+      totalTypes: typeStats.length,
+      totalMoves: levelUpMoves.length,
     };
-  }, [learnset, moveDetailsMap]);
+  }, [learnset.levelUp, moveDetailsMap]);
 
   // Get primary type and create gradient style
   const heroGradientStyle = useMemo(() => {
@@ -5254,42 +5428,23 @@ function DetailPanel({
                 className="catch-section single-col"
                 style={{ padding: "0 16px 0", marginTop: "-16px" }}
               >
-                <div className="matchup-box pokedex-entry-box">
+                <button
+                  type="button"
+                  className="matchup-box pokedex-entry-box pokedex-entry-clickable"
+                  onClick={openFlavorModal}
+                  title={flavorTextVersions.length > 1 ? "View all Pokedex entries" : "View Pokedex entry"}
+                >
                   <div className="matchup-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                     <span>Pokedex Entry</span>
                     {flavorTextVersions.length > 1 && currentVersionLogo && (
-                      <button
-                        type="button"
-                        onClick={openFlavorModal}
-                        style={{
-                          background: "transparent",
-                          border: "1px solid rgba(255,255,255,0.2)",
-                          borderRadius: "8px",
-                          padding: "4px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          transition: "border-color 0.15s ease, transform 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
-                          e.currentTarget.style.transform = "translateY(-1px)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                        title="View all Pokedex entries"
-                      >
-                        <img
-                          src={currentVersionLogo}
-                          alt=""
-                          width={28}
-                          height={28}
-                          className="pokedex-entry-logo"
-                          style={{ display: "block" }}
-                        />
-                      </button>
+                      <img
+                        src={currentVersionLogo}
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="pokedex-entry-logo"
+                        style={{ display: "block" }}
+                      />
                     )}
                   </div>
                   {selectedFlavorText && (
@@ -5297,7 +5452,7 @@ function DetailPanel({
                       {selectedFlavorText}
                     </div>
                   )}
-                </div>
+                </button>
               </section>
             )}
             {shouldShowLearnset && (
@@ -5309,32 +5464,42 @@ function DetailPanel({
                   aria-label="View learned moves"
                 >
                   <div className="learnset-summary-content">
-                    <span className="learnset-summary-title">Learned Moves</span>
+                    <div className="learnset-summary-title-wrapper">
+                      <span className="learnset-summary-title">Learned Moves</span>
+                      <span className="learnset-summary-click-indicator" aria-hidden="true">→</span>
+                    </div>
                     <div className="learnset-summary-stats">
-                      <span className="learnset-summary-stat">
-                        <span className="learnset-summary-label">Strongest</span>
-                        <span className="learnset-summary-value">
-                          {learnsetSummary.strongestMove 
-                            ? `${learnsetSummary.strongestMove.label} (${learnsetSummary.strongestMove.details?.power ?? '—'})`
-                            : '—'}
-                        </span>
-                      </span>
-                      <span className="learnset-summary-stat">
-                        <span className="learnset-summary-label">Types</span>
-                        <span className="learnset-summary-value">{learnsetSummary.typeCoverage.size}</span>
-                      </span>
-                      {learnsetSummary.avgPower != null && (
-                        <span className="learnset-summary-stat">
-                          <span className="learnset-summary-label">Avg Power</span>
-                          <span className="learnset-summary-value">{learnsetSummary.avgPower}</span>
-                        </span>
+                      {learnsetSummary.typeStats.length > 0 ? (
+                        <>
+                          <div className="learnset-summary-top-moves-label">
+                            Level-Up Move Types ({learnsetSummary.totalMoves} moves)
+                          </div>
+                          <div className="learnset-summary-type-stats">
+                            {learnsetSummary.typeStats.slice(0, 6).map((stat) => (
+                              <span key={stat.type} className={`type-chip type-${stat.type}`}>
+                                <img 
+                                  src={getTypeIconUrl(stat.type)} 
+                                  alt={stat.type}
+                                  className="type-icon"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                                <span className="type-name">
+                                  {stat.type} {stat.count} ({stat.percentage}%)
+                                </span>
+                              </span>
+                            ))}
+                            {learnsetSummary.typeStats.length > 6 && (
+                              <span className="learnset-summary-type-more">
+                                +{learnsetSummary.typeStats.length - 6} more
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="learnset-summary-loading">Loading move types...</div>
                       )}
-                      <span className="learnset-summary-stat">
-                        <span className="learnset-summary-label">Total Moves</span>
-                        <span className="learnset-summary-value">
-                          {learnsetMeta.levelCount + learnsetMeta.machineCount}
-                        </span>
-                      </span>
                     </div>
                   </div>
                 </button>
@@ -5415,6 +5580,7 @@ function DetailPanel({
           learnsetMeta={learnsetMeta}
           pokemonName={name}
           moveDetailsMap={moveDetailsMap}
+          pokemonTypes={details?.types}
           onClose={() => setIsLearnsetModalOpen(false)}
         />
       )}
