@@ -135,6 +135,133 @@ const formatTimeOfDay = (value) => {
   return TIME_OF_DAY_LABELS[normalized] || toTitleCase(normalized);
 };
 
+const VERSION_GROUP_RELEASE_ORDER = [
+  "legends-za",
+  "scarlet-violet",
+  "legends-arceus",
+  "brilliant-diamond-shining-pearl",
+  "sword-shield",
+  "lets-go-pikachu-lets-go-eevee",
+  "ultra-sun-ultra-moon",
+  "sun-moon",
+  "omega-ruby-alpha-sapphire",
+  "x-y",
+  "black-2-white-2",
+  "black-white",
+  "heartgold-soulsilver",
+  "platinum",
+  "diamond-pearl",
+  "firered-leafgreen",
+  "emerald",
+  "ruby-sapphire",
+  "crystal",
+  "gold-silver",
+  "yellow",
+  "red-blue",
+];
+
+const VERSION_GROUP_ORDER_LOOKUP = new Map(
+  VERSION_GROUP_RELEASE_ORDER.map((name, index) => [name, index])
+);
+
+const GAME_KEY_TO_VERSION_GROUPS = new Map([
+  ["scarlet-violet", ["scarlet-violet"]],
+  ["legends-arceus", ["legends-arceus"]],
+  ["legends-za", ["legends-za"]],
+  ["sword-shield", ["sword-shield"]],
+  ["ultra-sun-ultra-moon", ["ultra-sun-ultra-moon"]],
+  ["sun-moon", ["sun-moon"]],
+  ["omega-ruby-alpha-sapphire", ["omega-ruby-alpha-sapphire"]],
+  ["x-y", ["x-y"]],
+  ["black-2-white-2", ["black-2-white-2"]],
+  ["black-white", ["black-white"]],
+  ["heartgold-soulsilver", ["heartgold-soulsilver"]],
+  ["platinum", ["platinum"]],
+  ["diamond-pearl", ["diamond-pearl"]],
+  ["brilliant-diamond-shining-pearl", ["brilliant-diamond-shining-pearl"]],
+  ["firered-leafgreen", ["firered-leafgreen"]],
+  ["ruby-sapphire-emerald", ["emerald", "ruby-sapphire"]],
+  ["gold-silver-crystal", ["crystal", "gold-silver"]],
+  ["red-blue-yellow", ["yellow", "red-blue"]],
+  ["lets-go", ["lets-go-pikachu-lets-go-eevee"]],
+]);
+
+const DEX_KEY_TO_VERSION_GROUPS = new Map([
+  ["paldea", ["scarlet-violet"]],
+  ["hisui", ["legends-arceus"]],
+  ["galar", ["sword-shield"]],
+  ["alola", ["ultra-sun-ultra-moon", "sun-moon"]],
+  ["kalos", ["x-y"]],
+  ["unova", ["black-2-white-2", "black-white"]],
+  ["sinnoh", ["brilliant-diamond-shining-pearl", "platinum", "diamond-pearl"]],
+  ["hoenn", ["omega-ruby-alpha-sapphire", "emerald", "ruby-sapphire"]],
+  ["johto", ["heartgold-soulsilver", "crystal", "gold-silver"]],
+  ["kanto", ["lets-go-pikachu-lets-go-eevee", "firered-leafgreen", "yellow", "red-blue"]],
+]);
+
+const VERSION_GROUP_LABEL_OVERRIDES = new Map([
+  ["red-blue", "Red & Blue"],
+  ["yellow", "Yellow"],
+  ["gold-silver", "Gold & Silver"],
+  ["crystal", "Crystal"],
+  ["ruby-sapphire", "Ruby & Sapphire"],
+  ["emerald", "Emerald"],
+  ["firered-leafgreen", "FireRed & LeafGreen"],
+  ["diamond-pearl", "Diamond & Pearl"],
+  ["platinum", "Platinum"],
+  ["heartgold-soulsilver", "HeartGold & SoulSilver"],
+  ["black-white", "Black & White"],
+  ["black-2-white-2", "Black 2 & White 2"],
+  ["x-y", "X & Y"],
+  ["omega-ruby-alpha-sapphire", "Omega Ruby & Alpha Sapphire"],
+  ["sun-moon", "Sun & Moon"],
+  ["ultra-sun-ultra-moon", "Ultra Sun & Ultra Moon"],
+  ["lets-go-pikachu-lets-go-eevee", "Let's Go Pikachu & Let's Go Eevee"],
+  ["sword-shield", "Sword & Shield"],
+  ["brilliant-diamond-shining-pearl", "Brilliant Diamond & Shining Pearl"],
+  ["legends-arceus", "Legends: Arceus"],
+  ["scarlet-violet", "Scarlet & Violet"],
+  ["legends-za", "Legends: Z-A"],
+]);
+
+const buildVersionGroupPreference = (gameKey, dexKey) => {
+  const seen = new Set();
+  const preference = [];
+  const pushValue = (value) => {
+    if (!value) return;
+    const normalized = String(value).toLowerCase();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    preference.push(normalized);
+  };
+  const pushAll = (values) => {
+    (values || []).forEach((value) => pushValue(value));
+  };
+  if (gameKey) {
+    pushAll(GAME_KEY_TO_VERSION_GROUPS.get(gameKey));
+  }
+  if (dexKey) {
+    pushAll(DEX_KEY_TO_VERSION_GROUPS.get(dexKey));
+  }
+  VERSION_GROUP_RELEASE_ORDER.forEach((value) => pushValue(value));
+  return preference;
+};
+
+const formatVersionGroupLabel = (value) => {
+  if (!value) return null;
+  const normalized = String(value).toLowerCase();
+  if (VERSION_GROUP_LABEL_OVERRIDES.has(normalized)) {
+    return VERSION_GROUP_LABEL_OVERRIDES.get(normalized);
+  }
+  return toTitleCase(normalized);
+};
+
+const formatMoveLevelLabel = (level) => {
+  if (level == null) return null;
+  if (level <= 0) return "Start";
+  return `Lv. ${level}`;
+};
+
 const normalizeEncounterData = (entries) => {
   if (!Array.isArray(entries) || entries.length === 0) return [];
   const versionMap = new Map();
@@ -2600,6 +2727,14 @@ function DetailPanel({
   const [altFormsForModal, setAltFormsForModal] = useState([]);
   const [altFormsModalTitle, setAltFormsModalTitle] = useState("");
   const [localFlavorEntries, setLocalFlavorEntries] = useState([]);
+  const [learnset, setLearnset] = useState({ levelUp: [], machine: [] });
+  const [learnsetMeta, setLearnsetMeta] = useState({
+    versionGroup: null,
+    versionGroupLabel: null,
+    hasMixedSources: false,
+    levelCount: 0,
+    machineCount: 0,
+  });
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 768;
@@ -2860,6 +2995,10 @@ function DetailPanel({
     setDebugLog((d) => d.concat(line).slice(-200));
   };
   const displayDexNumber = dexNumber || (id ? `#${id}` : "-");
+  const hasLearnsetContent = (learnset.levelUp?.length || 0) > 0 || (learnset.machine?.length || 0) > 0;
+  const shouldShowLearnset = Boolean(details) && (
+    hasLearnsetContent || (Array.isArray(details?.moves) && details.moves.length > 0)
+  );
 
   const handleShinyToggle = useCallback(() => {
     if (typeof setShiny === "function") {
@@ -3219,6 +3358,14 @@ function DetailPanel({
     setEvoPaths([]);
     setEvolutionChainData(null);
     setWeaknesses([]);
+    setLearnset({ levelUp: [], machine: [] });
+    setLearnsetMeta({
+      versionGroup: null,
+      versionGroupLabel: null,
+      hasMixedSources: false,
+      levelCount: 0,
+      machineCount: 0,
+    });
     addLog('Fetching details', { url });
     queuedFetch(url)
       .then((r) => r.json())
@@ -3464,6 +3611,158 @@ function DetailPanel({
 
     return () => { ignore = true; };
   }, [details, pokemonIdMap]);
+
+  useEffect(() => {
+    if (!details) {
+      setLearnset({ levelUp: [], machine: [] });
+      setLearnsetMeta({
+        versionGroup: null,
+        versionGroupLabel: null,
+        hasMixedSources: false,
+        levelCount: 0,
+        machineCount: 0,
+      });
+      return;
+    }
+
+    const preference = buildVersionGroupPreference(selectedGame, selectedDex);
+    const levelMap = new Map();
+    const machineMap = new Map();
+    const usedGroups = new Map();
+
+    const normalizeGroup = (value) => (value ? String(value).toLowerCase() : null);
+
+    const preferenceIndex = (group) => {
+      if (!group) return Number.POSITIVE_INFINITY;
+      const idx = preference.findIndex((value) => value === group);
+      if (idx !== -1) return idx;
+      if (VERSION_GROUP_ORDER_LOOKUP.has(group)) {
+        return preference.length + VERSION_GROUP_ORDER_LOOKUP.get(group);
+      }
+      return preference.length + VERSION_GROUP_RELEASE_ORDER.length + 10;
+    };
+
+    const recordGroupUsage = (group) => {
+      if (!group) return;
+      const key = normalizeGroup(group);
+      if (!key) return;
+      usedGroups.set(key, (usedGroups.get(key) || 0) + 1);
+    };
+
+    const moves = Array.isArray(details.moves) ? details.moves : [];
+
+    for (const entry of moves) {
+      const moveName = entry?.move?.name;
+      if (!moveName) continue;
+      const versionEntries = Array.isArray(entry?.version_group_details)
+        ? entry.version_group_details
+        : [];
+      if (versionEntries.length === 0) continue;
+
+      let bestLevel = null;
+      let bestMachine = null;
+
+      for (const info of versionEntries) {
+        const method = info?.move_learn_method?.name;
+        const versionGroupName = normalizeGroup(info?.version_group?.name);
+        if (!method || !versionGroupName) continue;
+        const score = preferenceIndex(versionGroupName);
+
+        if (method === "level-up") {
+          const rawLevel = Number(info?.level_learned_at);
+          const level = Number.isFinite(rawLevel) ? rawLevel : null;
+          const candidate = {
+            move: moveName,
+            level,
+            score,
+            versionGroup: versionGroupName,
+          };
+          const shouldUpdate = () => {
+            if (!bestLevel) return true;
+            if (candidate.score < bestLevel.score) return true;
+            if (candidate.score > bestLevel.score) return false;
+            const candidateLevel = candidate.level == null ? Number.POSITIVE_INFINITY : candidate.level;
+            const currentLevel = bestLevel.level == null ? Number.POSITIVE_INFINITY : bestLevel.level;
+            if (candidateLevel !== currentLevel) {
+              return candidateLevel < currentLevel;
+            }
+            return candidate.move.localeCompare(bestLevel.move) < 0;
+          };
+          if (shouldUpdate()) {
+            bestLevel = candidate;
+          }
+        } else if (method === "machine") {
+          const candidate = {
+            move: moveName,
+            score,
+            versionGroup: versionGroupName,
+          };
+          const shouldUpdate = () => {
+            if (!bestMachine) return true;
+            if (candidate.score < bestMachine.score) return true;
+            if (candidate.score > bestMachine.score) return false;
+            return candidate.move.localeCompare(bestMachine.move) < 0;
+          };
+          if (shouldUpdate()) {
+            bestMachine = candidate;
+          }
+        }
+      }
+
+      if (bestLevel) {
+        levelMap.set(moveName, bestLevel);
+        recordGroupUsage(bestLevel.versionGroup);
+      }
+      if (bestMachine) {
+        machineMap.set(moveName, bestMachine);
+        recordGroupUsage(bestMachine.versionGroup);
+      }
+    }
+
+    const levelUpList = Array.from(levelMap.values())
+      .sort((a, b) => {
+        const levelA = a.level == null ? Number.POSITIVE_INFINITY : a.level;
+        const levelB = b.level == null ? Number.POSITIVE_INFINITY : b.level;
+        if (levelA !== levelB) return levelA - levelB;
+        if (a.score !== b.score) return a.score - b.score;
+        return a.move.localeCompare(b.move);
+      })
+      .map((item) => ({
+        name: item.move,
+        label: toTitleCase(item.move),
+        level: item.level,
+        levelLabel: formatMoveLevelLabel(item.level),
+        versionGroup: item.versionGroup,
+      }));
+
+    const machineList = Array.from(machineMap.values())
+      .sort((a, b) => {
+        if (a.score !== b.score) return a.score - b.score;
+        return a.move.localeCompare(b.move);
+      })
+      .map((item) => ({
+        name: item.move,
+        label: toTitleCase(item.move),
+        versionGroup: item.versionGroup,
+      }));
+
+    const primaryVersionGroup = (() => {
+      const preferred = preference.find((group) => usedGroups.has(group));
+      if (preferred) return preferred;
+      const iterator = usedGroups.keys();
+      const next = iterator.next();
+      return next.done ? null : next.value;
+    })();
+
+    setLearnset({ levelUp: levelUpList, machine: machineList });
+    setLearnsetMeta({
+      versionGroup: primaryVersionGroup,
+      versionGroupLabel: formatVersionGroupLabel(primaryVersionGroup),
+      hasMixedSources: usedGroups.size > 1,
+      levelCount: levelUpList.length,
+      machineCount: machineList.length,
+    });
+  }, [details, selectedGame, selectedDex]);
 
   // Load local pokedex entries (flavor text) for SV/ZA and prefer them when present
   useEffect(() => {
@@ -4397,6 +4696,63 @@ function DetailPanel({
                 </div>
               </div>
             </section>
+            {shouldShowLearnset && (
+              <section className="learnset-panel">
+                <div className="matchup-box learnset-box">
+                  <div className="learnset-header">
+                    <span className="matchup-title">Learned Moves</span>
+                    {learnsetMeta.versionGroupLabel ? (
+                      <span className="learnset-meta">
+                        {learnsetMeta.hasMixedSources ? "Latest data: " : "Data source: "}
+                        {learnsetMeta.versionGroupLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="learnset-columns">
+                    <div className="learnset-column">
+                      <div className="learnset-column-title">
+                        Level Up
+                        <span className="learnset-count">{learnsetMeta.levelCount}</span>
+                      </div>
+                      {learnset.levelUp.length > 0 ? (
+                        <ul className="learnset-list">
+                          {learnset.levelUp.map((move) => (
+                            <li key={move.name} className="learnset-item">
+                              <span className="move-name">{move.label}</span>
+                              {move.levelLabel ? (
+                                <span className="move-level">{move.levelLabel}</span>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="learnset-empty">No level-up moves recorded.</div>
+                      )}
+                    </div>
+                    <div className="learnset-column">
+                      <div className="learnset-column-title">
+                        TM / HM
+                        <span className="learnset-count">{learnsetMeta.machineCount}</span>
+                      </div>
+                      {learnset.machine.length > 0 ? (
+                        <ul className="learnset-list">
+                          {learnset.machine.map((move) => (
+                            <li key={move.name} className="learnset-item">
+                              <span className="move-name">{move.label}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="learnset-empty">No TM or HM moves recorded.</div>
+                      )}
+                    </div>
+                  </div>
+                  {learnsetMeta.hasMixedSources && (
+                    <div className="learnset-footnote">Includes moves from multiple game versions.</div>
+                  )}
+                </div>
+              </section>
+            )}
             <div className="weak-resist">
               <div className="matchup-box weak-matchup">
                 <div className="matchup-title">Weak To</div>

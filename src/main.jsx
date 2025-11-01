@@ -8,6 +8,7 @@ import ItemsPage from './ItemsPage.jsx'
 import MovesPage from './MovesPage.jsx'
 import AbilitiesPage from './AbilitiesPage.jsx'
 import MinigamePage from './MinigamePage.jsx'
+import HomePage from './HomePage.jsx'
 
 const pathSegments = window.location.pathname.toLowerCase().split('/').filter(Boolean)
 const lastSegment = pathSegments[pathSegments.length - 1] || ''
@@ -92,6 +93,7 @@ function RootRouter() {
   }, [])
 
   const hash = String(window.location.hash || '').toLowerCase()
+  if (hash.startsWith('#/home')) return <HomePage />
   if (hash.startsWith('#/items')) return <ItemsPage />
   if (hash.startsWith('#/moves')) return <MovesPage />
   if (hash.startsWith('#/abilities')) return <AbilitiesPage />
