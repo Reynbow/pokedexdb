@@ -62,6 +62,19 @@ const getStatLabel = (statName, isMobile) => {
   return label;
 };
 
+const getStatColor = (baseStat) => {
+  // Normalize stat value from 0-180 range to 0-1 for interpolation
+  const normalized = Math.max(0, Math.min(1, baseStat / 180));
+  
+  // Interpolate from red (low) to green (high)
+  // Red: rgb(220, 50, 50), Green: rgb(50, 220, 50)
+  const red = Math.round(220 - (normalized * 170));
+  const green = Math.round(50 + (normalized * 170));
+  const blue = Math.round(50);
+  
+  return `rgb(${red}, ${green}, ${blue})`;
+};
+
 const deriveSpecialTags = (name) => {
   const lower = String(name || "").toLowerCase();
   if (!lower) return [];
@@ -4860,7 +4873,10 @@ function DetailPanel({
                         <div className="stat-bar">
                           <div
                             className="stat-fill"
-                            style={{ width: `${Math.min(100, (s.base_stat / 180) * 100)}%` }}
+                            style={{ 
+                              width: `${Math.min(100, (s.base_stat / 180) * 100)}%`,
+                              background: getStatColor(s.base_stat)
+                            }}
                             title={`${s.base_stat}`}
                           />
                         </div>
