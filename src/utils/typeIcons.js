@@ -28,3 +28,4 @@ export function getTypeIconMap(types) {
   return map;
 }
 
+

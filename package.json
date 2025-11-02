@@ -6,7 +6,7 @@
   "homepage": "https://pokedexdb.com",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-share-pages.mjs",
+    "build": "vite build && node scripts/generate-share-pages.mjs && node scripts/generate-sitemap.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"

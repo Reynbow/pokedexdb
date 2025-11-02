@@ -165,6 +165,8 @@ const buildMetaBlock = ({
   imageUrl,
   imageAlt,
   pageTitle,
+  displayName,
+  pokemonId,
 }) => {
   const indent = "    ";
   const lines = [
@@ -186,6 +188,26 @@ const buildMetaBlock = ({
     `${indent}<meta name="twitter:image:alt" content="${escapeHtmlAttr(imageAlt)}" />`,
     `${indent}<title>${escapeHtmlAttr(pageTitle)}</title>`,
   ];
+  
+  // Add JSON-LD structured data for better search engine understanding
+  if (displayName && pokemonId) {
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": pageTitle,
+      "description": description,
+      "url": canonicalUrl,
+      "mainEntity": {
+        "@type": "Article",
+        "headline": ogTitle,
+        "image": imageUrl,
+        "description": description,
+      },
+    };
+    const jsonLd = JSON.stringify(structuredData, null, 0);
+    lines.push(`${indent}<script type="application/ld+json">${jsonLd}</script>`);
+  }
+  
   return lines.join("\n");
 };
 
@@ -287,6 +309,8 @@ const generate = async () => {
       imageUrl,
       imageAlt,
       pageTitle,
+      displayName,
+      pokemonId: id,
     });
 
     const html = `${before}\n${metaBlock}\n${after}`;
