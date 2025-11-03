@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import SpriteImage from "./SpriteImage.jsx";
 import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "../constants/tags.js";
+import { GAME_LOGO_LOOKUP, VERSION_LOGO_FILES, VERSION_COLORS } from "../constants/games.js";
+import { getExclusiveVersionForSpecies } from "../constants/exclusives.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, LEGENDARY_NAMES, MYTHICAL_NAMES } from "../constants/species.js";
 
 // Local cache fallback to preserve memoization and reduce fetches when detailsCache is not provided
@@ -34,6 +36,51 @@ const stripMegaGmaxTokens = (rawName) => {
   const filtered = tokens.filter((t) => t !== "mega" && t !== "gmax");
   return filtered.join("-");
 };
+function hexToRgba(hex, alpha) {
+  try {
+    const m = String(hex || "").trim().toLowerCase();
+    if (!m.startsWith("#")) return hex;
+    let r, g, b;
+    if (m.length === 4) {
+      r = parseInt(m[1] + m[1], 16);
+      g = parseInt(m[2] + m[2], 16);
+      b = parseInt(m[3] + m[3], 16);
+    } else if (m.length === 7) {
+      r = parseInt(m.slice(1, 3), 16);
+      g = parseInt(m.slice(3, 5), 16);
+      b = parseInt(m.slice(5, 7), 16);
+    } else {
+      return hex;
+    }
+    const a = Number(alpha);
+    const clamped = Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 1;
+    return `rgba(${r}, ${g}, ${b}, ${clamped})`;
+  } catch {
+    return hex;
+  }
+}
+
+function getLuminance(hex) {
+  try {
+    const m = String(hex || "").trim().toLowerCase();
+    if (!m.startsWith("#")) return 1;
+    let r, g, b;
+    if (m.length === 4) {
+      r = parseInt(m[1] + m[1], 16);
+      g = parseInt(m[2] + m[2], 16);
+      b = parseInt(m[3] + m[3], 16);
+    } else if (m.length === 7) {
+      r = parseInt(m.slice(1, 3), 16);
+      g = parseInt(m.slice(3, 5), 16);
+      b = parseInt(m.slice(5, 7), 16);
+    } else {
+      return 1;
+    }
+    return (r + g + b) / (255 * 3);
+  } catch {
+    return 1;
+  }
+}
 const formatDisplayName = (rawName) => {
   const stripped = stripMegaGmaxTokens(rawName);
   return toTitleCase(stripped);
@@ -53,7 +100,7 @@ const deriveSpecialTags = (name) => {
   return tags;
 };
 
-function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false }) {
+function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null }) {
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
   const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
@@ -86,6 +133,38 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
         return a.tag.localeCompare(b.tag);
       });
   }, [name]);
+
+  const { formAwareName, baseSpeciesName } = useMemo(() => {
+    const stripped = stripMegaGmaxTokens(name || "").toLowerCase();
+    const formName = stripped; // keep regional forms for form-aware checks
+    // Preserve Indeedee gender forms and Paldean Tauros breed forms
+    if (/^indeedee-(male|female)$/.test(stripped)) {
+      return { formAwareName: stripped, baseSpeciesName: stripped };
+    }
+    if (/^tauros-paldea-(combat|blaze|aqua)$/.test(stripped)) {
+      return { formAwareName: stripped, baseSpeciesName: stripped };
+    }
+    // Remove common regional/form tokens so exclusives can fall back to base species
+    const baseName = formName
+      .replace(/-(alola|galar|hisui|paldea|original|totem|starter|male|female|f|m)$/g, "")
+      .replace(/-(mega|gmax)$/g, "");
+    return { formAwareName: formName, baseSpeciesName: baseName };
+  }, [name]);
+
+  const exclusiveBadge = useMemo(() => {
+    if (!selectedGame) return null;
+    // Try form-aware name first, then fall back to base species name
+    const versionKey =
+      getExclusiveVersionForSpecies(selectedGame, formAwareName) ||
+      getExclusiveVersionForSpecies(selectedGame, baseSpeciesName);
+    if (!versionKey) return null;
+    const logoFile = VERSION_LOGO_FILES.get(versionKey);
+    const logoUrl = logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
+    if (!logoUrl) return null;
+    const label = toTitleCase(String(versionKey).replace(/-/g, " "));
+    const color = VERSION_COLORS.get(versionKey) || null;
+    return { logoUrl, label, color, versionKey };
+  }, [selectedGame, baseSpeciesName]);
 
   useEffect(() => {
     let ignore = false;
@@ -142,7 +221,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
 
   return (
     <div
-      className={`card${selected ? " is-selected" : ""}`}
+      className={`card${selected ? " is-selected" : ""}${exclusiveBadge ? " has-exclusive" : ""}`}
       title={name}
       onClick={onSelect}
       role="button"
@@ -151,6 +230,31 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       ref={cardRef}
       aria-current={selected ? "true" : undefined}
     >
+      {exclusiveBadge ? (
+        <>
+          <div
+            className="card-exclusive-glow"
+            aria-hidden="true"
+            style={exclusiveBadge.color ? (() => {
+              const vk = exclusiveBadge.versionKey;
+              // For Black / Black 2, use a deep blue glow for visibility
+              const baseColor = (vk === "black" || vk === "black-2") ? "#1e3a8a" : exclusiveBadge.color;
+              const a1 = 0.42;
+              const a2 = 0.22;
+              return {
+                background: `radial-gradient(circle at 100% 0%, ${hexToRgba(baseColor, a1)} 0%, ${hexToRgba(baseColor, a2)} 26%, ${hexToRgba(baseColor, 0.0)} 56%)`
+              };
+            })() : undefined}
+          />
+          <div
+            className="card-exclusive"
+            title={`Exclusive to ${exclusiveBadge.label}`}
+            aria-label={`Exclusive to ${exclusiveBadge.label}`}
+          >
+            <img src={exclusiveBadge.logoUrl} alt={exclusiveBadge.label} />
+          </div>
+        </>
+      ) : null}
       {specialTags.length > 0 && (
         <div className="card-tags">
           {specialTags.map((tag) => (

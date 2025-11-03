@@ -13,6 +13,47 @@ export const GAME_LOGO_LOOKUP = new Map(
   })
 );
 
+// Representative brand colors for version logos
+export const VERSION_COLORS = new Map([
+  ["red", "#ef4444"],
+  ["blue", "#3b82f6"],
+  ["yellow", "#f59e0b"],
+  ["firered", "#dc2626"],
+  ["leafgreen", "#22c55e"],
+  ["lets-go-pikachu", "#fff7bf"],
+  ["lets-go-eevee", "#8b5e34"],
+  ["gold", "#f59e0b"],
+  ["silver", "#60a5fa"],
+  ["crystal", "#22d3ee"],
+  ["heartgold", "#f59e0b"],
+  ["soulsilver", "#60a5fa"],
+  ["ruby", "#dc2626"],
+  ["sapphire", "#2563eb"],
+  ["emerald", "#10b981"],
+  ["omega-ruby", "#ef4444"],
+  ["alpha-sapphire", "#3b82f6"],
+  ["diamond", "#60a5fa"],
+  ["pearl", "#f472b6"],
+  ["brilliant-diamond", "#38bdf8"],
+  ["shining-pearl", "#f9a8d4"],
+  ["black", "#111827"],
+  ["white", "#e5e7eb"],
+  ["black-2", "#0f172a"],
+  ["white-2", "#f3f4f6"],
+  ["x", "#2563eb"],
+  ["y", "#ef4444"],
+  ["sun", "#f59e0b"],
+  ["moon", "#6366f1"],
+  ["ultra-sun", "#f59e0b"],
+  ["ultra-moon", "#6366f1"],
+  ["sword", "#0ea5e9"],
+  ["shield", "#ec4899"],
+  ["legends-arceus", "#60a5fa"],
+  ["scarlet", "#ef4444"],
+  ["violet", "#8b5cf6"],
+  ["legends-za", "#14b8a6"],
+]);
+
 export const VERSION_LOGO_FILES = new Map([
   ["red", "red.png"],
   ["blue", "blue.png"],

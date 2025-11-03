@@ -2557,6 +2557,7 @@ function App() {
               selected={selected ? String(selected.id) === String(id) : undefined}
               dexNumber={dexDisplay}
               shiny={shiny}
+              selectedGame={selectedGame}
               detailsCache={detailsCache}
             />
           );
@@ -2584,6 +2585,7 @@ function App() {
               onSelect={() => selectPokemon(id, pref.name, pref.url)}
               dexNumber={dexDisplay}
               shiny={shiny}
+              selectedGame={selectedGame}
               detailsCache={detailsCache}
             />
           );
@@ -2768,6 +2770,7 @@ function App() {
                         onSelect={() => selectPokemon(id, pref.name, pref.url)}
                         dexNumber={dexDisplay}
                         shiny={shiny}
+                        selectedGame={selectedGame}
                         detailsCache={detailsCache}
                       />
                     );

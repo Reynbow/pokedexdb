@@ -4764,7 +4764,19 @@
   cursor: pointer;
   box-sizing: border-box;
   padding-bottom: 8px; /* fixed bottom gap */
+  overflow: hidden; /* clip exclusive glow */
 }
+.card-exclusive-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 0;
+}
+
 
 .card-tags {
   position: absolute;
@@ -4777,6 +4789,8 @@
   max-width: calc(100% - 24px);
   z-index: 3;
 }
+
+.card.has-exclusive .card-tags { padding-right: 36px; }
 
 .card-tag {
   display: inline-flex;
@@ -4879,7 +4893,7 @@
 }
 
 /* Tighter spacing in preview cards between sprite, name, and types */
-.card .sprite { margin-bottom: -10px; }
+.card .sprite { margin-bottom: -10px; position: relative; z-index: 2; }
 .card .name { margin-top: 0; }
 .card .types { display: flex; justify-content: center; gap: 6px; margin-top: 2px; margin-bottom: 0; }
 
@@ -4934,6 +4948,28 @@
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+/* Version exclusivity badge */
+.card-exclusive {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  z-index: 3;
+}
+.card-exclusive img {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 /* New filter box wrappers */
