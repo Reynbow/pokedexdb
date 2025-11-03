@@ -1,16 +1,109 @@
-# React + Vite
+# PokedexDB
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A fast, static Pokémon database built with React and Vite. Deployed to GitHub Pages with a custom domain.
 
-Currently, two official plugins are available:
+[View the site](https://pokedexdb.com)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+![Preview](public/og-preview.png)
 
-## React Compiler
+### Features
+- **Browse Pokémon**: Clean card layout with sprites and key details
+- **Filter & search**: Types, tags, games, items, moves, and more
+- **Dedicated pages**: `Abilities`, `Items`, `Moves`, plus a small minigame
+- **Zero backend**: Fully static build served from GitHub Pages
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Tech stack
+- **React** 19 + **Vite** 7
+- **ESLint** 9 for linting
+- **GitHub Pages** deployment (`gh-pages`) with `CNAME` for `pokedexdb.com`
 
-## Expanding the ESLint configuration
+## Getting started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+- Node.js 18+ (recommended)
+- npm 9+ (or a compatible package manager)
+
+### Install
+```bash
+npm install
+```
+
+### Develop
+```bash
+npm run dev
+```
+This starts Vite’s dev server with HMR.
+
+### Build
+```bash
+npm run build
+```
+This runs `vite build` and then generates share pages and a sitemap via:
+- `scripts/generate-share-pages.mjs`
+- `scripts/generate-sitemap.mjs`
+
+### Preview production build
+```bash
+npm run preview
+```
+
+### Lint
+```bash
+npm run lint
+```
+
+### Deploy
+```bash
+npm run deploy
+```
+Builds the site and publishes `dist/` to GitHub Pages via `gh-pages`. The `CNAME` file configures the custom domain `pokedexdb.com`.
+
+## Project structure
+```txt
+.
+├─ public/
+│  ├─ data/
+│  │  └─ pokemon_all.json
+│  ├─ sprites/
+│  │  └─ pokemon/              # ~6k sprite PNGs
+│  └─ og-preview.png
+├─ scripts/
+│  ├─ generate-share-pages.mjs
+│  └─ generate-sitemap.mjs
+├─ src/
+│  ├─ components/
+│  │  ├─ PokemonCard.jsx
+│  │  ├─ ErrorBoundary.jsx
+│  │  └─ SpriteImage.jsx
+│  ├─ sections/
+│  │  ├─ FilterTabs.jsx
+│  │  └─ GameFilters.jsx
+│  ├─ constants/               # Game/type/species data maps
+│  ├─ assets/                  # Logos and static assets
+│  ├─ App.jsx
+│  ├─ App.css
+│  └─ main.jsx
+├─ index.html
+├─ vite.config.js
+├─ eslint.config.js
+└─ package.json
+```
+
+## Configuration
+This project is a static site and does not require environment variables. If you introduce configuration, prefer Vite’s `VITE_*` env variables (`.env`, `.env.local`).
+
+## Data & assets
+- Primary dataset: `public/data/pokemon_all.json`
+- Sprites: `public/sprites/pokemon/` (large asset set)
+- Game logos and miscellaneous assets in `src/assets/` and `public/`
+
+## Contributing
+Issues and pull requests are welcome. Please:
+- Keep changes focused and well-described
+- Run `npm run lint` and ensure the app builds
+
+## License
+No license has been specified for this repository.
+
+## Acknowledgements
+Pokémon and all respective names/images are trademarks of their respective owners. This is a community project with no affiliation to Nintendo, Game Freak, or The Pokémon Company.
