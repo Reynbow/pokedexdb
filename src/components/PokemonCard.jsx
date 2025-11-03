@@ -16,7 +16,7 @@ function useInView(options) {
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => setInView(entry.isIntersecting),
-      options || { root: null, rootMargin: "200px 0px", threshold: 0.01 }
+      options || { root: null, rootMargin: "1000px 0px", threshold: 0.01 }
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -100,7 +100,7 @@ const deriveSpecialTags = (name) => {
   return tags;
 };
 
-function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null }) {
+function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null, eagerLoad = false }) {
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
   const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
@@ -272,7 +272,8 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
           alt={name}
           width={144}
           height={144}
-          loading="lazy"
+          loading={eagerLoad ? "eager" : "lazy"}
+          fetchpriority={eagerLoad ? "high" : undefined}
           formName={name}
           speciesId={baseSpeciesId}
           pokemonUrl={url}

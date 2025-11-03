@@ -3,6 +3,7 @@ import HeaderSection from "./sections/Header.jsx";
 import GameFilters from "./sections/GameFilters.jsx";
 import FilterTabs from "./sections/FilterTabs.jsx";
 import SpriteImage from "./components/SpriteImage.jsx";
+import PrefetchSprites from "./components/PrefetchSprites.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
@@ -2541,7 +2542,7 @@ function App() {
     if (!entries || entries.length === 0) return null;
     return (
       <div className="list">
-        {entries.map((p) => {
+        {entries.map((p, index) => {
           const pref = getRegionPreferredEntry(p);
           const parts = pref.url.split("/").filter(Boolean);
           const id = parts[parts.length - 1];
@@ -2559,6 +2560,7 @@ function App() {
               shiny={shiny}
               selectedGame={selectedGame}
               detailsCache={detailsCache}
+              eagerLoad={index < 6}
             />
           );
         })}
@@ -2570,7 +2572,7 @@ function App() {
     if (!entries || entries.length === 0) return null;
     return (
       <section className={className}>
-        {entries.map((p) => {
+        {entries.map((p, index) => {
           const pref = getRegionPreferredEntry(p);
           const parts = pref.url.split("/").filter(Boolean);
           const id = parts[parts.length - 1];
@@ -2587,9 +2589,33 @@ function App() {
               shiny={shiny}
               selectedGame={selectedGame}
               detailsCache={detailsCache}
+              eagerLoad={index < 8}
             />
           );
         })}
+        {
+          (() => {
+            const eagerCount = 8;
+            const prefetchCount = 24;
+            const items = entries
+              .slice(eagerCount, eagerCount + prefetchCount)
+              .map((p) => {
+                const pref = getRegionPreferredEntry(p);
+                const parts = pref.url.split("/").filter(Boolean);
+                const id = parts[parts.length - 1];
+                const idNum = Number(id);
+                const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                return {
+                  id,
+                  name: pref.name,
+                  url: pref.url,
+                  dexNumber: dexDisplay,
+                  shiny,
+                };
+              });
+            return <PrefetchSprites items={items} limit={24} />;
+          })()
+        }
       </section>
     );
   };
@@ -2690,7 +2716,7 @@ function App() {
                     {hasPrimaryContent && <div className="list-divider" role="separator" />}
                     <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
                     <div className="list">
-                      {megaGigantamaxFiltered.map((p) => {
+                    {megaGigantamaxFiltered.map((p, index) => {
                         const pref = getRegionPreferredEntry(p);
                         const parts = pref.url.split("/").filter(Boolean);
                         const id = parts[parts.length - 1];
@@ -2707,6 +2733,7 @@ function App() {
                             dexNumber={dexDisplay}
                             shiny={shiny}
                             detailsCache={detailsCache}
+                          eagerLoad={index < 6}
                           />
                         );
                       })}
@@ -2755,7 +2782,7 @@ function App() {
               <>
                 <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
                 <section className="grid grid-special">
-                  {megaGigantamaxFiltered.map((p) => {
+                  {megaGigantamaxFiltered.map((p, index) => {
                     const pref = getRegionPreferredEntry(p);
                     const parts = pref.url.split("/").filter(Boolean);
                     const id = parts[parts.length - 1];
@@ -2772,6 +2799,7 @@ function App() {
                         shiny={shiny}
                         selectedGame={selectedGame}
                         detailsCache={detailsCache}
+                        eagerLoad={index < 8}
                       />
                     );
                   })}

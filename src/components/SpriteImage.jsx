@@ -5,7 +5,7 @@ import { getBasePath } from "../utils/url.js";
 const SPRITE_PLACEHOLDER =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
 
-const buildSpriteSources = (id, variant, options = {}) => {
+export const buildSpriteSources = (id, variant, options = {}) => {
   const { formName, speciesId, pokemonUrl, dexNumber, shiny = false } = options;
   const clean = String(id ?? "").trim();
   const lowerName = String(formName || "").toLowerCase();
@@ -18,8 +18,24 @@ const buildSpriteSources = (id, variant, options = {}) => {
     seen.add(str);
     sources.push(str);
   };
+  const basePath = getBasePath();
+  const local = (p) => `${basePath}${p.startsWith("/") ? p.slice(1) : p}`;
 
   if (clean) {
+    // Prefer locally hosted sprites first
+    if (shiny && variant === "home") {
+      push(local(`/sprites/pokemon/other/home/shiny/${clean}.png`));
+    }
+    if (variant === "home") {
+      push(local(`/sprites/pokemon/other/home/${clean}.png`));
+    }
+    if (shiny) {
+      push(local(`/sprites/pokemon/shiny/${clean}.png`));
+    }
+    push(local(`/sprites/pokemon/other/showdown/${clean}.png`));
+    push(local(`/sprites/pokemon/${clean}.png`));
+
+    // Remote fallbacks
     if (shiny && variant === "home") {
       push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${clean}.png`);
     }
@@ -56,7 +72,6 @@ const buildSpriteSources = (id, variant, options = {}) => {
 
   if (lowerName.includes("mega")) {
     const padded = baseSpeciesId != null ? String(baseSpeciesId).padStart(4, "0") : null;
-    const basePath = getBasePath();
     const buildPath = (suffix) => {
       if (!suffix) return null;
       const cleanSuffix = suffix.startsWith("/") ? suffix.slice(1) : suffix;
