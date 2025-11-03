@@ -4872,6 +4872,28 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
+.card::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: -10px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(50% 60% at 50% 50%, rgba(124, 140, 255, 0.45) 0%, rgba(124, 140, 255, 0.22) 38%, rgba(124, 140, 255, 0.0) 70%);
+  filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateY(2px);
+}
+
+.card:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .card.is-selected {
   border-color: rgba(124, 140, 255, 0.75);
   box-shadow:
