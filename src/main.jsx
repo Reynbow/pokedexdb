@@ -1,14 +1,16 @@
-import React, { StrictMode, Component, useEffect, useState } from 'react'
+import React, { StrictMode, Component, useEffect, useState, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './design-system.css'
 import App from './App.jsx'
 import TestPage from './TestPage.jsx'
-import ItemsPage from './ItemsPage.jsx'
-import MovesPage from './MovesPage.jsx'
-import AbilitiesPage from './AbilitiesPage.jsx'
-import MinigamePage from './MinigamePage.jsx'
-import HomePage from './HomePage.jsx'
+
+// Lazy load route components for code splitting
+const ItemsPage = lazy(() => import('./ItemsPage.jsx'))
+const MovesPage = lazy(() => import('./MovesPage.jsx'))
+const AbilitiesPage = lazy(() => import('./AbilitiesPage.jsx'))
+const MinigamePage = lazy(() => import('./MinigamePage.jsx'))
+const HomePage = lazy(() => import('./HomePage.jsx'))
 
 const pathSegments = window.location.pathname.toLowerCase().split('/').filter(Boolean)
 const lastSegment = pathSegments[pathSegments.length - 1] || ''
@@ -80,6 +82,26 @@ class GlobalErrorBoundary extends Component {
   }
 }
 
+const LoadingFallback = () => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    minHeight: '50vh',
+    fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif'
+  }}>
+    <div style={{ textAlign: 'center', color: '#cbd5f5' }}>
+      <div style={{ marginBottom: 12 }}>Loading...</div>
+      <div style={{ width: 40, height: 40, border: '3px solid #333', borderTopColor: '#5d8ed2', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  </div>
+)
+
 function RootRouter() {
   const [, setVersion] = useState(0)
   useEffect(() => {
@@ -93,11 +115,41 @@ function RootRouter() {
   }, [])
 
   const hash = String(window.location.hash || '').toLowerCase()
-  if (hash.startsWith('#/home')) return <HomePage />
-  if (hash.startsWith('#/items')) return <ItemsPage />
-  if (hash.startsWith('#/moves')) return <MovesPage />
-  if (hash.startsWith('#/abilities')) return <AbilitiesPage />
-  if (hash.startsWith('#/whosthat')) return <MinigamePage />
+  if (hash.startsWith('#/home')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <HomePage />
+      </Suspense>
+    )
+  }
+  if (hash.startsWith('#/items')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <ItemsPage />
+      </Suspense>
+    )
+  }
+  if (hash.startsWith('#/moves')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <MovesPage />
+      </Suspense>
+    )
+  }
+  if (hash.startsWith('#/abilities')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AbilitiesPage />
+      </Suspense>
+    )
+  }
+  if (hash.startsWith('#/whosthat')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <MinigamePage />
+      </Suspense>
+    )
+  }
   return <App />
 }
 

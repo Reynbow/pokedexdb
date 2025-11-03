@@ -58,6 +58,7 @@ export default function FilterTabs({
                         src={getTypeIconUrl(t)} 
                         alt={t} 
                         className="type-icon"
+                        loading="lazy"
                         onError={(e) => {
                           // Hide icon if it fails to load
                           e.target.style.display = 'none';
@@ -194,6 +195,7 @@ export default function FilterTabs({
                       src={getTypeIconUrl(t)} 
                       alt={t} 
                       className="type-icon"
+                      loading="lazy"
                       onError={(e) => {
                         // Hide icon if it fails to load
                         e.target.style.display = 'none';

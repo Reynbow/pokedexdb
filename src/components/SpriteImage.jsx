@@ -106,6 +106,25 @@ const buildSpriteSources = (id, variant, options = {}) => {
     }
   }
 
+  // Add unknown pokemon sprite as fallback before placeholder
+  // Try shiny unknown sprite first if shiny is enabled
+  if (shiny && variant === "home") {
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/0.png`);
+  }
+  if (shiny) {
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/0.png`);
+  }
+  // Try animated/showdown unknown sprite if variant is showdown
+  if (variant === "showdown" || variant === "animated") {
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/0.png`);
+  }
+  // Try home variant unknown sprite
+  if (variant === "home") {
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/0.png`);
+  }
+  // Regular unknown sprite fallback
+  push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png`);
+  
   push(SPRITE_PLACEHOLDER);
   return sources;
 };
@@ -146,7 +165,9 @@ export default function SpriteImage({
   };
 
   const src = sources[Math.min(index, sources.length - 1)];
-  return <img {...rest} alt={alt} src={src} onError={handleError} />;
+  // Add lazy loading by default if not explicitly set
+  const loading = rest.loading !== undefined ? rest.loading : "lazy";
+  return <img {...rest} alt={alt} src={src} onError={handleError} loading={loading} />;
 }
 
 

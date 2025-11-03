@@ -119,6 +119,41 @@
   letter-spacing: 0.2px;
 }
 
+.title.logo {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 2.25rem;
+  color: #e6edf3;
+  letter-spacing: -1px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0 0 6px;
+}
+
+.logo-accent {
+  color: #ff4040;
+  font-weight: 700;
+  display: inline-block;
+  line-height: 1;
+}
+
+.logo-dot {
+  width: 14px;
+  height: 14px;
+  background: radial-gradient(circle, #ffaa00 30%, #ff4040 100%);
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+  transform: translateY(-0.03em);
+}
+
+.logo-db {
+  color: #e6edf3;
+  font-weight: 700;
+}
+
 .subtitle {
   margin: 0 0 20px;
   color: #a1a1aa;
@@ -1082,6 +1117,16 @@
   height: 32px;
   image-rendering: -webkit-optimize-contrast;
 }
+
+/* Darken Pokemon 0 sprite when used as fallback on items page */
+.item-icon.is-unknown-pokemon {
+  filter: brightness(0.5);
+}
+
+.item-art-wrap .detail-art.is-unknown-pokemon {
+  filter: brightness(0.5);
+}
+
 .item-name {
   text-transform: capitalize;
   font-weight: 600;
@@ -1338,6 +1383,15 @@
   width: auto;
   height: auto;
   align-self: flex-end;
+}
+
+/* Apply 2x scale only for unknown Pokemon sprite fallback */
+.detail-art.is-unknown {
+  transform: scale(0.5);
+}
+
+.detail-art.is-unknown.is-animated {
+  transform: scale(0.5);
 }
 
 .detail-title h2 {
@@ -4165,6 +4219,16 @@
     font-size: 1.75rem;
   }
   
+  .title.logo {
+    font-size: 1.75rem;
+  }
+  
+  .logo-dot {
+    width: 11px;
+    height: 11px;
+    transform: translateY(-0.03em);
+  }
+  
   /* Grid adjustments for mobile */
   .grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 140px));
@@ -4488,6 +4552,16 @@
   /* Smaller title */
   .title {
     font-size: 1.5rem;
+  }
+  
+  .title.logo {
+    font-size: 1.5rem;
+  }
+  
+  .logo-dot {
+    width: 9px;
+    height: 9px;
+    transform: translateY(-0.03em);
   }
   
   /* Adjust detail title */
@@ -5439,6 +5513,16 @@
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: rgba(15, 23, 42, 0.65);
+}
+
+.minigame-history-entry.is-uncompleted {
+  opacity: 0.7;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.minigame-history-entry.is-uncompleted .minigame-history-name {
+  color: rgba(248, 250, 252, 0.7);
 }
 
 .minigame-history-entry-primary {

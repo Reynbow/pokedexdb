@@ -295,6 +295,7 @@ export default function MovesPage() {
                           src={getTypeIconUrl(t)} 
                           alt={t} 
                           className="type-icon"
+                          loading="lazy"
                           onError={(e) => {
                             e.target.style.display = 'none';
                           }}
@@ -559,6 +560,7 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                               src={getTypeIconUrl(data.type.name)} 
                               alt={data.type.name} 
                               className="type-icon"
+                              loading="lazy"
                               onError={(e) => {
                                 e.target.style.display = 'none';
                               }}
@@ -581,7 +583,7 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                           return (
                             <span className={cls}>
                               {src ? (
-                                <img className="move-meta-icon" src={src} alt="" aria-hidden="true" />
+                                <img className="move-meta-icon" src={src} alt="" aria-hidden="true" loading="lazy" />
                               ) : null}
                               {cat ? humanize(cat) : 'Unknown'}
                             </span>
@@ -716,6 +718,7 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                                     src={getTypeIconUrl(t)} 
                                     alt={t} 
                                     className="type-icon"
+                                    loading="lazy"
                                     onError={(e) => {
                                       e.target.style.display = 'none';
                                     }}

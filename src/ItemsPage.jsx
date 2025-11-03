@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 
+const UNKNOWN_POKEMON_SPRITE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
+
 export default function ItemsPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
@@ -312,7 +314,7 @@ export default function ItemsPage() {
                         onClick={() => selectItem(i)}
                         aria-pressed={selectedItem?.name === i.name}
                       >
-                        <img className="item-icon" alt="" src={getItemSpriteUrl(i.name)} />
+                        <ItemIcon src={getItemSpriteUrl(i.name)} />
                         <span className="item-name">{i.name.replaceAll("-", " ")}</span>
                       </button>
                     ))}
@@ -327,7 +329,7 @@ export default function ItemsPage() {
                         onClick={() => selectItem(i)}
                         aria-pressed={selectedItem?.name === i.name}
                       >
-                        <img className="item-icon" alt="" src={getItemSpriteUrl(i.name)} />
+                        <ItemIcon src={getItemSpriteUrl(i.name)} />
                         <span className="item-name">{i.name.replaceAll("-", " ")}</span>
                       </button>
                     ))}
@@ -347,6 +349,23 @@ export default function ItemsPage() {
   );
 }
 
+function ItemIcon({ src }) {
+  const [imgSrc, setImgSrc] = useState(src);
+  const isUnknown = imgSrc === UNKNOWN_POKEMON_SPRITE;
+  
+  useEffect(() => {
+    setImgSrc(src);
+  }, [src]);
+  
+  const handleError = () => {
+    if (imgSrc !== UNKNOWN_POKEMON_SPRITE) {
+      setImgSrc(UNKNOWN_POKEMON_SPRITE);
+    }
+  };
+  
+  return <img className={`item-icon${isUnknown ? " is-unknown-pokemon" : ""}`} alt="" src={imgSrc} onError={handleError} />;
+}
+
 function ItemDetailPanel({ item, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -354,6 +373,7 @@ function ItemDetailPanel({ item, onClose }) {
   const [machines, setMachines] = useState([]);
   const [machinesLoading, setMachinesLoading] = useState(false);
   const [machinesError, setMachinesError] = useState(null);
+  const [itemSpriteSrc, setItemSpriteSrc] = useState(null);
 
   const englishEffect = useMemo(() => {
     const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
@@ -391,6 +411,7 @@ function ItemDetailPanel({ item, onClose }) {
       setLoading(true);
       setError(null);
       setData(null);
+      setItemSpriteSrc(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`);
       try {
         const url = `https://pokeapi.co/api/v2/item/${item.name}`;
         const j = await fetch(url).then((r) => r.json());
@@ -406,6 +427,14 @@ function ItemDetailPanel({ item, onClose }) {
       cancelled = true;
     };
   }, [item]);
+
+  const handleItemSpriteError = () => {
+    if (itemSpriteSrc !== UNKNOWN_POKEMON_SPRITE) {
+      setItemSpriteSrc(UNKNOWN_POKEMON_SPRITE);
+    }
+  };
+
+  const isItemDetailUnknown = itemSpriteSrc === UNKNOWN_POKEMON_SPRITE;
 
   // Category fetch removed since meta panel is hidden
 
@@ -447,10 +476,12 @@ function ItemDetailPanel({ item, onClose }) {
         <div className="hero-left">
           <div className="detail-art-wrap item-art-wrap">
             <img
-              className="detail-art is-static"
-              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`}
+              className={`detail-art is-static${isItemDetailUnknown ? " is-unknown-pokemon" : ""}`}
+              src={itemSpriteSrc || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`}
               alt=""
               style={{ width: 60, height: 60, transform: "none" }}
+              loading="lazy"
+              onError={handleItemSpriteError}
             />
           </div>
         </div>

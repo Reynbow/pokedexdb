@@ -4952,6 +4952,25 @@ function DetailPanel({
     }
 
     push(pixel);
+    
+    // Add unknown pokemon sprite as fallback after pixel
+    // Try shiny unknown sprite first if shiny is enabled
+    if (shiny && isFemaleActive) {
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/0.png`);
+    }
+    if (shiny) {
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/0.png`);
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/0.png`);
+    }
+    // Try animated/showdown unknown sprite if animated
+    if (animated) {
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/0.png`);
+    }
+    // Try home variant unknown sprite
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/0.png`);
+    // Regular unknown sprite fallback
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png`);
+    
     return sources.length > 0 ? sources : [pixel];
   }, [details, species, id, shiny, animated, isFemaleActive, name]);
 
@@ -4962,6 +4981,7 @@ function DetailPanel({
   }, [detailArtSources]);
 
   const detailImg = detailArtSources.length > 0 ? detailArtSources[Math.min(detailArtIndex, detailArtSources.length - 1)] : "";
+  const isUnknownSprite = detailImg && detailImg.includes("/0.png");
 
   const handleDetailArtError = useCallback(() => {
     setDetailArtIndex((prev) => {
@@ -5150,7 +5170,7 @@ function DetailPanel({
           <div className="hero-left">
             <div className="detail-art-wrap">
               <img
-                className={`detail-art ${animated ? "is-animated" : "is-static"}`}
+                className={`detail-art ${animated ? "is-animated" : "is-static"}${isUnknownSprite ? " is-unknown" : ""}`}
                 src={detailImg}
                 alt={name}
                 loading="lazy"

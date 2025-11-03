@@ -54,6 +54,15 @@ const getUtcDateKey = () => {
   return `${year}-${month}-${day}`;
 };
 
+// Seeded random number generator for deterministic but random-looking Pokemon selection
+const seededRandom = (seed) => {
+  // Simple linear congruential generator
+  const a = 1664525;
+  const c = 1013904223;
+  const m = Math.pow(2, 32);
+  return ((a * seed + c) % m) / m;
+};
+
 const hashStringToNumber = (value) => {
   let hash = 0;
   const input = String(value || "");
@@ -65,9 +74,12 @@ const hashStringToNumber = (value) => {
 };
 
 const computeDailyPokemonId = (dateKey) => {
-  const hash = hashStringToNumber(dateKey);
-  const mod = hash % MAX_POKEMON_ID;
-  return mod === 0 ? MAX_POKEMON_ID : mod;
+  // Use date as seed for random generation
+  const seed = hashStringToNumber(dateKey);
+  const random = seededRandom(seed);
+  // Generate random ID between 1 and MAX_POKEMON_ID
+  const randomId = Math.floor(random * MAX_POKEMON_ID) + 1;
+  return randomId;
 };
 
 const normalizeName = (value) =>
@@ -79,6 +91,26 @@ const normalizeName = (value) =>
     .replace(/[♂]/g, "m")
     .replace(/[^a-z0-9]/g, "");
 
+const MIN_HISTORY_DATE = "2025-11-27"; // History available starting from this date
+
+const parseDateKey = (value) => {
+  if (!value || typeof value !== "string") return null;
+  const match = /^\d{4}-\d{2}-\d{2}$/.exec(value.trim());
+  if (!match) return null;
+  const [year, month, day] = value.split("-").map((part) => Number.parseInt(part, 10));
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const isDateOnOrAfter = (value, minimum) => {
+  const target = parseDateKey(value);
+  const min = parseDateKey(minimum);
+  if (!target || !min) return false;
+  return target.getTime() >= min.getTime();
+};
+
 const loadStoredHistory = () => {
   if (typeof window === "undefined") return [];
   try {
@@ -88,6 +120,7 @@ const loadStoredHistory = () => {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((entry) => entry && typeof entry.date === "string")
+      .filter((entry) => isDateOnOrAfter(entry.date, MIN_HISTORY_DATE))
       .map((entry) => ({
         date: entry.date,
         pokemonId: entry.pokemonId ?? null,
@@ -105,7 +138,8 @@ const loadStoredHistory = () => {
 const saveHistoryRecords = (records) => {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(records));
+    const filtered = records.filter((entry) => entry && isDateOnOrAfter(entry.date, MIN_HISTORY_DATE));
+    window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.warn("[Minigame] Failed to persist history", error);
   }
@@ -154,6 +188,63 @@ const formatPerformanceSummary = (solvedAtStep) => {
   return `Solved after ${cluesUsed} ${label}`;
 };
 
+const generatePastDateKeys = (daysBack = 90) => {
+  const dates = [];
+  const minDate = parseDateKey(MIN_HISTORY_DATE);
+  if (!minDate) return dates;
+
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const startDate = todayUtc.getTime() < minDate.getTime() ? minDate : todayUtc;
+
+  for (let i = 0; i < daysBack; i += 1) {
+    const date = new Date(startDate);
+    date.setUTCDate(date.getUTCDate() - i);
+
+    if (date.getTime() < minDate.getTime()) {
+      break;
+    }
+
+    if (date.getTime() > todayUtc.getTime()) {
+      continue;
+    }
+
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    dates.push(`${year}-${month}-${day}`);
+  }
+  return dates;
+};
+
+const buildFullHistory = (completedHistory, daysBack = 90) => {
+  const completedMap = new Map();
+  completedHistory.forEach((entry) => {
+    if (entry && isDateOnOrAfter(entry.date, MIN_HISTORY_DATE)) {
+      completedMap.set(entry.date, { ...entry, isCompleted: true });
+    }
+  });
+
+  const allDateKeys = generatePastDateKeys(daysBack);
+  const fullHistory = allDateKeys.map((dateKey) => {
+    const completed = completedMap.get(dateKey);
+    if (completed) {
+      return completed;
+    }
+    const pokemonId = computeDailyPokemonId(dateKey);
+    return {
+      date: dateKey,
+      pokemonId,
+      pokemonName: null,
+      completedAt: null,
+      solvedAtStep: null,
+      isCompleted: false,
+    };
+  });
+
+  return fullHistory.sort((a, b) => b.date.localeCompare(a.date));
+};
+
 export default function MinigamePage() {
   const dailyKeyRef = useRef(getUtcDateKey());
   const dailyKey = dailyKeyRef.current;
@@ -181,6 +272,8 @@ export default function MinigamePage() {
   }
 
   const [history, setHistory] = useState(initialDataRef.current.history);
+  const [fullHistory, setFullHistory] = useState(() => buildFullHistory(initialDataRef.current.history));
+  const [pokemonNamesCache, setPokemonNamesCache] = useState(() => new Map());
   const [pokemon, setPokemon] = useState(null);
   const [step, setStep] = useState(() => (initialDataRef.current.todaysRecord ? STEP_COUNT : 1));
   const [loading, setLoading] = useState(false);
@@ -213,6 +306,74 @@ export default function MinigamePage() {
       setSolvedAtStep(todaysRecord.solvedAtStep ?? STEP_COUNT);
     }
   }, [todaysRecord, completion.isCompleted]);
+
+  // Update full history when completed history changes
+  useEffect(() => {
+    setFullHistory(buildFullHistory(history));
+  }, [history]);
+
+  // Track which Pokemon IDs we've requested to avoid duplicate requests
+  const requestedIdsRef = useRef(new Set());
+  const pokemonNamesCacheRef = useRef(new Map());
+  
+  // Sync cache ref with state
+  useEffect(() => {
+    pokemonNamesCacheRef.current = pokemonNamesCache;
+  }, [pokemonNamesCache]);
+
+  // Load Pokemon names for uncompleted games when history is shown
+  useEffect(() => {
+    if (!showHistory || fullHistory.length === 0) return;
+
+    const uncompletedEntries = fullHistory.filter((entry) => !entry.isCompleted && !entry.pokemonName);
+    if (uncompletedEntries.length === 0) return;
+
+    // Batch load Pokemon names (limit to first 30 to avoid too many requests)
+    const toLoad = uncompletedEntries
+      .slice(0, 30)
+      .filter((entry) => {
+        const cache = pokemonNamesCacheRef.current;
+        return !cache.has(entry.pokemonId) && !requestedIdsRef.current.has(entry.pokemonId);
+      });
+
+    if (toLoad.length === 0) return;
+
+    // Mark IDs as requested
+    toLoad.forEach((entry) => requestedIdsRef.current.add(entry.pokemonId));
+
+    let cancelled = false;
+    const loadPokemonNames = async () => {
+      const updates = new Map();
+      for (const entry of toLoad) {
+        if (cancelled) break;
+        try {
+          const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${entry.pokemonId}`);
+          if (response.ok) {
+            const data = await response.json();
+            const name = data?.name ? toTitleCase(data.name) : null;
+            if (name) {
+              updates.set(entry.pokemonId, name);
+            }
+          }
+        } catch {
+          // Ignore errors, will just show ID
+        }
+      }
+      if (!cancelled && updates.size > 0) {
+        setPokemonNamesCache((prev) => {
+          const merged = new Map(prev);
+          updates.forEach((name, id) => merged.set(id, name));
+          return merged;
+        });
+      }
+    };
+
+    loadPokemonNames();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showHistory, fullHistory.length]);
 
   useEffect(() => () => {
     if (confettiTimeoutRef.current) {
@@ -437,8 +598,16 @@ export default function MinigamePage() {
    [pokemon, completion.isCompleted, loading, guess, step, normalizedTargetName, generateConfetti, markCompletion]
    );
 
-  const totalHistory = history.length;
+  const totalHistory = fullHistory.length;
+  const completedCount = fullHistory.filter((entry) => entry.isCompleted).length;
   const hasHistory = totalHistory > 0;
+
+  // Get Pokemon name for history entry (from cache or entry)
+  const getHistoryPokemonName = useCallback((entry) => {
+    if (entry.pokemonName) return entry.pokemonName;
+    if (entry.isCompleted) return `#${entry.pokemonId}`;
+    return pokemonNamesCache.get(entry.pokemonId) || `#${entry.pokemonId}`;
+  }, [pokemonNamesCache]);
   const guessDisabled = loading || !!error || completion.isCompleted || !pokemon;
   const revealDetailsStep = STEP_COUNT - 1;
   const showRevealDetails = step >= revealDetailsStep;
@@ -609,26 +778,37 @@ export default function MinigamePage() {
               {showHistory && (
                 <section className="minigame-history" aria-live="polite">
                   <div className="minigame-history-header">
-                    <h3>Previous Completions</h3>
-                    <span className="minigame-history-count">{totalHistory} total</span>
+                    <h3>Game History</h3>
+                    <span className="minigame-history-count">{completedCount} of {totalHistory} completed</span>
                   </div>
                   {hasHistory ? (
                     <ul className="minigame-history-list">
-                      {history.map((entry) => (
-                        <li key={entry.date} className="minigame-history-entry">
-                          <div className="minigame-history-entry-primary">
-                            <span className="minigame-history-name">{entry.pokemonName || `#${entry.pokemonId}`}</span>
-                            <span className="minigame-history-date">{formatHistoryDate(entry.date)}</span>
-                          </div>
-                          <div className="minigame-history-entry-meta">
-                            <span className="minigame-history-id">ID #{entry.pokemonId}</span>
-                            <span className="minigame-history-time">{formatPerformanceSummary(entry.solvedAtStep)}</span>
-                          </div>
-                        </li>
-                      ))}
+                      {fullHistory.map((entry) => {
+                        const isCompleted = entry.isCompleted;
+                        const pokemonName = getHistoryPokemonName(entry);
+                        return (
+                          <li 
+                            key={entry.date} 
+                            className={`minigame-history-entry${!isCompleted ? " is-uncompleted" : ""}`}
+                          >
+                            <div className="minigame-history-entry-primary">
+                              <span className="minigame-history-name">{pokemonName}</span>
+                              <span className="minigame-history-date">{formatHistoryDate(entry.date)}</span>
+                            </div>
+                            <div className="minigame-history-entry-meta">
+                              <span className="minigame-history-id">ID #{entry.pokemonId}</span>
+                              {isCompleted ? (
+                                <span className="minigame-history-time">{formatPerformanceSummary(entry.solvedAtStep)}</span>
+                              ) : (
+                                <span className="minigame-history-time">Not completed</span>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
-                    <div className="minigame-history-empty">You haven&apos;t completed any daily challenges yet.</div>
+                    <div className="minigame-history-empty">No game history available.</div>
                   )}
                 </section>
               )}

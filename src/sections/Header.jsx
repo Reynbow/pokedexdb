@@ -15,8 +15,11 @@ function HeaderSection({
   return (
     <header className={`app-header${showFilters ? " has-filters" : ""}`}>
       <div className="container">
-        <h1 className="title">{title}</h1>
-        <p className="subtitle">{subtitle}</p>
+        <h1 className="title logo">
+          <span className="logo-accent">Pokedex</span>
+          <div className="logo-dot"></div>
+          <span className="logo-db">DB</span>
+        </h1>
         <CategoryToggle />
         <div className="search-row">
           <div className="filters-toggle" aria-label="Filters visibility">
