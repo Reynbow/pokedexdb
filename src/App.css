@@ -4068,6 +4068,14 @@
   color: #94a3b8;
 }
 
+/* Clamp hero panel catch location preview to 6 lines with ellipsis */
+.detail-panel .catch-trigger-secondary {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .catch-trigger-count {
   display: inline-flex;
   align-items: center;
