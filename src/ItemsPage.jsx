@@ -2,13 +2,13 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 
-const UNKNOWN_POKEMON_SPRITE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
-
 export default function ItemsPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [localItemsDb, setLocalItemsDb] = useState(null);
+  
   const [selectedFilter, setSelectedFilter] = useState(null);
   const [filterItemsMap, setFilterItemsMap] = useState(() => new Map());
   const [filterLoading, setFilterLoading] = useState(() => new Map());
@@ -51,9 +51,30 @@ export default function ItemsPage() {
       setLoading(true);
       setError(null);
       try {
-        const r = await fetch("https://pokeapi.co/api/v2/item?limit=20000");
-        const j = await r.json();
-        if (!cancelled) setItems(Array.isArray(j.results) ? j.results : []);
+        // Prefer local database only
+        try {
+          const localResp = await fetch("/items/items.json", { cache: "no-store" });
+          if (!cancelled && localResp?.ok) {
+            const localData = await localResp.json();
+            if (localData && typeof localData === "object") {
+              setLocalItemsDb(localData);
+              const keys = Object.keys(localData);
+              const list = keys.map((k) => ({ name: k }));
+              setItems(list);
+              return;
+            }
+          }
+          // If local DB missing or invalid, surface empty state
+          if (!cancelled) {
+            setItems([]);
+            setError(new Error("Local items database not found"));
+          }
+        } catch (e) {
+          if (!cancelled) {
+            setItems([]);
+            setError(e);
+          }
+        }
       } catch (e) {
         if (!cancelled) setError(e);
       } finally {
@@ -66,28 +87,22 @@ export default function ItemsPage() {
     };
   }, []);
 
-  // Preload filter sets/icons in the background so icons exist before click and grouped view is ready
+  // No preloading of filters; we no longer render filter chips
   useEffect(() => {
     if (!Array.isArray(items) || items.length === 0) return;
-    FILTERS.filter((f) => f.kind !== "other").forEach((f) => {
-      ensureFilterLoaded(f.key);
-    });
+    // intentionally no-op
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
-  const activeFilterSet = useMemo(() => {
-    if (!selectedFilter) return null;
-    return filterItemsMap.get(selectedFilter) || null;
-  }, [selectedFilter, filterItemsMap]);
+  const activeFilterSet = null;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    // If a filter is selected but not yet loaded, show nothing until ready
-    if (selectedFilter && !activeFilterSet) return [];
-    const base = activeFilterSet ? items.filter((i) => activeFilterSet.has(i.name)) : items;
-    const result = q ? base.filter((i) => i.name.includes(q)) : base;
+    const base = Array.isArray(items) ? items : [];
+    const constrained = localItemsDb ? base.filter((i) => !!localItemsDb[i.name]) : base;
+    const result = q ? constrained.filter((i) => i.name.includes(q)) : constrained;
     return [...result].sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, query, activeFilterSet, selectedFilter]);
+  }, [items, query, localItemsDb]);
 
   useEffect(() => {
     const onPop = () => {
@@ -142,7 +157,24 @@ export default function ItemsPage() {
   }
 
   function getItemSpriteUrl(name) {
+    // Use local image if available
+    try {
+      const entry = localItemsDb && localItemsDb[name];
+      const imgRel = Array.isArray(entry?.images) ? entry.images[0] : null;
+      if (imgRel) return `/items/${imgRel}`;
+    } catch {}
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${name}.png`;
+  }
+
+  function humanizeName(raw) {
+    const s = String(raw || "").replace(/[-_]+/g, " ").trim();
+    return s.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function getDisplayName(name) {
+    const local = localItemsDb && localItemsDb[name];
+    if (local && local.name) return String(local.name);
+    return humanizeName(name);
   }
 
   function getIconOverride(key) {
@@ -272,25 +304,7 @@ export default function ItemsPage() {
               Reset
             </button>
           </div>
-          <div className="items-filter-row" role="tablist" aria-label="Item categories">
-            {FILTERS.map((f) => {
-              const isOn = selectedFilter === f.key;
-              const isLoading = filterLoading.get(f.key);
-              const icon = getIconOverride(f.key) || filterIconMap.get(f.key);
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  className={`filter-chip items-chip${isOn ? " is-on" : ""}`}
-                  aria-pressed={isOn}
-                  onClick={() => onClickFilter(f.key)}
-                >
-                  {icon ? <img className="filter-icon" src={icon} alt="" aria-hidden="true" /> : null}
-                  {f.label}
-                </button>
-              );
-            })}
-          </div>
+          
         </div>
       </header>
       <main className="container">
@@ -304,42 +318,25 @@ export default function ItemsPage() {
           <section className="content split">
             <div className="list-panel">
               <div className="list-scroll">
-                {selectedFilter ? (
-                  <div className="list items-list">
-                    {filtered.map((i) => (
-                      <button
-                        key={i.name}
-                        type="button"
-                        className={`item-row${selectedItem?.name === i.name ? " is-selected" : ""}`}
-                        onClick={() => selectItem(i)}
-                        aria-pressed={selectedItem?.name === i.name}
-                      >
-                        <ItemIcon src={getItemSpriteUrl(i.name)} />
-                        <span className="item-name">{i.name.replaceAll("-", " ")}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="list items-list">
-                    {filtered.map((i) => (
-                      <button
-                        key={i.name}
-                        type="button"
-                        className={`item-row${selectedItem?.name === i.name ? " is-selected" : ""}`}
-                        onClick={() => selectItem(i)}
-                        aria-pressed={selectedItem?.name === i.name}
-                      >
-                        <ItemIcon src={getItemSpriteUrl(i.name)} />
-                        <span className="item-name">{i.name.replaceAll("-", " ")}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="list items-list">
+                  {filtered.map((i) => (
+                    <button
+                      key={i.name}
+                      type="button"
+                      className={`item-row${selectedItem?.name === i.name ? " is-selected" : ""}`}
+                      onClick={() => selectItem(i)}
+                      aria-pressed={selectedItem?.name === i.name}
+                    >
+                      <img className="item-icon" alt="" src={getItemSpriteUrl(i.name)} />
+                      <span className="item-name">{getDisplayName(i.name)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <aside className="detail-panel">
               <div className="detail-inner">
-                <ItemDetailPanel item={selectedItem} onClose={clearSelection} />
+                <ItemDetailPanel item={selectedItem} onClose={clearSelection} localDb={localItemsDb} />
               </div>
             </aside>
           </section>
@@ -349,211 +346,251 @@ export default function ItemsPage() {
   );
 }
 
-function ItemIcon({ src }) {
-  const [imgSrc, setImgSrc] = useState(src);
-  const isUnknown = imgSrc === UNKNOWN_POKEMON_SPRITE;
-  
-  useEffect(() => {
-    setImgSrc(src);
-  }, [src]);
-  
-  const handleError = () => {
-    if (imgSrc !== UNKNOWN_POKEMON_SPRITE) {
-      setImgSrc(UNKNOWN_POKEMON_SPRITE);
-    }
-  };
-  
-  return <img className={`item-icon${isUnknown ? " is-unknown-pokemon" : ""}`} alt="" src={imgSrc} onError={handleError} />;
-}
-
-function ItemDetailPanel({ item, onClose }) {
-  const [data, setData] = useState(null);
+function ItemDetailPanel({ item, onClose, localDb }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [machines, setMachines] = useState([]);
-  const [machinesLoading, setMachinesLoading] = useState(false);
-  const [machinesError, setMachinesError] = useState(null);
   const [itemSpriteSrc, setItemSpriteSrc] = useState(null);
+  const [availableGames, setAvailableGames] = useState([]);
+  const [selectedGame, setSelectedGame] = useState("");
+  
 
-  const englishEffect = useMemo(() => {
-    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.effect || en.short_effect || "") : "";
-  }, [data]);
-  const englishFlavour = useMemo(() => {
-    const entries = Array.isArray(data?.flavor_text_entries) ? data.flavor_text_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.text || en.flavor_text || "") : "";
-  }, [data]);
-  const englishShortEffect = useMemo(() => {
-    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.short_effect || "") : "";
-  }, [data]);
-
-  const effectLines = useMemo(() => {
-    const raw = String(englishEffect || "");
-    const cleaned = raw.replace(/\s+/g, " ").trim();
-    if (!cleaned) return [];
-    const parts = cleaned
-      .split(/(?<=[.!?])\s+|;\s+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return parts;
-  }, [englishEffect]);
+  // Local helper to infer generation from game text
+  const inferGenerationFromGameText = (text) => {
+    const t = String(text || "").toLowerCase();
+    if (t.includes("red") || t.includes("blue") || t.includes("yellow")) return 1;
+    if (t.includes("gold") || t.includes("silver") || t.includes("crystal")) return 2;
+    if (t.includes("ruby") || t.includes("sapphire") || t.includes("emerald") || t.includes("firered") || t.includes("leafgreen")) return 3;
+    if (t.includes("diamond") || t.includes("pearl") || t.includes("platinum") || t.includes("heartgold") || t.includes("soulsilver")) return 4;
+    if (t.includes("black 2") || t.includes("white 2") || (/\bblack\b/.test(t) && !t.includes("blackberry")) || /\bwhite\b/.test(t)) return 5;
+    if (t.includes("x ") || t.startsWith("x") || t.includes(" y ") || t.endsWith(" y") || t.startsWith("y ") || t.includes("omega ruby") || t.includes("alpha sapphire")) return 6;
+    if (t.includes("sun") || t.includes("moon") || t.includes("ultra sun") || t.includes("ultra moon") || t.includes("let's go, pikachu") || t.includes("let's go, eevee")) return 7;
+    if (t.includes("sword") || t.includes("shield") || t.includes("brilliant diamond") || t.includes("shining pearl") || t.includes("legends: arceus") || t.includes("legends arceus") || t.includes("isle of armor") || t.includes("crown tundra")) return 8;
+    if (t.includes("scarlet") || t.includes("violet") || t.includes("the teal mask") || t.includes("the indigo disk") || t.includes("legends: z-a")) return 9;
+    return null;
+  };
 
   const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const entry = useMemo(() => (localDb && item ? localDb[item.name] : null), [localDb, item]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       if (!item) return;
       setLoading(true);
-      setError(null);
-      setData(null);
-      setItemSpriteSrc(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`);
+      // Prefer local image
       try {
-        const url = `https://pokeapi.co/api/v2/item/${item.name}`;
-        const j = await fetch(url).then((r) => r.json());
-        if (!cancelled) setData(j);
-      } catch (e) {
-        if (!cancelled) setError(e);
-      } finally {
-        if (!cancelled) setLoading(false);
+        const entry = localDb && localDb[item.name];
+        const imgRel = Array.isArray(entry?.images) ? entry.images[0] : null;
+        if (imgRel) {
+          setItemSpriteSrc(`/items/${imgRel}`);
+        } else {
+          setItemSpriteSrc(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`);
+        }
+      } catch {
+        setItemSpriteSrc(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`);
       }
+      if (!cancelled) setLoading(false);
     }
     load();
     return () => {
       cancelled = true;
     };
-  }, [item]);
+  }, [item, localDb]);
 
-  const handleItemSpriteError = () => {
-    if (itemSpriteSrc !== UNKNOWN_POKEMON_SPRITE) {
-      setItemSpriteSrc(UNKNOWN_POKEMON_SPRITE);
-    }
-  };
-
-  const isItemDetailUnknown = itemSpriteSrc === UNKNOWN_POKEMON_SPRITE;
-
-  // Category fetch removed since meta panel is hidden
-
+  // Build available games from local DB and default-select latest
   useEffect(() => {
-    let cancelled = false;
-    async function loadMachines() {
-      const entries = Array.isArray(data?.machines) ? data.machines : [];
-      if (entries.length === 0) { setMachines([]); return; }
-      setMachinesLoading(true);
-      setMachinesError(null);
-      try {
-        const results = await Promise.all(entries.map(async (m) => {
-          try {
-            const j = await fetch(m.machine.url).then((r) => r.json());
-            return { move: j?.move?.name, version_group: j?.version_group?.name };
-          } catch {
-            return null;
-          }
-        }));
-        if (!cancelled) setMachines(results.filter(Boolean));
-      } catch (e) {
-        if (!cancelled) setMachinesError(e);
-      } finally {
-        if (!cancelled) setMachinesLoading(false);
+    if (!entry) { setAvailableGames([]); setSelectedGame(""); return; }
+    const gameSet = new Set();
+    const groups = Array.isArray(entry.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
+    groups.forEach((g) => {
+      (Array.isArray(g?.games) ? g.games : []).forEach((name) => {
+        const n = String(name || "").trim();
+        if (n) gameSet.add(n);
+      });
+    });
+    const acquisitions = Array.isArray(entry.acquisition) ? entry.acquisition : [];
+    acquisitions.forEach((a) => {
+      const scope = String(a?.scope || "");
+      scope.split(/,|\band\b|\/|\+|·/i).forEach((part) => {
+        const n = String(part || "").trim();
+        if (n) gameSet.add(n);
+      });
+    });
+    const games = Array.from(gameSet);
+    const withGen = games.map((g) => ({ name: g, gen: inferGenerationFromGameText(g) || 0 }));
+    withGen.sort((a, b) => (a.gen !== b.gen ? a.gen - b.gen : a.name.localeCompare(b.name)));
+    setAvailableGames(withGen.map((x) => x.name));
+    const latest = withGen.length > 0 ? withGen[withGen.length - 1].name : "";
+    setSelectedGame(latest);
+  }, [entry]);
+
+  // No pocket/category fetch; we do not query PokeAPI
+
+  const selectFlavorText = useMemo(() => {
+    if (!entry) return "";
+    const groups = Array.isArray(entry?.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
+    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedGame));
+    if (direct && direct.text) return direct.text;
+    let best = null;
+    let bestGen = -1;
+    for (const g of groups) {
+      const gen = Math.max(...(Array.isArray(g?.games) ? g.games.map((n) => inferGenerationFromGameText(String(n))) : []).filter((x) => typeof x === "number"));
+      if (Number.isFinite(gen) && gen >= bestGen && g.text) {
+        bestGen = gen;
+        best = g.text;
       }
     }
-    loadMachines();
-    return () => { cancelled = true; };
-  }, [data?.machines]);
+    return best || "";
+  }, [entry, selectedGame]);
+
+  const selectAcquisitionText = useMemo(() => {
+    if (!entry) return "";
+    const acquisitions = Array.isArray(entry?.acquisition) ? entry.acquisition : [];
+    const direct = acquisitions.find((a) => String(a?.scope || "").split(/,|\band\b|\/|\+|·/i).some((p) => String(p).trim() === selectedGame));
+    if (direct && direct.text) return direct.text;
+    let best = null;
+    let bestGen = -1;
+    for (const a of acquisitions) {
+      const scope = String(a?.scope || "");
+      const gens = scope.split(/,|\band\b|\/|\+|·/i).map((p) => inferGenerationFromGameText(String(p))).filter((x) => typeof x === "number");
+      const gen = gens.length > 0 ? Math.max(...gens) : -1;
+      if (gen >= bestGen && a.text) {
+        bestGen = gen;
+        best = a.text;
+      }
+    }
+    return best || "";
+  }, [entry, selectedGame]);
+
+  const selectShoppingDetails = useMemo(() => {
+    if (!entry) return [];
+    const groups = Array.isArray(entry?.shopping_by_group) ? entry.shopping_by_group : [];
+    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedGame));
+    if (direct) {
+      const lines = [];
+      // Support both free-text and structured fields in group entries
+      const locs = Array.isArray(direct.locations) ? direct.locations :
+        (direct.location ? [direct.location] : []);
+      const buy = direct.buy_price != null ? direct.buy_price : (direct.price?.buy ?? null);
+      const sell = direct.sell_price != null ? direct.sell_price : (direct.price?.sell ?? null);
+      if (locs.length > 0) lines.push(`Location: ${locs.join(", ")}`);
+      if (buy != null) lines.push(`Buy: ${buy}`);
+      if (sell != null) lines.push(`Sell: ${sell}`);
+      if (direct.text && lines.length === 0) return [direct.text];
+      if (lines.length > 0) return lines;
+    }
+    const lines = [];
+    if (entry.cost != null) lines.push(`Cost: ${entry.cost}`);
+    if (entry.buy_price != null) lines.push(`Buy: ${entry.buy_price}`);
+    if (entry.sell_price != null) lines.push(`Sell: ${entry.sell_price}`);
+    // Derive shopping location from common fields
+    const entryLocs =
+      (Array.isArray(entry.shop_locations) ? entry.shop_locations : null) ||
+      (Array.isArray(entry.purchase_locations) ? entry.purchase_locations : null) ||
+      (Array.isArray(entry.buy_locations) ? entry.buy_locations : null) ||
+      (Array.isArray(entry.locations) ? entry.locations : null) ||
+      (Array.isArray(entry.shops) ? entry.shops : null);
+    if (Array.isArray(entryLocs) && entryLocs.length > 0) lines.push(`Location: ${entryLocs.join(", ")}`);
+    if (Array.isArray(entry.attributes) && entry.attributes.length > 0) lines.push(`Attributes: ${entry.attributes.join(", ")}`);
+    if (lines.length > 0) return lines;
+    let best = null; let bestGen = -1;
+    for (const g of groups) {
+      const gen = Math.max(...(Array.isArray(g?.games) ? g.games.map((n) => inferGenerationFromGameText(String(n))) : []).filter((x) => typeof x === "number"));
+      if (Number.isFinite(gen) && gen >= bestGen && g.text) { bestGen = gen; best = g.text; }
+    }
+    return best ? [best] : [];
+  }, [entry, selectedGame]);
+
+  const selectPocketCategory = useMemo(() => {
+    if (!entry) return { pocket: null, category: null };
+    const pocketGroups = Array.isArray(entry?.pocket_by_group) ? entry.pocket_by_group : [];
+    const direct = pocketGroups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedGame));
+    const pocket = direct?.pocket || entry.pocket || null;
+    const category = entry.category || null;
+    return { pocket, category };
+  }, [entry, selectedGame]);
+
+  // No machine data fetch; we use only local JSON
 
   if (!item) return <div />;
 
   return (
     <>
       <div className="detail-title detail-title-top">
-        <h2>{item.name.replaceAll("-", " ")}</h2>
+        <h2>{(localDb && localDb[item.name] && localDb[item.name].name) ? localDb[item.name].name : humanize(item.name)}</h2>
       </div>
       <div className="detail-hero item-hero">
         <div className="hero-left">
           <div className="detail-art-wrap item-art-wrap">
             <img
-              className={`detail-art is-static${isItemDetailUnknown ? " is-unknown-pokemon" : ""}`}
+              className="detail-art is-static"
               src={itemSpriteSrc || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`}
               alt=""
               style={{ width: 60, height: 60, transform: "none" }}
               loading="lazy"
-              onError={handleItemSpriteError}
             />
           </div>
         </div>
         <div className="hero-right">
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            {availableGames.length > 0 ? (
+              <select
+                className="game-select"
+                aria-label="Select game variant"
+                value={selectedGame}
+                onChange={(e) => setSelectedGame(e.target.value)}
+              >
+                {availableGames.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            ) : null}
+          </div>
           {loading ? (
             <div className="list-empty">Loading</div>
-          ) : error ? (
-            <div className="list-empty">Failed to load item.</div>
           ) : (
             <>
-              {/* Meta panel (category/pocket/cost/fling) removed as requested */}
-
-              {englishShortEffect || englishEffect ? (
-                <div className="effect-window">
-                  {englishShortEffect ? <div className="effect-summary">{englishShortEffect}</div> : null}
-                  {effectLines.length > 0 ? (
-                    <ul className="effect-list">
-                      {effectLines.map((line, idx) => (
-                        <li key={idx}>{line}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              ) : null}
-
-
-              {Array.isArray(data?.held_by_pokemon) && data.held_by_pokemon.length > 0 ? (
+              {selectFlavorText ? (
                 <section className="about">
-                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Held By Pokémon</h3>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {data.held_by_pokemon.slice(0, 20).map((h) => (
-                      <li key={h.pokemon?.name}>
-                        {humanize(h.pokemon?.name)}
-                        {Array.isArray(h.version_details) && h.version_details[0]?.rarity != null ? ` · Rarity: ${h.version_details[0].rarity}` : ""}
-                      </li>
-                    ))}
-                  </ul>
+                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Flavour Text</h3>
+                  <div>{selectFlavorText}</div>
                 </section>
               ) : null}
 
-              {machinesLoading ? (
-                <section className="about"><h3 className="list-subheading" style={{ textAlign: "left" }}>Machines</h3><div>Loading</div></section>
-              ) : machinesError ? null : machines.length > 0 ? (
+              {selectAcquisitionText ? (
                 <section className="about">
-                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Machines</h3>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {machines.map((m, idx) => (
-                      <li key={idx}>{humanize(m.move)}{m.version_group ? ` · ${humanize(m.version_group)}` : ""}</li>
-                    ))}
-                  </ul>
+                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Location</h3>
+                  <div>{selectAcquisitionText}</div>
                 </section>
               ) : null}
+
+              <section className="about">
+                <h3 className="list-subheading" style={{ textAlign: "left" }}>Shopping Details</h3>
+                {selectShoppingDetails.length > 0 ? (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {selectShoppingDetails.map((line, idx) => (
+                      <li key={idx}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div>—</div>
+                )}
+              </section>
+
+              <section className="about">
+                <h3 className="list-subheading" style={{ textAlign: "left" }}>Pocket</h3>
+                {selectPocketCategory.pocket || selectPocketCategory.category ? (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {selectPocketCategory.pocket ? <li>Pocket: {selectPocketCategory.pocket}</li> : null}
+                    {selectPocketCategory.category ? <li>Category: {selectPocketCategory.category}</li> : null}
+                  </ul>
+                ) : (
+                  <div>—</div>
+                )}
+              </section>
             </>
           )}
         </div>
-        {Array.isArray(data?.flavor_text_entries) && data.flavor_text_entries.length > 0 ? (
-          <div className="hero-wide-section">
-            <section className="about">
-              <div className="flavor-window">
-                {data.flavor_text_entries
-                  .filter((e) => e?.language?.name === "en")
-                  .slice(0, 6)
-                  .map((e, idx) => (
-                    <div key={idx} className="flavor-row">
-                      <div className="flavor-meta">{humanize(e.version_group?.name || e.version?.name || "")}</div>
-                      <div className="flavor-text">{e.text || e.flavor_text}</div>
-                    </div>
-                  ))}
-              </div>
-            </section>
-          </div>
-        ) : null}
+        {/* Panels above handle content; removed legacy wide flavor list */}
       </div>
     </>
   );
