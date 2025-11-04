@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import HeaderSection from "./sections/Header.jsx";
 import GameFilters from "./sections/GameFilters.jsx";
 import FilterTabs from "./sections/FilterTabs.jsx";
@@ -1612,6 +1612,8 @@ function App() {
   const pokedexPromiseRef = useRef(new Map());
   const lastSelectedIdRef = useRef(null);
   const lastSelectedFlashTimerRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const pendingCenterIdRef = useRef(null);
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -2079,6 +2081,7 @@ function App() {
   const selectPokemon = (id, name, url, options) => {
     // Remember which card was selected so we can restore/flash it after closing
     try { lastSelectedIdRef.current = String(id); } catch {}
+    try { pendingCenterIdRef.current = String(id); } catch {}
     const opts = options || {};
     if (opts.forceNational) {
       setSelectedDex("national");
@@ -2107,16 +2110,12 @@ function App() {
     // After closing, scroll back to the previously selected card in the grid and highlight it
     const targetId = lastSelectedIdRef.current ? String(lastSelectedIdRef.current) : null;
     if (!targetId) return;
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let attempts = 0;
     const tryRestore = () => {
       const node = document.querySelector(`.card[data-id="${CSS.escape(targetId)}"]`);
       if (node) {
         try {
-          node.scrollIntoView({ block: "center", inline: "nearest", behavior: prefersReducedMotion ? "auto" : "smooth" });
+          node.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
         } catch {
           // older browsers may not support options; fallback
           node.scrollIntoView(true);
@@ -2137,6 +2136,33 @@ function App() {
     };
     requestAnimationFrame(tryRestore);
   };
+
+  // Center the selected card in the list panel immediately (no animation)
+  useLayoutEffect(() => {
+    if (!selected) return;
+    const id = pendingCenterIdRef.current ? String(pendingCenterIdRef.current) : null;
+    if (!id) return;
+    const container = listScrollRef.current;
+    if (!container) return;
+    const node = container.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+    if (!node) return;
+    try {
+      // Compute offset of node relative to the scroll container
+      const getOffsetTopRelative = (parent, el) => {
+        let top = 0;
+        let current = el;
+        while (current && current !== parent) {
+          top += current.offsetTop;
+          current = current.offsetParent;
+        }
+        return top;
+      };
+      const nodeTop = getOffsetTopRelative(container, node);
+      const target = Math.max(0, nodeTop - Math.max(0, (container.clientHeight - node.clientHeight) / 2));
+      container.scrollTop = target;
+    } catch {}
+    pendingCenterIdRef.current = null;
+  }, [selected]);
 
   // When region changes, migrate current selection to region-preferred form if available
   useEffect(() => {
@@ -2745,7 +2771,7 @@ function App() {
         {selected ? (
           <section className="content split">
             <div className="list-panel">
-              <div className="list-scroll">
+              <div className="list-scroll" ref={listScrollRef}>
                 {listPrimaryContent}
                 {megaGigantamaxFiltered.length > 0 && (
                   <div className="list-special">

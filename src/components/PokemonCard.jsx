@@ -203,19 +203,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
     };
   }, [id, url, inView, cache]);
 
-  useEffect(() => {
-    const node = cardRef.current;
-    if (!selected || !node || !node.isConnected) return;
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    node.scrollIntoView({
-      block: "center",
-      inline: "nearest",
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-    });
-  }, [selected]);
+  // Removed auto-scrolling on selection to avoid distracting scroll animations.
 
   const dexNo = dexNumber || `#${id}`;
 
