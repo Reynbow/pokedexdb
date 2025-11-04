@@ -776,6 +776,33 @@
 }
 
 
+.filter-tabs-container .filters-desktop .type-filters .type-chip,
+.filter-tabs-container .filter-tabs-content .type-filters .type-chip {
+  justify-content: center; /* center text regardless of logo position */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 1); /* darker text shadow on type filters */
+}
+
+.filter-tabs-container .filters-desktop .type-filters .type-chip .type-name,
+.filter-tabs-container .filter-tabs-content .type-filters .type-chip .type-name {
+  position: relative;
+  z-index: 2; /* keep text above the logo */
+  text-align: center;
+}
+
+/* Enlarge the logo 3x and absolutely position it so it doesn't affect layout */
+.filter-tabs-container .filters-desktop .type-filters .type-chip .type-icon,
+.filter-tabs-container .filter-tabs-content .type-filters .type-chip .type-icon {
+  position: absolute;
+  width: 52px;   /* 3x the base 18px */
+  height: 52px;  /* 3x the base 18px */
+  left: -8px;    /* push partly outside the chip on the left */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;    /* behind the text */
+  pointer-events: none;
+  opacity: 0.5;  /* 50% opacity */
+}
+
 .type-chip::before {
   content: '';
   position: absolute;
