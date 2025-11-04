@@ -1610,6 +1610,8 @@ function App() {
   const gameFiltersRef = useRef(null);
   const pokedexCacheRef = useRef(new Map());
   const pokedexPromiseRef = useRef(new Map());
+  const lastSelectedIdRef = useRef(null);
+  const lastSelectedFlashTimerRef = useRef(null);
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -2075,6 +2077,8 @@ function App() {
   }, [pokemon, bootSelection, resolveSelectionFromLocation]);
 
   const selectPokemon = (id, name, url, options) => {
+    // Remember which card was selected so we can restore/flash it after closing
+    try { lastSelectedIdRef.current = String(id); } catch {}
     const opts = options || {};
     if (opts.forceNational) {
       setSelectedDex("national");
@@ -2100,6 +2104,38 @@ function App() {
   const clearSelection = () => {
     updatePokemonLocation(null, { pruneKeys: ["i", "m", "a", "p"] });
     setSelected(null);
+    // After closing, scroll back to the previously selected card in the grid and highlight it
+    const targetId = lastSelectedIdRef.current ? String(lastSelectedIdRef.current) : null;
+    if (!targetId) return;
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let attempts = 0;
+    const tryRestore = () => {
+      const node = document.querySelector(`.card[data-id="${CSS.escape(targetId)}"]`);
+      if (node) {
+        try {
+          node.scrollIntoView({ block: "center", inline: "nearest", behavior: prefersReducedMotion ? "auto" : "smooth" });
+        } catch {
+          // older browsers may not support options; fallback
+          node.scrollIntoView(true);
+        }
+        node.classList.add("is-previous");
+        if (lastSelectedFlashTimerRef.current) {
+          clearTimeout(lastSelectedFlashTimerRef.current);
+        }
+        lastSelectedFlashTimerRef.current = setTimeout(() => {
+          try { node.classList.remove("is-previous"); } catch {}
+        }, 3800);
+        return;
+      }
+      if (attempts < 12) {
+        attempts += 1;
+        requestAnimationFrame(tryRestore);
+      }
+    };
+    requestAnimationFrame(tryRestore);
   };
 
   // When region changes, migrate current selection to region-preferred form if available
@@ -5691,6 +5727,7 @@ function DetailPanel({
           onRetry={handleAbilityRetry}
           onSelectPokemon={onSelectPokemon}
           currentPokemonId={id}
+          shiny={shiny}
         />
       )}
       {isFlavorModalOpen && flavorTextVersions.length > 0 && (
@@ -6649,7 +6686,7 @@ function GameAvailabilityModal({ games, activeGame, pokemonName, onClose }) {
   );
 }
 
-function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSelectPokemon, currentPokemonId }) {
+function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSelectPokemon, currentPokemonId, shiny = false }) {
   const abilityTitleId = ability?.name ? `ability-modal-title-${ability.name}` : undefined;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTypes, setSelectedTypes] = useState([]);

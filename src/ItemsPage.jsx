@@ -349,8 +349,18 @@ export default function ItemsPage() {
 function ItemDetailPanel({ item, onClose, localDb }) {
   const [loading, setLoading] = useState(false);
   const [itemSpriteSrc, setItemSpriteSrc] = useState(null);
+  // Global games (union) - retained but not primary
   const [availableGames, setAvailableGames] = useState([]);
   const [selectedGame, setSelectedGame] = useState("");
+  // Per-panel game selections
+  const [flavorGames, setFlavorGames] = useState([]);
+  const [selectedFlavorGame, setSelectedFlavorGame] = useState("");
+  const [locationGames, setLocationGames] = useState([]);
+  const [selectedLocationGame, setSelectedLocationGame] = useState("");
+  const [shoppingGames, setShoppingGames] = useState([]);
+  const [selectedShoppingGame, setSelectedShoppingGame] = useState("");
+  const [pocketGames, setPocketGames] = useState([]);
+  const [selectedPocketGame, setSelectedPocketGame] = useState("");
   
 
   // Local helper to infer generation from game text
@@ -396,7 +406,7 @@ function ItemDetailPanel({ item, onClose, localDb }) {
     };
   }, [item, localDb]);
 
-  // Build available games from local DB and default-select latest
+  // Build available games from local DB and default-select latest (global)
   useEffect(() => {
     if (!entry) { setAvailableGames([]); setSelectedGame(""); return; }
     const gameSet = new Set();
@@ -423,12 +433,57 @@ function ItemDetailPanel({ item, onClose, localDb }) {
     setSelectedGame(latest);
   }, [entry]);
 
+  // Build per-panel game lists and defaults
+  useEffect(() => {
+    if (!entry) {
+      setFlavorGames([]); setSelectedFlavorGame("");
+      setLocationGames([]); setSelectedLocationGame("");
+      setShoppingGames([]); setSelectedShoppingGame("");
+      setPocketGames([]); setSelectedPocketGame("");
+      return;
+    }
+    // Flavor games
+    const fg = new Set();
+    const fgroups = Array.isArray(entry.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
+    fgroups.forEach(g => (Array.isArray(g?.games) ? g.games : []).forEach(n => { const t = String(n||"").trim(); if (t) fg.add(t); }));
+    const fga = Array.from(fg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
+      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
+    setFlavorGames(fga);
+    setSelectedFlavorGame(fga[fga.length-1] || "");
+    // Location games
+    const lg = new Set();
+    const acq = Array.isArray(entry.acquisition) ? entry.acquisition : [];
+    acq.forEach(a => {
+      String(a?.scope||"").split(/,|\band\b|\/|\+|·/i).forEach(p => { const t = String(p||"").trim(); if (t) lg.add(t); });
+    });
+    const lga = Array.from(lg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
+      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
+    setLocationGames(lga);
+    setSelectedLocationGame(lga[lga.length-1] || "");
+    // Shopping games
+    const sg = new Set();
+    const sgroups = Array.isArray(entry.shopping_by_group) ? entry.shopping_by_group : [];
+    sgroups.forEach(g => (Array.isArray(g?.games) ? g.games : []).forEach(n => { const t = String(n||"").trim(); if (t) sg.add(t); }));
+    const sga = Array.from(sg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
+      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
+    setShoppingGames(sga);
+    setSelectedShoppingGame(sga[sga.length-1] || "");
+    // Pocket games
+    const pg = new Set();
+    const pgroups = Array.isArray(entry.pocket_by_group) ? entry.pocket_by_group : [];
+    pgroups.forEach(g => (Array.isArray(g?.games) ? g.games : []).forEach(n => { const t = String(n||"").trim(); if (t) pg.add(t); }));
+    const pga = Array.from(pg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
+      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
+    setPocketGames(pga);
+    setSelectedPocketGame(pga[pga.length-1] || "");
+  }, [entry]);
+
   // No pocket/category fetch; we do not query PokeAPI
 
   const selectFlavorText = useMemo(() => {
     if (!entry) return "";
     const groups = Array.isArray(entry?.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
-    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedGame));
+    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedFlavorGame));
     if (direct && direct.text) return direct.text;
     let best = null;
     let bestGen = -1;
@@ -440,12 +495,12 @@ function ItemDetailPanel({ item, onClose, localDb }) {
       }
     }
     return best || "";
-  }, [entry, selectedGame]);
+  }, [entry, selectedFlavorGame]);
 
   const selectAcquisitionText = useMemo(() => {
     if (!entry) return "";
     const acquisitions = Array.isArray(entry?.acquisition) ? entry.acquisition : [];
-    const direct = acquisitions.find((a) => String(a?.scope || "").split(/,|\band\b|\/|\+|·/i).some((p) => String(p).trim() === selectedGame));
+    const direct = acquisitions.find((a) => String(a?.scope || "").split(/,|\band\b|\/|\+|·/i).some((p) => String(p).trim() === selectedLocationGame));
     if (direct && direct.text) return direct.text;
     let best = null;
     let bestGen = -1;
@@ -459,12 +514,12 @@ function ItemDetailPanel({ item, onClose, localDb }) {
       }
     }
     return best || "";
-  }, [entry, selectedGame]);
+  }, [entry, selectedLocationGame]);
 
   const selectShoppingDetails = useMemo(() => {
     if (!entry) return [];
     const groups = Array.isArray(entry?.shopping_by_group) ? entry.shopping_by_group : [];
-    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedGame));
+    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedShoppingGame));
     if (direct) {
       const lines = [];
       // Support both free-text and structured fields in group entries
@@ -498,16 +553,16 @@ function ItemDetailPanel({ item, onClose, localDb }) {
       if (Number.isFinite(gen) && gen >= bestGen && g.text) { bestGen = gen; best = g.text; }
     }
     return best ? [best] : [];
-  }, [entry, selectedGame]);
+  }, [entry, selectedShoppingGame]);
 
   const selectPocketCategory = useMemo(() => {
     if (!entry) return { pocket: null, category: null };
     const pocketGroups = Array.isArray(entry?.pocket_by_group) ? entry.pocket_by_group : [];
-    const direct = pocketGroups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedGame));
+    const direct = pocketGroups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedPocketGame));
     const pocket = direct?.pocket || entry.pocket || null;
     const category = entry.category || null;
     return { pocket, category };
-  }, [entry, selectedGame]);
+  }, [entry, selectedPocketGame]);
 
   // No machine data fetch; we use only local JSON
 
@@ -519,78 +574,94 @@ function ItemDetailPanel({ item, onClose, localDb }) {
         <h2>{(localDb && localDb[item.name] && localDb[item.name].name) ? localDb[item.name].name : humanize(item.name)}</h2>
       </div>
       <div className="detail-hero item-hero">
-        <div className="hero-left">
-          <div className="detail-art-wrap item-art-wrap">
-            <img
-              className="detail-art is-static"
-              src={itemSpriteSrc || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`}
-              alt=""
-              style={{ width: 60, height: 60, transform: "none" }}
-              loading="lazy"
-            />
-          </div>
-        </div>
-        <div className="hero-right">
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            {availableGames.length > 0 ? (
-              <select
-                className="game-select"
-                aria-label="Select game variant"
-                value={selectedGame}
-                onChange={(e) => setSelectedGame(e.target.value)}
-              >
-                {availableGames.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-          {loading ? (
-            <div className="list-empty">Loading</div>
-          ) : (
-            <>
-              {selectFlavorText ? (
-                <section className="about">
-                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Flavour Text</h3>
-                  <div>{selectFlavorText}</div>
-                </section>
-              ) : null}
+        {loading ? (
+          <div className="list-empty">Loading</div>
+        ) : (
+          <>
+            {/* Basic info */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8 }}>
+                <img
+                  className="detail-art is-static"
+                  src={itemSpriteSrc || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`}
+                  alt=""
+                  style={{ width: 60, height: 60, transform: "none" }}
+                  loading="lazy"
+                />
+              </div>
+              <div>Type: {(entry && (entry.type || entry.category)) || "—"}</div>
+              <div>Buy: {(entry && (entry.buy_price ?? entry.price?.buy)) ?? "—"}</div>
+              <div>Sell: {(entry && (entry.sell_price ?? entry.price?.sell)) ?? "—"}</div>
+            </div>
 
-              {selectAcquisitionText ? (
-                <section className="about">
-                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Location</h3>
-                  <div>{selectAcquisitionText}</div>
-                </section>
-              ) : null}
+            {/* Flavour Text */}
+            <section className="about" style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Flavour Text</h3>
+                {flavorGames.length > 0 ? (
+                  <select aria-label="Select game for flavour" value={selectedFlavorGame} onChange={(e)=>setSelectedFlavorGame(e.target.value)}>
+                    {flavorGames.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                ) : null}
+              </div>
+              <div>{selectFlavorText || "—"}</div>
+            </section>
 
-              <section className="about">
-                <h3 className="list-subheading" style={{ textAlign: "left" }}>Shopping Details</h3>
-                {selectShoppingDetails.length > 0 ? (
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {selectShoppingDetails.map((line, idx) => (
-                      <li key={idx}>{line}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div>—</div>
-                )}
-              </section>
+            {/* Locations */}
+            <section className="about" style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Locations</h3>
+                {locationGames.length > 0 ? (
+                  <select aria-label="Select game for locations" value={selectedLocationGame} onChange={(e)=>setSelectedLocationGame(e.target.value)}>
+                    {locationGames.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                ) : null}
+              </div>
+              <div>{selectAcquisitionText || "—"}</div>
+            </section>
 
-              <section className="about">
-                <h3 className="list-subheading" style={{ textAlign: "left" }}>Pocket</h3>
-                {selectPocketCategory.pocket || selectPocketCategory.category ? (
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {selectPocketCategory.pocket ? <li>Pocket: {selectPocketCategory.pocket}</li> : null}
-                    {selectPocketCategory.category ? <li>Category: {selectPocketCategory.category}</li> : null}
-                  </ul>
-                ) : (
-                  <div>—</div>
-                )}
-              </section>
-            </>
-          )}
-        </div>
-        {/* Panels above handle content; removed legacy wide flavor list */}
+            {/* Shopping Details */}
+            <section className="about" style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Shopping Details</h3>
+                {shoppingGames.length > 0 ? (
+                  <select aria-label="Select game for shopping" value={selectedShoppingGame} onChange={(e)=>setSelectedShoppingGame(e.target.value)}>
+                    {shoppingGames.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                ) : null}
+              </div>
+              {selectShoppingDetails.length > 0 ? (
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {selectShoppingDetails.map((line, idx) => (
+                    <li key={idx}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div>—</div>
+              )}
+            </section>
+
+            {/* Pocket */}
+            <section className="about" style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Pocket</h3>
+                {pocketGames.length > 0 ? (
+                  <select aria-label="Select game for pocket" value={selectedPocketGame} onChange={(e)=>setSelectedPocketGame(e.target.value)}>
+                    {pocketGames.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                ) : null}
+              </div>
+              {selectPocketCategory.pocket || selectPocketCategory.category ? (
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {selectPocketCategory.pocket ? <li>Pocket: {selectPocketCategory.pocket}</li> : null}
+                  {selectPocketCategory.category ? <li>Category: {selectPocketCategory.category}</li> : null}
+                </ul>
+              ) : (
+                <div>—</div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </>
   );

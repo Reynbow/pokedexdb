@@ -229,6 +229,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.()}
       ref={cardRef}
       aria-current={selected ? "true" : undefined}
+      data-id={id}
     >
       {exclusiveBadge ? (
         <>

@@ -3641,6 +3641,13 @@
   pointer-events: none;
 }
 
+/* Match the icon size used in the filter-by-type chips */
+.ability-learner-type .type-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+}
+
 .ability-learner-name {
   font-weight: 600;
   color: #f8fafc;
@@ -4942,6 +4949,38 @@
     0 10px 28px rgba(15, 23, 42, 0.5);
   background: linear-gradient(180deg, rgba(124, 140, 255, 0.22), rgba(59, 130, 246, 0.24));
   transform: translateY(0);
+}
+
+/* Temporary glow around previously selected card when closing detail */
+.card.is-previous {
+  border-color: rgba(250, 204, 21, 0.9);
+  box-shadow:
+    inset 0 0 0 2px rgba(250, 204, 21, 0.7),
+    0 0 0 2px rgba(250, 204, 21, 0.35),
+    0 10px 28px rgba(15, 23, 42, 0.5),
+    0 0 30px rgba(250, 204, 21, 0.45);
+  background: linear-gradient(180deg, rgba(250, 204, 21, 0.18), rgba(59, 130, 246, 0.16));
+  /* Overlay animation provides a longer, smoother fade */
+}
+
+.card.is-previous::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px rgba(250, 204, 21, 0.9),
+    0 0 0 2px rgba(250, 204, 21, 0.5),
+    0 0 38px rgba(250, 204, 21, 0.6);
+  background: radial-gradient(70% 70% at 50% 50%, rgba(250, 204, 21, 0.18) 0%, rgba(250, 204, 21, 0.10) 45%, rgba(250, 204, 21, 0.0) 80%);
+  animation: previousGlow 3.6s ease-out forwards;
+  will-change: opacity;
+}
+
+@keyframes previousGlow {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .sprite {
