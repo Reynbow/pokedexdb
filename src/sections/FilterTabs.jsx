@@ -54,10 +54,11 @@ export default function FilterTabs({
                         });
                       }}
                     >
+                      {/* Left, in-button icon */}
                       <img 
                         src={getTypeIconUrl(t)} 
                         alt={t} 
-                        className="type-icon"
+                        className="type-icon type-icon--left"
                         loading="lazy"
                         onError={(e) => {
                           // Hide icon if it fails to load
@@ -65,6 +66,17 @@ export default function FilterTabs({
                         }}
                       />
                       <span className="type-name">{t}</span>
+                      {/* Right, oversized decorative icon */}
+                      <img 
+                        src={getTypeIconUrl(t)} 
+                        alt=""
+                        aria-hidden="true"
+                        className="type-icon type-icon--right"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
                     </span>
                   ))}
                 </div>
@@ -191,10 +203,11 @@ export default function FilterTabs({
                       });
                     }}
                   >
+                    {/* Left, in-button icon */}
                     <img 
                       src={getTypeIconUrl(t)} 
                       alt={t} 
-                      className="type-icon"
+                      className="type-icon type-icon--left"
                       loading="lazy"
                       onError={(e) => {
                         // Hide icon if it fails to load
@@ -202,6 +215,17 @@ export default function FilterTabs({
                       }}
                     />
                     <span className="type-name">{t}</span>
+                    {/* Right, oversized decorative icon */}
+                    <img 
+                      src={getTypeIconUrl(t)} 
+                      alt=""
+                      aria-hidden="true"
+                      className="type-icon type-icon--right"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
                   </span>
                 ))}
               </div>

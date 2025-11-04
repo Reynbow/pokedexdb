@@ -790,17 +790,31 @@
 }
 
 /* Enlarge the logo 3x and absolutely position it so it doesn't affect layout */
-.filter-tabs-container .filters-desktop .type-filters .type-chip .type-icon,
-.filter-tabs-container .filter-tabs-content .type-filters .type-chip .type-icon {
+.filter-tabs-container .filters-desktop .type-filters .type-chip .type-icon--right,
+.filter-tabs-container .filter-tabs-content .type-filters .type-chip .type-icon--right {
   position: absolute;
-  width: 52px;   /* 3x the base 18px */
-  height: 52px;  /* 3x the base 18px */
-  left: -8px;    /* push partly outside the chip on the left */
+  width: 52px;   /* oversized decorative */
+  height: 52px;
+  right: -14px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 1;    /* behind the text */
   pointer-events: none;
-  opacity: 0.5;  /* 50% opacity */
+  opacity: 0.3;  /* 50% opacity */
+}
+
+/* Left, in-button icon sized to fit within the chip */
+.filter-tabs-container .filters-desktop .type-filters .type-chip .type-icon--left,
+.filter-tabs-container .filter-tabs-content .type-filters .type-chip .type-icon--left {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;    /* above decorative right icon but below text shadow */
+  pointer-events: none;
+  opacity: 1;
 }
 
 .type-chip::before {
