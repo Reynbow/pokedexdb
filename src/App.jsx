@@ -5548,7 +5548,7 @@ function DetailPanel({
                         />
                         <span className="type-name">
                           {w.type}
-                          {w.mult >= 4 ? " x4" : w.mult > 1 ? " x2" : ""}
+                          {w.mult >= 4 ? <span className="type-mult"> x4</span> : w.mult > 1 ? <span className="type-mult"> x2</span> : null}
                         </span>
                       </span>
                     ))
@@ -5573,7 +5573,7 @@ function DetailPanel({
                         />
                         <span className="type-name">
                           {r.type}
-                          {r.mult === 0 ? " x0" : r.mult <= 0.25 ? " x0.25" : " x0.5"}
+                          {r.mult === 0 ? <span className="type-mult"> x0</span> : r.mult <= 0.25 ? <span className="type-mult"> x0.25</span> : <span className="type-mult"> x0.5</span>}
                         </span>
                       </span>
                     ))
@@ -7299,7 +7299,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
                           {typeList.length > 0 && (
                             <div className="ability-learner-types">
                               {typeList.map((type) => (
-                                <span key={`${pokemon.url}-${type}`} className={`ability-learner-type type-${type}`}>
+                                <span key={`${pokemon.url}-${type}`} className={`ability-learner-type type-${type}`} data-tooltip={type} aria-label={type}>
                                   <img 
                                     src={getTypeIconUrl(type)} 
                                     alt={type} 
