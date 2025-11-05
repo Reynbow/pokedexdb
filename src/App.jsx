@@ -1614,6 +1614,7 @@ function App() {
   const lastSelectedFlashTimerRef = useRef(null);
   const listScrollRef = useRef(null);
   const pendingCenterIdRef = useRef(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -1642,6 +1643,53 @@ function App() {
       localStorage.setItem("pref:shiny", shiny ? "1" : "0");
     } catch {}
   }, [shiny]);
+
+  // Track scroll position of window and list container to toggle the scroll-to-top button
+  useEffect(() => {
+    const updateVisibility = () => {
+      const winY = typeof window !== "undefined" ? window.scrollY || document.documentElement.scrollTop || 0 : 0;
+      setShowScrollTop((prev) => {
+        // Keep previous value if unchanged to avoid extra renders
+        const next = winY > 600;
+        return prev === next ? prev : next;
+      });
+    };
+    updateVisibility();
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateVisibility);
+  }, []);
+
+  // Also watch the list panel's own scroll (it can scroll independently of window)
+  {
+    const scrollEl = listScrollRef.current;
+    useEffect(() => {
+      if (!scrollEl) return;
+      const onListScroll = () => {
+        const top = scrollEl.scrollTop || 0;
+        setShowScrollTop((prev) => {
+          const next = top > 600 || (typeof window !== "undefined" ? (window.scrollY || 0) > 600 : false);
+          return prev === next ? prev : next;
+        });
+      };
+      onListScroll();
+      scrollEl.addEventListener("scroll", onListScroll, { passive: true });
+      return () => scrollEl.removeEventListener("scroll", onListScroll);
+    }, [scrollEl]);
+  }
+
+  const handleScrollToTop = useCallback(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {}
+    const el = listScrollRef.current;
+    if (el) {
+      try {
+        el.scrollTo({ top: 0, behavior: "smooth" });
+      } catch {
+        el.scrollTop = 0;
+      }
+    }
+  }, []);
 
   const getTagsForName = (name) => {
     const lower = String(name || "").toLowerCase();
@@ -2715,6 +2763,17 @@ function App() {
 
   return (
     <div className="app-shell">
+      {showScrollTop ? (
+        <button
+          type="button"
+          className="scroll-top-fab"
+          aria-label="Scroll to top"
+          onClick={handleScrollToTop}
+          title="Scroll to top"
+        >
+          ↑ Top
+        </button>
+      ) : null}
       <a
         className="discord-support-fab"
         href="https://discord.gg/WXMjmyjeC3"

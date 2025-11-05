@@ -21,6 +21,22 @@ export const buildSpriteSources = (id, variant, options = {}) => {
   const basePath = getBasePath();
   const local = (p) => `${basePath}${p.startsWith("/") ? p.slice(1) : p}`;
 
+  // Prefer Showdown Gen 5 static front sprites first for preview/card usage
+  // Only do this when no explicit variant is requested (i.e., default preview)
+  if (!variant && lowerName) {
+    const showdownName = lowerName
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/--+/g, "-")
+      .replace(/^-+/, "")
+      .replace(/-+$/, "");
+    if (showdownName) {
+      if (shiny) {
+        push(`https://play.pokemonshowdown.com/sprites/gen5-shiny/${showdownName}.png`);
+      }
+      push(`https://play.pokemonshowdown.com/sprites/gen5/${showdownName}.png`);
+    }
+  }
+
   if (clean) {
     // Prefer locally hosted sprites first
     if (shiny && variant === "home") {

@@ -57,6 +57,51 @@
   }
 }
 
+/* Floating scroll-to-top button (bottom-right) */
+.scroll-top-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 18px;
+  z-index: 3000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(8, 12, 24, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+}
+
+.scroll-top-fab:hover,
+.scroll-top-fab:focus-visible {
+  transform: translateY(-1px);
+  background: rgba(124, 140, 255, 0.28);
+  border-color: rgba(124, 140, 255, 0.55);
+  color: #f8fafc;
+  outline: none;
+  box-shadow: 0 10px 24px rgba(8, 12, 24, 0.5);
+}
+
+.scroll-top-fab:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 520px) {
+  .scroll-top-fab {
+    /* Lift above the Discord button when it moves to bottom-right */
+    bottom: 70px;
+  }
+}
+
 .container {
   width: 100%;
   max-width: 1200px;
@@ -2561,6 +2606,33 @@
   border-color: rgba(59,130,246,0.65);
   box-shadow: 0 8px 20px rgba(15,23,42,0.5);
 }
+.ability-chip.toggle-chip.gender-toggle:not(.is-on) {
+  /* Male selected */
+  background: rgba(59,130,246,0.24);
+  border-color: rgba(59,130,246,0.55);
+  color: #f8fafc;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.4);
+}
+.ability-chip.toggle-chip.gender-toggle:not(.is-on):hover,
+.ability-chip.toggle-chip.gender-toggle:not(.is-on):focus-visible {
+  background: rgba(59,130,246,0.3);
+  border-color: rgba(59,130,246,0.65);
+  box-shadow: 0 8px 20px rgba(15,23,42,0.5);
+}
+/* Override generic .is-on for female state specifically for gender toggle */
+.ability-chip.toggle-chip.gender-toggle.is-on {
+  /* Female selected */
+  background: rgba(236,72,153,0.24);
+  border-color: rgba(236,72,153,0.6);
+  color: #fef2f8;
+  box-shadow: 0 6px 18px rgba(236,72,153,0.35);
+}
+.ability-chip.toggle-chip.gender-toggle.is-on:hover,
+.ability-chip.toggle-chip.gender-toggle.is-on:focus-visible {
+  background: rgba(236,72,153,0.32);
+  border-color: rgba(236,72,153,0.7);
+  box-shadow: 0 8px 20px rgba(236,72,153,0.45);
+}
 .nature-value { min-height: 24px; }
 .nature-chip {
   display: inline-flex;
@@ -3639,13 +3711,6 @@
   font-weight: 600;
   text-transform: capitalize;
   pointer-events: none;
-}
-
-/* Match the icon size used in the filter-by-type chips */
-.ability-learner-type .type-icon {
-  width: 18px;
-  height: 18px;
-  margin-right: 6px;
 }
 
 .ability-learner-name {
@@ -4951,38 +5016,6 @@
   transform: translateY(0);
 }
 
-/* Temporary glow around previously selected card when closing detail */
-.card.is-previous {
-  border-color: rgba(250, 204, 21, 0.9);
-  box-shadow:
-    inset 0 0 0 2px rgba(250, 204, 21, 0.7),
-    0 0 0 2px rgba(250, 204, 21, 0.35),
-    0 10px 28px rgba(15, 23, 42, 0.5),
-    0 0 30px rgba(250, 204, 21, 0.45);
-  background: linear-gradient(180deg, rgba(250, 204, 21, 0.18), rgba(59, 130, 246, 0.16));
-  /* Overlay animation provides a longer, smoother fade */
-}
-
-.card.is-previous::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  pointer-events: none;
-  box-shadow:
-    inset 0 0 0 2px rgba(250, 204, 21, 0.9),
-    0 0 0 2px rgba(250, 204, 21, 0.5),
-    0 0 38px rgba(250, 204, 21, 0.6);
-  background: radial-gradient(70% 70% at 50% 50%, rgba(250, 204, 21, 0.18) 0%, rgba(250, 204, 21, 0.10) 45%, rgba(250, 204, 21, 0.0) 80%);
-  animation: previousGlow 3.6s ease-out forwards;
-  will-change: opacity;
-}
-
-@keyframes previousGlow {
-  0%, 60% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
 .sprite {
   width: 144px;
   height: 144px;
@@ -5015,7 +5048,20 @@
   right: 8px;
   bottom: 34px; /* slightly higher name */
   z-index: 3; /* above sprite for readability */
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 0, 0, 0.35);
+  text-shadow:
+    /* crisp outline (outside-only) */
+    0 1px 0 rgba(0, 0, 0, 0.95),
+    0 -1px 0 rgba(0, 0, 0, 0.95),
+    1px 0 0 rgba(0, 0, 0, 0.95),
+    -1px 0 0 rgba(0, 0, 0, 0.95),
+    1px 1px 0 rgba(0, 0, 0, 0.95),
+    -1px 1px 0 rgba(0, 0, 0, 0.95),
+    1px -1px 0 rgba(0, 0, 0, 0.95),
+    -1px -1px 0 rgba(0, 0, 0, 0.95),
+    /* depth glows */
+    0 2px 6px rgba(0, 0, 0, 0.85),
+    0 0 12px rgba(0, 0, 0, 0.6),
+    0 0 2px rgba(0, 0, 0, 0.9);
 }
 .card .types {
   position: absolute;
