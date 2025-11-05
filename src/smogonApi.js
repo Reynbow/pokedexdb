@@ -77,6 +77,31 @@ const extractNatureValue = (value) => {
   return null;
 };
 
+// Try to pull a reasonable item string out of a Smogon set-like structure
+const extractItemValue = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const candidate = extractItemValue(entry);
+      if (candidate) return candidate;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    // Common fields we might see in datasets
+    const nested = value.item || value.items || value.held_item || value.value;
+    const candidate = extractItemValue(nested);
+    if (candidate) return candidate;
+    for (const key of Object.keys(value)) {
+      if (key === "name") continue; // avoid picking set names or move names as items
+      const next = extractItemValue(value[key]);
+      if (next) return next;
+    }
+  }
+  return null;
+};
+
 const parseSpreadNature = (spread) => {
   if (!spread) return null;
   if (typeof spread === "string") {
@@ -220,6 +245,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
       if (direct) {
         return {
           nature: direct,
+          item: extractItemValue(set) || null,
           format: formatKey,
           setName,
           evs: normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads),
@@ -229,6 +255,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
       if (fromSpreads) {
         return {
           nature: fromSpreads,
+          item: extractItemValue(set) || null,
           format: formatKey,
           setName,
           evs: normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads),
@@ -238,6 +265,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
       if (evs) {
         return {
           nature: null,
+          item: extractItemValue(set) || null,
           format: formatKey,
           setName,
           evs,
@@ -357,6 +385,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
   if (!normalizedAlias) {
     return {
       nature: null,
+      item: null,
       generation: null,
       format: null,
       setName: null,
@@ -379,6 +408,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
       if (selection) {
         return {
           nature: selection.nature || null,
+          item: selection.item || null,
           evs: selection.evs || null,
           generation,
           format: selection.format,
@@ -389,6 +419,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
       }
       return {
         nature: null,
+        item: null,
         evs: null,
         generation,
         format: null,
@@ -405,6 +436,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
   }
   return {
     nature: null,
+    item: null,
     evs: null,
     generation: null,
     format: null,

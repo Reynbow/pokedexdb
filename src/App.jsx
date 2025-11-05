@@ -3075,7 +3075,9 @@ function DetailPanel({
   const [smogonError, setSmogonError] = useState(null);
   const [smogonLoading, setSmogonLoading] = useState(false);
   const [smogonEvs, setSmogonEvs] = useState(null);
+  const [smogonItem, setSmogonItem] = useState(null);
   const [isEvModalOpen, setIsEvModalOpen] = useState(false);
+  const [activeItemName, setActiveItemName] = useState(null);
   const [activeAbility, setActiveAbility] = useState(null);
   const [abilityData, setAbilityData] = useState(null);
   const [abilityLoading, setAbilityLoading] = useState(false);
@@ -4881,6 +4883,13 @@ function DetailPanel({
   const closeNatureOverlay = useCallback(() => {
     setNatureOverlayName(null);
   }, []);
+  const handleItemClick = useCallback(() => {
+    if (!smogonItem) return;
+    setActiveItemName(smogonItem);
+  }, [smogonItem]);
+  const closeItemOverlay = useCallback(() => {
+    setActiveItemName(null);
+  }, []);
   const openEvInfoModal = useCallback(() => {
     setIsEvModalOpen(true);
   }, []);
@@ -5179,6 +5188,7 @@ function DetailPanel({
     const alias = (name || "").toLowerCase();
     setSmogonNature(null);
     setSmogonEvs(null);
+    setSmogonItem(null);
     setSmogonError(null);
     setSmogonLoading(false);
     if (!alias) return;
@@ -5201,10 +5211,12 @@ function DetailPanel({
             : null;
         setSmogonNature(hasNature ? result.nature : null);
         setSmogonEvs(evs);
+        setSmogonItem(result?.item || null);
         if (hasNature || evs) {
           setSmogonError(null);
           addLog("Smogon recommendations", {
             nature: result?.nature || null,
+            item: result?.item || null,
             evs,
             generation: result.generation,
             format: result.format,
@@ -5460,7 +5472,7 @@ function DetailPanel({
                   </div>
                 )}
                 <div className="about-row">
-                  <span className="label">Recommended Nature</span>
+                  <span className="label">Rec Nature</span>
                   <div className="value nature-value">
                     {smogonLoading ? (
                       <span className="nature-loading" aria-live="polite">
@@ -5479,6 +5491,34 @@ function DetailPanel({
                         aria-label={`View details for ${smogonNature} nature`}
                       >
                         <span className="text-capitalize">{smogonNature}</span>
+                      </button>
+                    ) : (
+                      <span className="nature-placeholder" title="No competitive data available">
+                        -
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="about-row">
+                  <span className="label">Rec Item</span>
+                  <div className="value nature-value">
+                    {smogonLoading ? (
+                      <span className="nature-loading" aria-live="polite">
+                        <span className="nature-spinner" aria-hidden="true" />
+                        Loading
+                      </span>
+                    ) : smogonError ? (
+                      <span className="nature-placeholder" title={smogonError}>
+                        Unavailable
+                      </span>
+                    ) : smogonItem ? (
+                      <button
+                        type="button"
+                        className="nature-chip"
+                        onClick={handleItemClick}
+                        aria-label={`View details for ${smogonItem}`}
+                      >
+                        <span className="text-capitalize">{smogonItem}</span>
                       </button>
                     ) : (
                       <span className="nature-placeholder" title="No competitive data available">
@@ -5819,6 +5859,12 @@ function DetailPanel({
           onSelectPokemon={onSelectPokemon}
           currentPokemonId={id}
           shiny={shiny}
+        />
+      )}
+      {activeItemName && (
+        <ItemOverlay
+          itemName={activeItemName}
+          onClose={closeItemOverlay}
         />
       )}
       {isFlavorModalOpen && flavorTextVersions.length > 0 && (
@@ -6459,6 +6505,107 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
               </ul>
             ) : (
               <div className="ability-learners-empty">No natures match your search.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ItemOverlay({ itemName, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
+
+  const normalizedSlug = useMemo(() => {
+    const raw = String(itemName || "").toLowerCase();
+    return raw
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  }, [itemName]);
+
+  const titleId = normalizedSlug ? `item-modal-title-${normalizedSlug}` : undefined;
+
+  useEffect(() => {
+    if (!normalizedSlug) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    fetch(`https://pokeapi.co/api/v2/item/${normalizedSlug}/`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((json) => {
+        if (cancelled) return;
+        setData(json);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e?.message || "Failed to load item");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedSlug]);
+
+  const displayName = useMemo(() => humanizeName(itemName || data?.name || ""), [itemName, data?.name]);
+  const iconUrl = useMemo(() => data?.sprites?.default || (normalizedSlug ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${normalizedSlug}.png` : null), [data?.sprites, normalizedSlug]);
+  const effect = useMemo(() => {
+    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
+    const en = entries.find((e) => e?.language?.name === "en");
+    return en?.short_effect || en?.effect || null;
+  }, [data]);
+  const flavor = useMemo(() => {
+    const entries = Array.isArray(data?.flavor_text_entries) ? data.flavor_text_entries : [];
+    const en = entries.find((e) => e?.language?.name === "en");
+    return en?.text || null;
+  }, [data]);
+
+  const [isMouseDownOnBackdrop, setIsMouseDownOnBackdrop] = useState(false);
+  const handleBackdropMouseDown = () => setIsMouseDownOnBackdrop(true);
+  const handleModalMouseDown = () => setIsMouseDownOnBackdrop(false);
+  const handleBackdropMouseUp = () => {
+    if (isMouseDownOnBackdrop) onClose?.();
+    setIsMouseDownOnBackdrop(false);
+  };
+
+  return (
+    <div className="ability-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown} onMouseUp={handleBackdropMouseUp}>
+      <div
+        className="ability-modal item-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onMouseDown={handleModalMouseDown}
+      >
+        <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close item details">X</button>
+        <div className="ability-modal-left">
+          <div className="ability-modal-header">
+            <h2 className="ability-modal-title" id={titleId}>
+              <span className="text-capitalize">{displayName}</span>
+            </h2>
+            <div className="ability-modal-subtle">Held item details</div>
+          </div>
+          <div className="ability-modal-body">
+            {loading ? (
+              <div className="ability-modal-loading">Loading</div>
+            ) : error ? (
+              <div className="ability-modal-error">{error}</div>
+            ) : (
+              <div className="effect-summary">
+                {iconUrl ? (
+                  <img src={iconUrl} alt="" width={36} height={36} loading="lazy" style={{ marginRight: 8, verticalAlign: "middle" }} />
+                ) : null}
+                <span>{effect || flavor || "No description available."}</span>
+              </div>
             )}
           </div>
         </div>
