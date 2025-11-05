@@ -2127,6 +2127,14 @@ function App() {
   }, [pokemon, bootSelection, resolveSelectionFromLocation]);
 
   const selectPokemon = (id, name, url, options) => {
+    // Clear any persisted highlight from the previously selected card
+    try {
+      if (lastSelectedFlashTimerRef.current) {
+        clearTimeout(lastSelectedFlashTimerRef.current);
+        lastSelectedFlashTimerRef.current = null;
+      }
+      document.querySelectorAll(".card.is-previous").forEach((el) => el.classList.remove("is-previous"));
+    } catch {}
     // Remember which card was selected so we can restore/flash it after closing
     try { lastSelectedIdRef.current = String(id); } catch {}
     try { pendingCenterIdRef.current = String(id); } catch {}
@@ -2171,10 +2179,8 @@ function App() {
         node.classList.add("is-previous");
         if (lastSelectedFlashTimerRef.current) {
           clearTimeout(lastSelectedFlashTimerRef.current);
+          lastSelectedFlashTimerRef.current = null;
         }
-        lastSelectedFlashTimerRef.current = setTimeout(() => {
-          try { node.classList.remove("is-previous"); } catch {}
-        }, 3800);
         return;
       }
       if (attempts < 12) {

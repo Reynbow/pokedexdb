@@ -205,6 +205,66 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
 
   // Removed auto-scrolling on selection to avoid distracting scroll animations.
 
+  // Mouse-driven parallax for the sprite
+  const hoverRafIdRef = useRef(0);
+  const mousePositionRef = useRef({ x: 0, y: 0 });
+  const isHoveringRef = useRef(false);
+  const lastBoundsRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverRafIdRef.current) {
+        cancelAnimationFrame(hoverRafIdRef.current);
+        hoverRafIdRef.current = 0;
+      }
+    };
+  }, []);
+
+  const resetParallax = () => {
+    const el = cardRef.current;
+    if (!el) return;
+    el.style.setProperty("--parallax-x", "0px");
+    el.style.setProperty("--parallax-y", "0px");
+  };
+
+  const scheduleParallaxUpdate = () => {
+    if (hoverRafIdRef.current) return;
+    hoverRafIdRef.current = requestAnimationFrame(() => {
+      hoverRafIdRef.current = 0;
+      const el = cardRef.current;
+      if (!el || !isHoveringRef.current) return;
+      const bounds = lastBoundsRef.current || el.getBoundingClientRect();
+      lastBoundsRef.current = bounds;
+      const { x, y } = mousePositionRef.current;
+      const centerX = bounds.left + bounds.width / 2;
+      const centerY = bounds.top + bounds.height / 2;
+      const relX = (x - centerX) / (bounds.width / 2);
+      const relY = (y - centerY) / (bounds.height / 2);
+      const clamp = (v) => Math.max(-1, Math.min(1, v));
+      const maxOffset = 4; // px
+      const offsetX = (clamp(relX) * maxOffset).toFixed(2);
+      const offsetY = (clamp(relY) * maxOffset).toFixed(2);
+      el.style.setProperty("--parallax-x", `${offsetX}px`);
+      el.style.setProperty("--parallax-y", `${offsetY}px`);
+    });
+  };
+
+  const handleMouseEnter = () => {
+    isHoveringRef.current = true;
+    lastBoundsRef.current = cardRef.current?.getBoundingClientRect() || null;
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isHoveringRef.current) return;
+    mousePositionRef.current = { x: e.clientX, y: e.clientY };
+    scheduleParallaxUpdate();
+  };
+
+  const handleMouseLeave = () => {
+    isHoveringRef.current = false;
+    resetParallax();
+  };
+
   const dexNo = dexNumber || `#${id}`;
 
   return (
@@ -215,6 +275,9 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.()}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       ref={cardRef}
       aria-current={selected ? "true" : undefined}
       data-id={id}

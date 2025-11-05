@@ -5048,7 +5048,8 @@
   border-color: rgba(129, 140, 248, 0.55);
 }
 
-.card:hover {
+.card:hover,
+.card.is-previous {
   transform: translateY(-2px);
   border-color: rgba(var(--type-rgb), 0.55);
   box-shadow:
@@ -5074,7 +5075,8 @@
   transform: translateY(2px);
 }
 
-.card:hover::after {
+.card:hover::after,
+.card.is-previous::after {
   opacity: 1;
   transform: translateY(0);
 }
@@ -5109,6 +5111,11 @@
 
 /* Tighter spacing in preview cards between sprite, name, and types */
 .card .sprite { margin: 0 auto 10px; position: relative; z-index: 1; padding-bottom: 8px; }
+.card .sprite {
+  transform: translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0);
+  transition: transform 0.12s ease-out;
+  will-change: transform;
+}
 .card .name { margin-top: 0; }
 .card .types { display: flex; justify-content: center; gap: 6px; margin-top: 2px; margin-bottom: 0; }
 
@@ -5158,8 +5165,9 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
-/* Add subtle type-colored glow to sprite on hover */
-.card:hover .sprite {
+/* Add subtle type-colored glow to sprite on hover or when previously selected */
+.card:hover .sprite,
+.card.is-previous .sprite {
   filter:
     drop-shadow(0 0 10px rgba(var(--type-rgb), 0.5))
     drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
