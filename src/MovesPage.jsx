@@ -363,7 +363,30 @@ export default function MovesPage() {
                         onClick={() => primary && selectMove(primary)}
                         aria-pressed={isSelected}
                       >
+                        {typeForGroup ? (
+                          <img
+                            src={getTypeIconUrl(typeForGroup)}
+                            alt=""
+                            className="type-icon type-icon-bg"
+                            loading="lazy"
+                            aria-hidden="true"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        ) : null}
                         <span className="item-name">{g.key.replaceAll("-", " ")}</span>
+                        {typeForGroup ? (
+                          <img
+                            src={getTypeIconUrl(typeForGroup)}
+                            alt={typeForGroup}
+                            className="type-icon item-type-icon"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        ) : null}
                       </button>
                     );
                   })}
