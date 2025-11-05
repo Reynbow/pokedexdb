@@ -218,6 +218,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       ref={cardRef}
       aria-current={selected ? "true" : undefined}
       data-id={id}
+      data-type={types && types.length > 0 ? types[0] : undefined}
     >
       {exclusiveBadge ? (
         <>

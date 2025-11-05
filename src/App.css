@@ -4923,6 +4923,7 @@
   position: relative;
   aspect-ratio: 1 / 1;
   border-radius: 16px;
+  --type-rgb: 124, 140, 255; /* default hover glow color */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
@@ -4937,6 +4938,24 @@
   padding-bottom: 8px; /* fixed bottom gap */
   overflow: hidden; /* clip exclusive glow */
 }
+.card[data-type="normal"] { --type-rgb: 138, 133, 94; }
+.card[data-type="fire"] { --type-rgb: 178, 80, 35; }
+.card[data-type="water"] { --type-rgb: 62, 107, 181; }
+.card[data-type="electric"] { --type-rgb: 149, 111, 22; }
+.card[data-type="grass"] { --type-rgb: 74, 127, 63; }
+.card[data-type="ice"] { --type-rgb: 74, 142, 149; }
+.card[data-type="fighting"] { --type-rgb: 147, 36, 28; }
+.card[data-type="poison"] { --type-rgb: 107, 39, 105; }
+.card[data-type="ground"] { --type-rgb: 145, 111, 54; }
+.card[data-type="flying"] { --type-rgb: 106, 97, 184; }
+.card[data-type="psychic"] { --type-rgb: 151, 58, 95; }
+.card[data-type="bug"] { --type-rgb: 105, 124, 29; }
+.card[data-type="rock"] { --type-rgb: 126, 104, 42; }
+.card[data-type="ghost"] { --type-rgb: 82, 64, 126; }
+.card[data-type="dragon"] { --type-rgb: 75, 36, 179; }
+.card[data-type="dark"] { --type-rgb: 86, 61, 42; }
+.card[data-type="steel"] { --type-rgb: 127, 128, 157; }
+.card[data-type="fairy"] { --type-rgb: 148, 73, 113; }
 .card-exclusive-glow {
   position: absolute;
   top: 0;
@@ -5031,8 +5050,11 @@
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: rgba(124, 140, 255, 0.35);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-color: rgba(var(--type-rgb), 0.55);
+  box-shadow:
+    0 0 0 2px rgba(var(--type-rgb), 0.35),
+    0 14px 28px rgba(0, 0, 0, 0.45),
+    0 18px 36px rgba(var(--type-rgb), 0.18);
 }
 
 .card::after {
@@ -5043,7 +5065,7 @@
   bottom: -10px;
   height: 22px;
   border-radius: 50%;
-  background: radial-gradient(50% 60% at 50% 50%, rgba(124, 140, 255, 0.45) 0%, rgba(124, 140, 255, 0.22) 38%, rgba(124, 140, 255, 0.0) 70%);
+  background: radial-gradient(50% 60% at 50% 50%, rgba(var(--type-rgb), 0.60) 0%, rgba(var(--type-rgb), 0.30) 38%, rgba(var(--type-rgb), 0.0) 70%);
   filter: blur(8px);
   opacity: 0;
   pointer-events: none;
@@ -5134,6 +5156,13 @@
 .card .type-chip:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* Add subtle type-colored glow to sprite on hover */
+.card:hover .sprite {
+  filter:
+    drop-shadow(0 0 10px rgba(var(--type-rgb), 0.5))
+    drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
 }
 
 /* Type color accents */
