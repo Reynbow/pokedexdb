@@ -7,7 +7,7 @@ import PrefetchSprites from "./components/PrefetchSprites.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
-import { findRecommendedNature, fetchSmogonStats, normalizeSpeciesName } from "./smogonApi";
+import { findRecommendedNature, fetchSmogonStats, fetchSmogonSets, fetchSmogonImgsIndex, normalizeSpeciesName } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation, getBasePath } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
@@ -5865,6 +5865,9 @@ function DetailPanel({
         <ItemOverlay
           itemName={activeItemName}
           onClose={closeItemOverlay}
+          pokemonAlias={name}
+          generationHint={species?.generation?.name}
+          onSelectItem={setActiveItemName}
         />
       )}
       {isFlavorModalOpen && flavorTextVersions.length > 0 && (
@@ -6513,10 +6516,15 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
   );
 }
 
-function ItemOverlay({ itemName, onClose }) {
+function ItemOverlay({ itemName, onClose, pokemonAlias, generationHint, onSelectItem }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [otherLoading, setOtherLoading] = useState(false);
+  const [otherError, setOtherError] = useState(null);
+  const [otherItems, setOtherItems] = useState([]);
+  const [otherItemDetails, setOtherItemDetails] = useState([]);
+  const [imgsIndex, setImgsIndex] = useState(null);
 
   const normalizedSlug = useMemo(() => {
     const raw = String(itemName || "").toLowerCase();
@@ -6556,8 +6564,70 @@ function ItemOverlay({ itemName, onClose }) {
     };
   }, [normalizedSlug]);
 
+  // Load Smogon image index (for Global Link artwork fallback)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const idx = await fetchSmogonImgsIndex();
+        if (!cancelled) setImgsIndex(idx || null);
+      } catch {
+        if (!cancelled) setImgsIndex(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const displayName = useMemo(() => humanizeName(itemName || data?.name || ""), [itemName, data?.name]);
-  const iconUrl = useMemo(() => data?.sprites?.default || (normalizedSlug ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${normalizedSlug}.png` : null), [data?.sprites, normalizedSlug]);
+  const iconUrl = useMemo(() => {
+    // 1) Prefer PokeAPI Scarlet/Violet or higher-quality artwork if present
+    const sprites = data?.sprites || null;
+    const other = sprites?.other || null;
+    const fromOther = (() => {
+      if (!other || typeof other !== "object") return null;
+      const keys = ["scarlet-violet", "sv", "home", "showdown", "official-artwork"];
+      for (const key of keys) {
+        const entry = other[key];
+        if (!entry) continue;
+        if (typeof entry === "string" && entry) return entry;
+        if (typeof entry === "object") {
+          const candidate = entry.default || entry.front_default || entry.image || entry.png || null;
+          if (candidate) return candidate;
+        }
+      }
+      return null;
+    })();
+    if (fromOther) return fromOther;
+
+    // 2) Fallback to Global Link artwork via Smogon imgs index
+    const fromGl = (() => {
+      if (!imgsIndex || !normalizedSlug) return null;
+      const slug = normalizedSlug;
+      const candidates = [
+        imgsIndex?.items?.[slug],
+        imgsIndex?.items_gl?.[slug],
+        imgsIndex?.items?.gl?.[slug],
+        imgsIndex?.gl?.items?.[slug],
+        imgsIndex?.["global-link"]?.items?.[slug],
+        imgsIndex?.["items-global-link"]?.[slug],
+      ];
+      for (const c of candidates) {
+        if (!c) continue;
+        if (typeof c === "string") return c;
+        if (typeof c === "object") {
+          const url = c.url || c.href || c.default || c.png || c.svg || null;
+          if (url) return url;
+        }
+      }
+      return null;
+    })();
+    if (fromGl) return fromGl;
+
+    // 3) Default to existing PokeAPI sprite or GitHub fallback
+    return sprites?.default || (normalizedSlug ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${normalizedSlug}.png` : null);
+  }, [data?.sprites, normalizedSlug, imgsIndex]);
   const effect = useMemo(() => {
     const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
     const en = entries.find((e) => e?.language?.name === "en");
@@ -6569,12 +6639,194 @@ function ItemOverlay({ itemName, onClose }) {
     return en?.text || null;
   }, [data]);
 
+  const normalizeItemSlug = useCallback((raw) => {
+    const v = String(raw || "").toLowerCase();
+    return v
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  }, []);
+
+  // Build a best-effort extractor for item values from arbitrary Smogon set data
+  const extractItemAny = useCallback((value) => {
+    if (!value) return null;
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const found = extractItemAny(entry);
+        if (found) return found;
+      }
+      return null;
+    }
+    if (typeof value === "object") {
+      const nested = value.item || value.items || value.held_item || value.value;
+      const candidate = extractItemAny(nested);
+      if (candidate) return candidate;
+      for (const key of Object.keys(value)) {
+        if (key === "name") continue;
+        const next = extractItemAny(value[key]);
+        if (next) return next;
+      }
+    }
+    return null;
+  }, []);
+
+  // Load other recommended items from Smogon builds for this Pokémon
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setOtherError(null);
+      setOtherItems([]);
+      if (!pokemonAlias) return;
+      setOtherLoading(true);
+      try {
+        const rec = await findRecommendedNature(pokemonAlias, { generationHint });
+        if (cancelled) return;
+        const generation = rec?.generation || null;
+        const speciesKey = rec?.speciesKey || null;
+        if (!generation || !speciesKey) {
+          setOtherItems([]);
+          return;
+        }
+        const dataset = await fetchSmogonSets(generation);
+        if (cancelled) return;
+        const speciesSets = dataset?.[speciesKey] || {};
+        const collected = new Set();
+        Object.values(speciesSets).forEach((setsByName) => {
+          if (!setsByName || typeof setsByName !== "object") return;
+          Object.values(setsByName).forEach((set) => {
+            const item = extractItemAny(set);
+            if (!item) return;
+            const normalized = String(item).trim().toLowerCase();
+            if (normalized) collected.add(normalized);
+          });
+        });
+        const primary = String(itemName || "").trim().toLowerCase();
+        const list = Array.from(collected)
+          .filter((i) => i && i !== primary)
+          .slice(0, 20);
+        setOtherItems(list);
+      } catch (e) {
+        if (!cancelled) setOtherError(e?.message || "Failed to load other recommendations");
+      } finally {
+        if (!cancelled) setOtherLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [pokemonAlias, generationHint, itemName, extractItemAny]);
+
+  // Fetch details for other items to display definitions like the primary item
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setOtherItemDetails([]);
+      if (!otherItems || otherItems.length === 0) return;
+      const slugs = otherItems.map((it) => normalizeItemSlug(it)).filter(Boolean);
+      try {
+        const results = await Promise.all(
+          slugs.map(async (slug) => {
+            try {
+              const r = await fetch(`https://pokeapi.co/api/v2/item/${slug}/`);
+              if (!r.ok) throw new Error(`HTTP ${r.status}`);
+              const json = await r.json();
+              const enEff = Array.isArray(json?.effect_entries)
+                ? json.effect_entries.find((e) => e?.language?.name === "en")
+                : null;
+              const enFlavor = Array.isArray(json?.flavor_text_entries)
+                ? json.flavor_text_entries.find((e) => e?.language?.name === "en")
+                : null;
+              // Select preferred artwork (SV > GL > default)
+              const sprites = json?.sprites || null;
+              const other = sprites?.other || null;
+              let art = null;
+              if (other && typeof other === "object") {
+                const keys = ["scarlet-violet", "sv", "home", "showdown", "official-artwork"];
+                for (const key of keys) {
+                  const entry = other[key];
+                  if (!entry) continue;
+                  if (typeof entry === "string" && entry) { art = entry; break; }
+                  if (typeof entry === "object") {
+                    const candidate = entry.default || entry.front_default || entry.image || entry.png || null;
+                    if (candidate) { art = candidate; break; }
+                  }
+                }
+              }
+              if (!art && imgsIndex) {
+                const candidates = [
+                  imgsIndex?.items?.[slug],
+                  imgsIndex?.items_gl?.[slug],
+                  imgsIndex?.items?.gl?.[slug],
+                  imgsIndex?.gl?.items?.[slug],
+                  imgsIndex?.["global-link"]?.items?.[slug],
+                  imgsIndex?.["items-global-link"]?.[slug],
+                ];
+                for (const c of candidates) {
+                  if (!c) continue;
+                  if (typeof c === "string") { art = c; break; }
+                  if (typeof c === "object") {
+                    const url = c.url || c.href || c.default || c.png || c.svg || null;
+                    if (url) { art = url; break; }
+                  }
+                }
+              }
+              if (!art) {
+                art = sprites?.default || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
+              }
+              return {
+                slug,
+                name: json?.name || slug,
+                iconUrl: art,
+                effect: enEff?.short_effect || enEff?.effect || null,
+                flavor: enFlavor?.text || null,
+              };
+            } catch {
+              return {
+                slug,
+                name: slug,
+                iconUrl: (imgsIndex && (imgsIndex?.items?.[slug] || imgsIndex?.items_gl?.[slug])) || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`,
+                effect: null,
+                flavor: null,
+              };
+            }
+          })
+        );
+        if (!cancelled) setOtherItemDetails(results);
+      } catch {
+        if (!cancelled) setOtherItemDetails([]);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [otherItems, normalizeItemSlug, imgsIndex]);
+
   const [isMouseDownOnBackdrop, setIsMouseDownOnBackdrop] = useState(false);
-  const handleBackdropMouseDown = () => setIsMouseDownOnBackdrop(true);
-  const handleModalMouseDown = () => setIsMouseDownOnBackdrop(false);
-  const handleBackdropMouseUp = () => {
-    if (isMouseDownOnBackdrop) onClose?.();
+  const handleBackdropMouseDown = (event) => {
+    // Only start close gesture if the original target is the backdrop itself
+    if (event.target === event.currentTarget) {
+      setIsMouseDownOnBackdrop(true);
+    }
+  };
+  const handleModalMouseDown = (event) => {
+    // Prevent backdrop from receiving the bubbled event
+    event.stopPropagation();
     setIsMouseDownOnBackdrop(false);
+  };
+  const handleBackdropMouseUp = (event) => {
+    // Only close if the mouse interaction ended on the backdrop and began there
+    if (event.target === event.currentTarget && isMouseDownOnBackdrop) {
+      onClose?.();
+    }
+    setIsMouseDownOnBackdrop(false);
+  };
+  const handleModalContextMenu = (event) => {
+    // Ensure right-click inside the modal does not trigger backdrop handlers
+    event.stopPropagation();
   };
 
   return (
@@ -6585,11 +6837,23 @@ function ItemOverlay({ itemName, onClose }) {
         aria-modal="true"
         aria-labelledby={titleId}
         onMouseDown={handleModalMouseDown}
+        onContextMenu={handleModalContextMenu}
       >
         <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close item details">X</button>
         <div className="ability-modal-left">
           <div className="ability-modal-header">
             <h2 className="ability-modal-title" id={titleId}>
+              {iconUrl ? (
+                <img
+                  src={iconUrl}
+                  alt=""
+                  width={60}
+                  height={60}
+                  loading="lazy"
+                  aria-hidden="true"
+                  style={{ borderRadius: 6 }}
+                />
+              ) : null}
               <span className="text-capitalize">{displayName}</span>
             </h2>
             <div className="ability-modal-subtle">Held item details</div>
@@ -6601,12 +6865,37 @@ function ItemOverlay({ itemName, onClose }) {
               <div className="ability-modal-error">{error}</div>
             ) : (
               <div className="effect-summary">
-                {iconUrl ? (
-                  <img src={iconUrl} alt="" width={36} height={36} loading="lazy" style={{ marginRight: 8, verticalAlign: "middle" }} />
-                ) : null}
                 <span>{effect || flavor || "No description available."}</span>
               </div>
             )}
+
+            {/* Other Smogon build items */}
+            <div className="item-modal-other">
+              <h3 className="ability-modal-subtitle" style={{ marginTop: 16 }}>Other recommended items from Smogon builds</h3>
+              {otherLoading ? (
+                <div className="ability-modal-loading">Loading recommendations…</div>
+              ) : otherError ? (
+                <div className="ability-modal-subtle">{otherError}</div>
+              ) : otherItemDetails.length > 0 ? (
+                <ul className="nature-info-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, listStyle: "none", padding: 0, margin: 0 }}>
+                  {otherItemDetails.map((it) => (
+                    <li key={it.slug} className="nature-info-card">
+                      <div className="nature-info-card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {it.iconUrl ? (
+                          <img src={it.iconUrl} alt="" width={24} height={24} loading="lazy" />
+                        ) : null}
+                        <span className="text-capitalize">{humanizeName(it.name)}</span>
+                      </div>
+                      <div style={{ color: "#cbd5f5", fontSize: "0.9rem" }}>
+                        {it.effect || it.flavor || "No description available."}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="ability-learners-empty">No other items found across builds.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -3053,6 +3053,21 @@
   overflow: hidden;
 }
 
+/* Narrower layout specifically for ItemOverlay */
+.item-modal {
+  grid-template-columns: 1fr;
+  width: min(600px, 94vw);
+  height: auto;
+  max-height: calc(100vh - 96px);
+  overflow: visible;
+}
+
+.item-modal .ability-modal-left { height: auto; }
+.item-modal .ability-modal-body {
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
 .ability-modal-left,
 .ability-modal-right {
   display: flex;
