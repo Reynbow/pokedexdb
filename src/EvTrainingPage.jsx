@@ -885,15 +885,6 @@ export default function EvTrainingPage() {
 					</div>
 					{/* Go-To Targets are rendered in the right column via the main layout */}
 					<div className="matchup-box">
-						<div className="matchup-title">Speedy Farming Spots</div>
-						<ul className="game-modal-method-description">
-							<li>Speed EVs: Fletchling/Rookidee south of Mesagoza (1 EV each).</li>
-							<li>Speed EVs (faster): Cyclizar near Levincia or Porto Marinada (2 EV each).</li>
-							<li>Other stats: pick single-type swarms and pair with the matching Power Item.</li>
-							<li>Use meals/sandwiches for Encounter Power so targets spawn nonstop.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
 						<div className="matchup-title">Shop Cheat Sheet</div>
 						<ul className="game-modal-method-description">
 							<li>Power Items: Delibird Presents (Mesagoza/Levincia/Cascarrafa) for 10,000₽.</li>

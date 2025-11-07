@@ -1547,6 +1547,18 @@
   z-index: 0;
   overflow: visible;
 }
+.hero-type-bg {
+  position: absolute;
+  left: 0%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 150%;
+  height: auto;
+  opacity: 0.04;
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
 .item-art-wrap {
   width: 80px;
   height: 80px;

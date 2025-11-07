@@ -5432,6 +5432,17 @@ function DetailPanel({
     };
   }, [details?.types]);
 
+  // Primary type icon for background logo in hero panel
+  const primaryTypeName = useMemo(() => {
+    if (!details?.types || details.types.length === 0) return null;
+    const primary = details.types
+      .slice()
+      .sort((a, b) => a.slot - b.slot)[0];
+    return primary?.type?.name || null;
+  }, [details?.types]);
+
+  const heroTypeIconUrl = primaryTypeName ? getTypeIconUrl(primaryTypeName) : null;
+
   return (
     <aside className="detail-panel">
       <div className="detail-inner" style={heroGradientStyle}>
@@ -5445,6 +5456,15 @@ function DetailPanel({
         <div className="detail-hero">
           <div className="hero-left">
             <div className="detail-art-wrap">
+              {heroTypeIconUrl ? (
+                <img
+                  className="hero-type-bg"
+                  src={heroTypeIconUrl}
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                />
+              ) : null}
               <img
                 className={`detail-art ${animated ? "is-animated" : "is-static"}${isUnknownSprite ? " is-unknown" : ""}`}
                 src={detailImg}
