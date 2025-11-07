@@ -1,3 +1,35 @@
+/* Two-column layout: left stacks all info, right shows vitamins and targets */
+.ev-layout {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  gap: 16px;
+}
+.ev-col-left,
+.ev-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ev-col-left .matchup-grid {
+  display: block; /* stack boxes as-is, avoid forced equal heights */
+}
+.ev-col-left .matchup-grid .matchup-box {
+  margin-bottom: 12px;
+}
+.ev-col-left .matchup-box:has(> .ev-targets-grid) {
+  display: none;
+}
+.ev-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  align-items: start;
+}
+.ev-split-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
 /* Modern dark theme with a subtle gradient background */
 
 #root {
@@ -6319,4 +6351,184 @@
   opacity: 0.85;
   mix-blend-mode: multiply;
   z-index: 2;
+}
+
+/* --- EV Training: Go-To Targets panel --- */
+.ev-targets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.ev-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 12px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  position: relative;
+  overflow: visible; /* allow children to hang outside borders */
+}
+
+.ev-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ev-target-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ev-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e5e7eb;
+  background: rgba(124, 140, 255, 0.22);
+  border: 1px solid rgba(124, 140, 255, 0.32);
+}
+.ev-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5f5;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.ev-badge-top {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.ev-target-sprites {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.ev-target-sprite-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.ev-target-sprites > .ev-target-sprite-wrap + .ev-target-sprite-wrap .ev-target-sprite,
+.ev-split-col > .ev-target-sprite-wrap + .ev-target-sprite-wrap .ev-target-sprite {
+  margin-top: -12px; /* overlap sprites while keeping names flush */
+}
+.ev-split-col:first-child .ev-target-sprite-wrap {
+  gap: 0;
+}
+.ev-split-col:first-child .ev-target-sprite {
+  margin-left: -10px; /* allow left overflow by 10px */
+}
+.ev-split-col:last-child .ev-target-sprite-wrap {
+  justify-content: flex-end;
+  flex-direction: row-reverse; /* show name then sprite */
+}
+.ev-split-col:last-child .ev-target-species {
+  text-align: right;
+}
+.ev-target-sprite {
+  width: 56px;
+  height: 56px;
+  image-rendering: -webkit-optimize-contrast;
+}
+.ev-target-sprite-wrap:nth-child(2) .ev-target-sprite { /* legacy overlap rule no longer needed */ }
+.ev-target-species {
+  font-weight: 400;
+  color: #e5e7eb;
+  flex: 1;
+}
+.ev-target-location { display: none; }
+
+.ev-topline-right {
+  text-align: right;
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ev-location-top { display: none; }
+
+/* Map image inside cards */
+.ev-map-wrap {
+  margin-top: 0;
+  margin-bottom: 10px; /* space between map and stat pills */
+  position: relative;
+}
+.ev-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+.ev-map-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 8px;
+  pointer-events: none; /* allow clicks to pass to map */
+}
+.ev-map-overlay .ev-badge {
+  pointer-events: auto; /* re-enable if needed in future */
+  background: rgba(17, 24, 39, 0.82); /* dark slate */
+  color: #f1f5f9; /* light text */
+  border-color: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Modal for full-size map */
+.ev-map-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4000;
+}
+.ev-map-modal-inner {
+  position: relative;
+  max-width: 92vw;
+  max-height: 90vh;
+}
+.ev-map-modal-inner img {
+  display: block;
+  max-width: 92vw;
+  max-height: 90vh;
+  border-radius: 10px;
+}
+.ev-map-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111827;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
 }

@@ -80,6 +80,168 @@ function NameSprite({ name, size = 56 }) {
     );
 }
 
+function getMapCandidatesForStat(statLabel) {
+    const base = String(statLabel || "").toLowerCase().trim();
+    if (!base) return [];
+    const aliases = [
+        base,
+        base.replace(/\s+/g, "-"),
+        base.replace(/\./g, ""),
+        base.replace(/\s+|\./g, ""),
+        base.replace(/[^a-z0-9]+/g, "-")
+    ];
+    const uniq = Array.from(new Set(aliases.filter(Boolean)));
+    const files = [];
+    uniq.forEach((t) => {
+        files.push(`/maps/${t}.png`);
+        files.push(`/maps/${t}.jpg`);
+        files.push(`/maps/${t}.jpeg`);
+    });
+    return files;
+}
+
+function MapImage({ statLabel = null, src = null, onOpen, overlayLeft = null, overlayRight = null }) {
+    const inferred = useMemo(() => (src ? [src] : getMapCandidatesForStat(statLabel)), [statLabel, src]);
+    const [index, setIndex] = useState(0);
+    if (inferred.length === 0) return null;
+    const current = inferred[Math.min(index, inferred.length - 1)];
+    const handleError = () => setIndex((i) => (i + 1 < inferred.length ? i + 1 : i));
+    const handleClick = () => onOpen?.(current);
+    return (
+        <div className="ev-map-wrap">
+            <img className="ev-map" src={current} alt={`${statLabel || "map"} map`} onError={handleError} onClick={handleClick} loading="lazy" />
+            {(overlayLeft || overlayRight) ? (
+                <div className="ev-map-overlay" aria-hidden="true">
+                    <div className="ev-map-overlay-left">{overlayLeft}</div>
+                    <div className="ev-map-overlay-right">{overlayRight}</div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function getTargetsForGame(gameKey) {
+    switch (gameKey) {
+        case "ruby-sapphire-emerald":
+            return [
+                { stat: "HP", species: ["whismur"], ev: "+1 HP each", location: "Rusturf Tunnel" },
+                { stat: "Attack", species: ["shuppet"], ev: "+1 Attack each", location: "Mt. Pyre" },
+                { stat: "Defense", species: ["geodude", "aron"], ev: "+1 Defense each", location: "Granite Cave" },
+                { stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each", location: "Route 113" },
+                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Coastlines of Hoenn" },
+                { stat: "Speed", species: ["zubat"], ev: "+1 Speed each", location: "Granite Cave" },
+            ];
+        case "firered-leafgreen":
+            return [
+                { stat: "HP", species: ["drowzee"], ev: "+2 HP each", location: "Route 11" },
+                { stat: "Attack", species: ["primeape"], ev: "+2 Attack each", location: "Route 23 / Sevii Islands (trainers)" },
+                { stat: "Defense", species: ["onix", "graveler"], ev: "+2 Defense each", location: "Victory Road" },
+                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Pokémon Tower" },
+                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Routes 19–21 (surf)" },
+                { stat: "Speed", species: ["diglett", "dugtrio"], ev: "+1–2 Speed each", location: "Diglett's Cave" },
+            ];
+        case "heartgold-soulsilver":
+            return [
+                { stat: "HP", species: ["wooper", "quagsire"], ev: "+1–2 HP each", location: "Union Cave B2F (surf)" },
+                { stat: "Attack", species: ["mankey", "primeape"], ev: "+1–2 Attack each", location: "Route 42 rematches" },
+                { stat: "Defense", species: ["graveler", "onix"], ev: "+2 Defense each", location: "Route 45" },
+                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Sprout/Bell Tower (night)" },
+                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Route 41 (surf)" },
+                { stat: "Speed", species: ["diglett", "pidgeotto"], ev: "+1–2 Speed each", location: "Diglett's Cave / Route 43" },
+            ];
+        case "diamond-pearl":
+        case "platinum":
+            return [
+                { stat: "HP", species: ["bibarel"], ev: "+2 HP each", location: "Route 212 (south)" },
+                { stat: "Attack", species: ["gyarados"], ev: "+2 Attack each", location: "Surf (Resort Area / Route 218)" },
+                { stat: "Defense", species: ["geodude", "graveler"], ev: "+1–2 Defense each", location: "Iron Island" },
+                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Old Chateau" },
+                { stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
+                { stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Route 201" },
+            ];
+        case "black-2-white-2":
+            return [
+                { stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Floccesy Ranch)" },
+                { stat: "Attack", species: ["sandile"], ev: "+1 Attack each", location: "Desert Resort" },
+                { stat: "Defense", species: ["boldore"], ev: "+2 Defense each", location: "Clay Tunnel" },
+                { stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
+                { stat: "Sp. Def", species: ["frillish", "jellicent"], ev: "+1–2 Sp. Def each", location: "Route 4 / Undella Bay (surf)" },
+                { stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
+            ];
+        case "black-white":
+            return [
+                { stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Unova)" },
+                { stat: "Attack", species: ["lillipup", "herdier"], ev: "+1–2 Attack each", location: "Route 1" },
+                { stat: "Defense", species: ["roggenrola"], ev: "+1 Defense each", location: "Wellspring Cave" },
+                { stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
+                { stat: "Sp. Def", species: ["frillish"], ev: "+1 Sp. Def each", location: "Undella Bay (surf)" },
+                { stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
+            ];
+        case "omega-ruby-alpha-sapphire":
+            return [
+                { stat: "HP", species: ["whismur"], ev: "+1 HP each (hordes)", location: "Rusturf Tunnel" },
+                { stat: "Attack", species: ["shuppet"], ev: "+1 Attack each (hordes)", location: "Route 121" },
+                { stat: "Defense", species: ["geodude"], ev: "+1 Defense each (hordes)", location: "Granite Cave" },
+                { stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each (hordes)", location: "Route 113" },
+                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Surf (Hoenn routes)" },
+                { stat: "Speed", species: ["zubat"], ev: "+1 Speed each (hordes)", location: "Granite Cave" },
+            ];
+        case "x-y":
+            return [
+                { stat: "HP", species: ["gulpin"], ev: "+1 HP each (hordes)", location: "Route 5" },
+                { stat: "Attack", species: ["axew"], ev: "+1 Attack each (hordes)", location: "Route 10" },
+                { stat: "Defense", species: ["nosepass"], ev: "+1 Defense each (hordes)", location: "Route 8 cliffs" },
+                { stat: "Sp. Atk", species: ["psyduck"], ev: "+1 Sp. Atk each (hordes)", location: "Route 7" },
+                { stat: "Sp. Def", species: ["tentacool"], ev: "+1 Sp. Def each", location: "Route 12 (fishing)" },
+                { stat: "Speed", species: ["fletchling"], ev: "+1 Speed each (hordes)", location: "Route 5" },
+            ];
+        case "sun-moon":
+        case "ultra-sun-ultra-moon":
+            return [
+                { stat: "HP", species: ["caterpie", "metapod"], ev: "+1 HP each (SOS)", location: "Route 1" },
+                { stat: "Attack", species: ["yungoos", "gumshoos"], ev: "+1–2 Attack each (SOS)", location: "Route 1 (night)" },
+                { stat: "Defense", species: ["roggenrola"], ev: "+1 Defense each (SOS)", location: "Ten Carat Hill" },
+                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each (SOS)", location: "Hau'oli Cemetery" },
+                { stat: "Sp. Def", species: ["dewpider"], ev: "+1 Sp. Def each (SOS)", location: "Brooklet Hill" },
+                { stat: "Speed", species: ["zubat"], ev: "+1 Speed each (SOS)", location: "Verdant Cavern" },
+            ];
+        case "sword-shield":
+            return [
+                { stat: "HP", species: ["skwovet"], ev: "+1 HP each", location: "Route 1" },
+                { stat: "Attack", species: ["timburr"], ev: "+1 Attack each", location: "Galar Mine No. 1" },
+                { stat: "Defense", species: ["rolycoly"], ev: "+1 Defense each", location: "Route 3" },
+                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Watchtower Ruins" },
+                { stat: "Sp. Def", species: ["duskull"], ev: "+1 Sp. Def each", location: "Watchtower Ruins (night)" },
+                { stat: "Speed", species: ["rookidee"], ev: "+1 Speed each", location: "Route 2" },
+            ];
+        case "brilliant-diamond-shining-pearl":
+            return [
+                { stat: "HP", species: ["bibarel"], ev: "+2 HP each", location: "Route 212" },
+                { stat: "Attack", species: ["gyarados"], ev: "+2 Attack each", location: "Surf (Route 218)" },
+                { stat: "Defense", species: ["graveler"], ev: "+2 Defense each", location: "Iron Island / Grand Underground" },
+                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Lost Tower" },
+                { stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
+                { stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Near Sandgem Town" },
+            ];
+        case "scarlet-violet":
+        case "legends-za":
+            return [
+                { stat: "HP", species: ["marill", "azumarill"], ev: "+2 HP" },
+                { stat: "HP", species: ["azumarill"], ev: "+3 HP" },
+                { stat: "Attack", species: ["heracross", "bisharp", "lokix"], ev: "+2 Attack" },
+                { stat: "Attack", species: ["luxray"], ev: "+3 Attack" },
+                { stat: "Defense", species: ["bergmite"], ev: "+1 Defense" },
+                { stat: "Defense", species: ["avalugg", "slowbro"], ev: "+2 Defense" },
+                { stat: "Sp. Atk", species: ["flaaffy", "girafarig"], ev: "+2 Sp. Atk" },
+                { stat: "Sp. Def", species: ["goomy", "sliggoo"], ev: "+1 Sp. Def" },
+                { stat: "Sp. Def", species: ["swablu", "altaria"], ev: "+2 Sp. Def" },
+                { stat: "Speed", species: ["murkrow", "pawmi", "deerling", "rookidee", "wattrel"], ev: "+1 Speed" },
+                { stat: "Speed", species: ["corvisquire", "cyclizar"], ev: "+2 Speed" },
+            ];
+        default:
+            return null;
+    }
+}
 function parseSimpleEvNumber(evText) {
     const raw = String(evText || "").toLowerCase();
     // ignore ranges like "+1–2" or "+1-2"
@@ -90,7 +252,7 @@ function parseSimpleEvNumber(evText) {
     return Number.isFinite(n) ? n : null;
 }
 
-function renderGoToTargets(items) {
+function renderGoToTargets(items, onOpenMap, getMapSrc) {
     if (!Array.isArray(items) || items.length === 0) return null;
     // Group by stat label
     const groups = new Map();
@@ -137,10 +299,14 @@ function renderGoToTargets(items) {
             const rightLocs = Array.from(new Set(rightItems.map((it) => it.location).filter(Boolean))).map((loc) => String(loc).split(" / ").map((s) => s.trim()).filter(Boolean).join(" / ")).filter(Boolean);
             cards.push(
                 <div key={`g-${groupIndex++}-${statLabel}`} className="ev-target" role="listitem">
-                    <div className="ev-topline">
-                        <span className="ev-badge">{`+${low} ${statLabel}`}</span>
-                        <span className="ev-badge">{`+${high} ${statLabel}`}</span>
-                    </div>
+                    {getMapSrc ? (
+                        <MapImage
+                            src={getMapSrc(statLabel)}
+                            onOpen={onOpenMap}
+                            overlayLeft={<span className="ev-badge">{`+${low} ${statLabel}`}</span>}
+                            overlayRight={<span className="ev-badge">{`+${high} ${statLabel}`}</span>}
+                        />
+                    ) : null}
                     {renderTopRight([
                         leftLocs.join(" / "),
                         rightLocs.join(" / "),
@@ -173,10 +339,14 @@ function renderGoToTargets(items) {
             const locLines = Array.isArray(it.location) ? it.location : String(it.location || "").split(" / ").map((s) => s.trim()).filter(Boolean);
             cards.push(
                 <div key={`g-${groupIndex}-${statLabel}-${idx}`} className="ev-target" role="listitem">
-                    <div className="ev-topline">
-                        <span className="ev-badge">{String(it.ev || "").replace(/\s*each\b/gi, "")}</span>
-                        {renderTopRight(locLines, `g-${groupIndex}-${idx}`)}
-                    </div>
+                    {getMapSrc ? (
+                        <MapImage
+                            src={getMapSrc(it.stat)}
+                            onOpen={onOpenMap}
+                            overlayLeft={<span className="ev-badge">{String(it.ev || "").replace(/\s*each\b/gi, "")}</span>}
+                        />
+                    ) : null}
+                    {renderTopRight(locLines, `g-${groupIndex}-${idx}`)}
                     <div className="ev-target-sprites">
                         {(it.species || []).map((name) => (
                             <div key={name} className="ev-target-sprite-wrap" title={name} aria-label={name}>
@@ -200,6 +370,7 @@ function renderGoToTargets(items) {
 
 export default function EvTrainingPage() {
 	const [selectedGame, setSelectedGame] = useState(null);
+	const [openMapSrc, setOpenMapSrc] = useState(null);
 
 	const availableGames = useMemo(() => NATIONAL_GAME_OPTIONS, []);
 	const selectedDex = "national";
@@ -311,14 +482,14 @@ export default function EvTrainingPage() {
 							</div>
 							<div className="matchup-box">
 								<div className="matchup-title">Go-To Targets</div>
-							{renderGoToTargets([
+						{renderGoToTargets([
 								{ stat: "HP", species: ["whismur"], ev: "+1 HP each", location: "Rusturf Tunnel" },
 								{ stat: "Attack", species: ["shuppet"], ev: "+1 Attack each", location: "Mt. Pyre" },
 								{ stat: "Defense", species: ["geodude", "aron"], ev: "+1 Defense each", location: "Granite Cave" },
 								{ stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each", location: "Route 113" },
 								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Coastlines of Hoenn" },
 								{ stat: "Speed", species: ["zubat"], ev: "+1 Speed each", location: "Granite Cave" },
-							])}
+						], setOpenMapSrc)}
 							</div>
 							<div className="matchup-box">
 								<div className="matchup-title">Shopping Notes</div>
@@ -341,14 +512,14 @@ export default function EvTrainingPage() {
 							</div>
 							<div className="matchup-box">
 								<div className="matchup-title">Go-To Targets</div>
-							{renderGoToTargets([
+						{renderGoToTargets([
 								{ stat: "HP", species: ["drowzee"], ev: "+2 HP each", location: "Route 11" },
 								{ stat: "Attack", species: ["primeape"], ev: "+2 Attack each", location: "Route 23 / Sevii Islands (trainers)" },
 								{ stat: "Defense", species: ["onix", "graveler"], ev: "+2 Defense each", location: "Victory Road" },
 								{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Pokémon Tower" },
 								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Routes 19–21 (surf)" },
 								{ stat: "Speed", species: ["diglett", "dugtrio"], ev: "+1–2 Speed each", location: "Diglett's Cave" },
-							])}
+						], setOpenMapSrc)}
 							</div>
 							<div className="matchup-box">
 								<div className="matchup-title">Shopping Notes</div>
@@ -377,14 +548,14 @@ export default function EvTrainingPage() {
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Go-To Targets</div>
-							{renderGoToTargets([
+						{renderGoToTargets([
 								{ stat: "HP", species: ["wooper", "quagsire"], ev: "+1–2 HP each", location: "Union Cave B2F (surf)" },
 								{ stat: "Attack", species: ["mankey", "primeape"], ev: "+1–2 Attack each", location: "Route 42 rematches" },
 								{ stat: "Defense", species: ["graveler", "onix"], ev: "+2 Defense each", location: "Route 45" },
 								{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Sprout/Bell Tower (night)" },
 								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Route 41 (surf)" },
 								{ stat: "Speed", species: ["diglett", "pidgeotto"], ev: "+1–2 Speed each", location: "Diglett's Cave / Route 43" },
-							])}
+						], setOpenMapSrc)}
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Shopping Notes</div>
@@ -416,7 +587,7 @@ export default function EvTrainingPage() {
 							{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Old Chateau" },
 							{ stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
 							{ stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Route 201" },
-						])}
+						], setOpenMapSrc)}
 					</div>
 					<div className="matchup-box">
 						<div className="matchup-title">Shopping Notes</div>
@@ -443,14 +614,14 @@ export default function EvTrainingPage() {
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Go-To Targets</div>
-							{renderGoToTargets([
+						{renderGoToTargets([
 								{ stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Floccesy Ranch)" },
 								{ stat: "Attack", species: ["sandile"], ev: "+1 Attack each", location: "Desert Resort" },
 								{ stat: "Defense", species: ["boldore"], ev: "+2 Defense each", location: "Clay Tunnel" },
 								{ stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
 								{ stat: "Sp. Def", species: ["frillish", "jellicent"], ev: "+1–2 Sp. Def each", location: "Route 4 / Undella Bay (surf)" },
 								{ stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
-							])}
+						], setOpenMapSrc)}
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Shopping Notes</div>
@@ -482,7 +653,7 @@ export default function EvTrainingPage() {
 							{ stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
 							{ stat: "Sp. Def", species: ["frillish"], ev: "+1 Sp. Def each", location: "Undella Bay (surf)" },
 							{ stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
-						])}
+						], setOpenMapSrc)}
 					</div>
 					<div className="matchup-box">
 						<div className="matchup-title">Shopping Notes</div>
@@ -509,14 +680,14 @@ export default function EvTrainingPage() {
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Go-To Targets</div>
-							{renderGoToTargets([
+						{renderGoToTargets([
 								{ stat: "HP", species: ["whismur"], ev: "+1 HP each (hordes)", location: "Rusturf Tunnel" },
 								{ stat: "Attack", species: ["shuppet"], ev: "+1 Attack each (hordes)", location: "Route 121" },
 								{ stat: "Defense", species: ["geodude"], ev: "+1 Defense each (hordes)", location: "Granite Cave" },
 								{ stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each (hordes)", location: "Route 113" },
 								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Surf (Hoenn routes)" },
 								{ stat: "Speed", species: ["zubat"], ev: "+1 Speed each (hordes)", location: "Granite Cave" },
-							])}
+						], setOpenMapSrc)}
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Shopping Notes</div>
@@ -548,7 +719,7 @@ export default function EvTrainingPage() {
 							{ stat: "Sp. Atk", species: ["psyduck"], ev: "+1 Sp. Atk each (hordes)", location: "Route 7" },
 							{ stat: "Sp. Def", species: ["tentacool"], ev: "+1 Sp. Def each", location: "Route 12 (fishing)" },
 							{ stat: "Speed", species: ["fletchling"], ev: "+1 Speed each (hordes)", location: "Route 5" },
-						])}
+						], setOpenMapSrc)}
 					</div>
 					<div className="matchup-box">
 						<div className="matchup-title">Shopping Notes</div>
@@ -581,7 +752,7 @@ export default function EvTrainingPage() {
 							{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each (SOS)", location: "Hau'oli Cemetery" },
 							{ stat: "Sp. Def", species: ["dewpider"], ev: "+1 Sp. Def each (SOS)", location: "Brooklet Hill" },
 							{ stat: "Speed", species: ["zubat"], ev: "+1 Speed each (SOS)", location: "Verdant Cavern" },
-						])}
+						], setOpenMapSrc)}
 					</div>
 					<div className="matchup-box">
 						<div className="matchup-title">Shopping Notes</div>
@@ -655,14 +826,14 @@ export default function EvTrainingPage() {
 						</div>
 						<div className="matchup-box">
 							<div className="matchup-title">Go-To Targets</div>
-							{renderGoToTargets([
+						{renderGoToTargets([
 								{ stat: "HP", species: ["skwovet"], ev: "+1 HP each", location: "Route 1" },
 								{ stat: "Attack", species: ["timburr"], ev: "+1 Attack each", location: "Galar Mine No. 1" },
 								{ stat: "Defense", species: ["rolycoly"], ev: "+1 Defense each", location: "Route 3" },
 								{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Watchtower Ruins" },
 								{ stat: "Sp. Def", species: ["duskull"], ev: "+1 Sp. Def each", location: "Watchtower Ruins (night)" },
 								{ stat: "Speed", species: ["rookidee"], ev: "+1 Speed each", location: "Route 2" },
-							])}
+						], setOpenMapSrc)}
 						</div>
 					</div>
 				);
@@ -686,7 +857,7 @@ export default function EvTrainingPage() {
 							{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Lost Tower" },
 							{ stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
 							{ stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Near Sandgem Town" },
-						])}
+						], setOpenMapSrc)}
 					</div>
 					<div className="matchup-box">
 						<div className="matchup-title">Shopping Notes</div>
@@ -712,22 +883,7 @@ export default function EvTrainingPage() {
 							<li>Vitamins jump straight to 252 in a stat if you prefer spending cash/LP.</li>
 						</ul>
 					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-							{ stat: "HP", species: ["marill", "azumarill"], ev: "+2 HP" },
-							{ stat: "HP", species: ["azumarill"], ev: "+3 HP" },
-							{ stat: "Attack", species: ["heracross", "bisharp", "lokix"], ev: "+2 Attack" },
-							{ stat: "Attack", species: ["luxray"], ev: "+3 Attack" },
-							{ stat: "Defense", species: ["bergmite"], ev: "+1 Defense" },
-							{ stat: "Defense", species: ["avalugg", "slowbro"], ev: "+2 Defense" },
-							{ stat: "Sp. Atk", species: ["flaaffy", "girafarig"], ev: "+2 Sp. Atk" },
-							{ stat: "Sp. Def", species: ["goomy", "sliggoo"], ev: "+1 Sp. Def" },
-							{ stat: "Sp. Def", species: ["swablu", "altaria"], ev: "+2 Sp. Def" },
-							{ stat: "Speed", species: ["murkrow", "pawmi", "deerling", "rookidee", "wattrel"], ev: "+1 Speed" },
-							{ stat: "Speed", species: ["corvisquire", "cyclizar"], ev: "+2 Speed" },
-						])}
-					</div>
+					{/* Go-To Targets are rendered in the right column via the main layout */}
 					<div className="matchup-box">
 						<div className="matchup-title">Speedy Farming Spots</div>
 						<ul className="game-modal-method-description">
@@ -782,11 +938,11 @@ export default function EvTrainingPage() {
 						resolveLogoUrls={resolveLogoUrls}
 					/>
 				)}
-		<section className="content single-col" style={{ paddingTop: 16 }}>
-			<div className="matchup-grid" style={{ marginBottom: 16 }}>
-					<div className="matchup-box">
-						<div className="matchup-title">EV Basics</div>
-						<ul className="game-modal-method-description">
+				<section className="content ev-layout" style={{ paddingTop: 16 }}>
+					<div className="ev-col-left">
+						<div className="matchup-box">
+							<div className="matchup-title">EV Basics</div>
+							<ul className="game-modal-method-description">
 							<li>Each Pokémon can invest up to 510 EVs overall, with no more than 252 EVs in a single stat.</li>
 							<li>Every 4 EVs in a stat translate to roughly +1 actual stat point at level 100 (less at lower levels).</li>
 							<li>Defeating or catching a Pokémon grants EVs based on its species; battling with Pokérus or Power Items multiplies those gains.</li>
@@ -794,8 +950,20 @@ export default function EvTrainingPage() {
 							<li>Natures modify final stats by ±10%; pair your EV spread with a matching nature to squeeze the most value out of each point.</li>
 						</ul>
 					</div>
-				<div className="matchup-box">
-					<div className="vitamin-columns">
+						{selectedGame ? (
+							renderGuideFor(selectedGame)
+						) : (
+							<div className="matchup-box">
+								<div className="matchup-title">Select a Game</div>
+								<p style={{ margin: 0 }}>
+									Choose a game above to see EV training specifics for that version.
+								</p>
+							</div>
+						)}
+					</div>
+					<div className="ev-col-right">
+						<div className="matchup-box">
+							<div className="vitamin-columns">
 						<div className="vitamin-column">
 							<div className="vitamin-column-title">Vitamins</div>
 							<ul className="game-modal-method-description vitamin-list">
@@ -937,21 +1105,42 @@ export default function EvTrainingPage() {
 								</li>
 							</ul>
 						</div>
-					</div>
-				</div>
-			</div>
-					{selectedGame ? (
-			renderGuideFor(selectedGame)
-					) : (
-						<div className="matchup-box">
-							<div className="matchup-title">Select a Game</div>
-							<p style={{ margin: 0 }}>
-								Choose a game above to see EV training specifics for that version.
-							</p>
+							</div>
 						</div>
-					)}
+						{selectedGame ? (() => {
+							const items = getTargetsForGame(selectedGame);
+							if (!items || items.length === 0) return null;
+									const mapFn = (["scarlet-violet", "legends-za"]).includes(selectedGame)
+										? (stat) => {
+											const m = new Map([
+												["HP", "/maps/scarletviolet/hp.webp"],
+												["Attack", "/maps/scarletviolet/attack.webp"],
+												["Defense", "/maps/scarletviolet/defense.webp"],
+												["Sp. Atk", "/maps/scarletviolet/spattack.webp"],
+												["Sp. Def", "/maps/scarletviolet/spdef.webp"],
+												["Speed", "/maps/scarletviolet/speed.webp"],
+											]);
+											return m.get(String(stat));
+										}
+										: undefined;
+							return (
+							<div className="matchup-box">
+								<div className="matchup-title">Go-To Targets</div>
+								{renderGoToTargets(items, setOpenMapSrc, mapFn)}
+							</div>
+						);
+						})() : null}
+					</div>
 				</section>
 			</main>
+			{openMapSrc ? (
+				<div className="ev-map-modal" onClick={() => setOpenMapSrc(null)}>
+					<div className="ev-map-modal-inner" onClick={(e) => e.stopPropagation()}>
+						<img src={openMapSrc} alt="Full map" />
+						<button className="ev-map-close" onClick={() => setOpenMapSrc(null)} aria-label="Close map">×</button>
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 }
