@@ -1603,6 +1603,13 @@ function App() {
       return false;
     }
   });
+  const [animated, setAnimated] = useState(() => {
+    try {
+      return localStorage.getItem("pref:animated") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
   const [gameIndexes, setGameIndexes] = useState(() => new Map());
   const typeIndexRef = useRef(new Map());
@@ -2814,6 +2821,7 @@ function App() {
           setSelectedGame,
           setSelectedDex,
           clearSelection,
+          setShowFilters,
         }}
       />
 
@@ -2860,7 +2868,7 @@ function App() {
                             dexNumber={dexDisplay}
                             shiny={shiny}
                             detailsCache={detailsCache}
-                          eagerLoad={index < 6}
+                            eagerLoad={index < 6}
                           />
                         );
                       })}
@@ -2896,9 +2904,11 @@ function App() {
               dexNumber={selectedDexNumber}
               selectedDex={selectedDex}
               selectedGame={selectedGame}
-            pokemonIdLookup={pokemonIdLookup}
-            shiny={shiny}
-            setShiny={setShiny}
+              pokemonIdLookup={pokemonIdLookup}
+              shiny={shiny}
+              setShiny={setShiny}
+              animated={animated}
+              setAnimated={setAnimated}
             />
             </ErrorBoundary>
           </section>
@@ -3040,6 +3050,8 @@ function DetailPanel({
   pokemonIdLookup,
   shiny = false,
   setShiny,
+  animated = false,
+  setAnimated,
 }) {
   const pokemonIdMap = useMemo(() => {
     if (pokemonIdLookup instanceof Map) return pokemonIdLookup;
@@ -3050,13 +3062,6 @@ function DetailPanel({
   }, [pokemonIdLookup]);
   const { id, name, url } = selected || {};
   const [details, setDetails] = useState(null);
-  const [animated, setAnimated] = useState(() => {
-    try {
-      return localStorage.getItem("pref:animated") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [female, setFemale] = useState(() => {
     try {
       return localStorage.getItem("pref:female") === "1";
@@ -3609,7 +3614,14 @@ function DetailPanel({
     const inner = (
       <>
         <span className="evo-tree-icon">
-          <SpriteImage id={node.id} alt={node.name} width={size} height={size} loading="lazy" shiny={shiny} />
+          <SpriteImage
+            id={node.id}
+            alt={node.name}
+            width={size}
+            height={size}
+            loading="lazy"
+            shiny={shiny}
+          />
         </span>
         <span className="evo-tree-name text-capitalize">{nodeName}</span>
       </>
@@ -3770,7 +3782,14 @@ function DetailPanel({
                       aria-pressed={isActiveForm}
                       title={formName}
                     >
-                      <SpriteImage id={form.id} alt={form.name} width={30} height={30} loading="lazy" shiny={shiny} />
+                      <SpriteImage
+                        id={form.id}
+                        alt={form.name}
+                        width={30}
+                        height={30}
+                        loading="lazy"
+                        shiny={shiny}
+                      />
                       <span className="evo-tree-form-name">{formName}</span>
                     </button>
                   );
@@ -4983,6 +5002,63 @@ function DetailPanel({
       seen.add(str);
       sources.push(str);
     };
+    const basePath = getBasePath();
+    const local = (p) => `${basePath}${p.startsWith("/") ? p.slice(1) : p}`;
+    const parseIdFromUrl = (url) => {
+      if (typeof url !== "string") return null;
+      const parts = url.split("/").filter(Boolean);
+      const maybe = Number(parts[parts.length - 1]);
+      if (Number.isFinite(maybe) && maybe >= 0 && maybe < 100000) {
+        return maybe;
+      }
+      return null;
+    };
+    const toNumericId = (value) => {
+      if (value == null) return null;
+      if (typeof value === "number") {
+        if (Number.isFinite(value) && value >= 0 && value < 100000) return value;
+        return null;
+      }
+      const str = String(value).trim();
+      if (!str) return null;
+      const match = str.match(/\d+/);
+      if (!match) return null;
+      const num = Number(match[0]);
+      if (!Number.isFinite(num) || num < 0 || num >= 100000) return null;
+      return num;
+    };
+    const spriteId = (() => {
+      const candidates = [
+        id,
+        details?.id,
+        species?.id,
+        details?.species?.id,
+        parseIdFromUrl(details?.species?.url),
+        parseIdFromUrl(species?.url),
+      ];
+      for (const candidate of candidates) {
+        const numeric = toNumericId(candidate);
+        if (numeric != null) {
+          return String(numeric);
+        }
+      }
+      return null;
+    })();
+
+    const effectiveSpriteId = spriteId ?? "0";
+    const localHomeSources = (() => {
+      if (!effectiveSpriteId) return [];
+      const list = [];
+      if (shiny) {
+        list.push(local(`/sprites/pokemon/other/home/shiny/${effectiveSpriteId}.png`));
+      }
+      list.push(local(`/sprites/pokemon/other/home/${effectiveSpriteId}.png`));
+      return list;
+    })();
+
+    if (!animated && !isFemaleActive) {
+      localHomeSources.forEach(push);
+    }
 
     const pixel = (() => {
       if (shiny && isFemaleActive) {
@@ -4998,6 +5074,35 @@ function DetailPanel({
     })();
 
     if (animated) {
+      if (effectiveSpriteId) {
+        // Prefer animated Showdown GIFs with correct gender/shiny where available
+        if (shiny && isFemaleActive) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/female/${effectiveSpriteId}.gif`);
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${effectiveSpriteId}-f.gif`);
+        }
+        if (shiny) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${effectiveSpriteId}.gif`);
+        }
+        if (isFemaleActive) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/female/${effectiveSpriteId}.gif`);
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${effectiveSpriteId}-f.gif`);
+        }
+        push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${effectiveSpriteId}.gif`);
+
+        // PNG fallbacks for female/shiny combinations (if GIFs are not present)
+        if (shiny && isFemaleActive) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/female/${effectiveSpriteId}.png`);
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${effectiveSpriteId}-f.png`);
+        }
+        if (shiny) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${effectiveSpriteId}.png`);
+        }
+        if (isFemaleActive) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/female/${effectiveSpriteId}.png`);
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${effectiveSpriteId}-f.png`);
+        }
+        push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${effectiveSpriteId}.png`);
+      }
       const showdownKey = shiny
         ? (isFemaleActive ? "front_shiny_female" : "front_shiny")
         : (isFemaleActive ? "front_female" : "front_default");
@@ -5012,6 +5117,7 @@ function DetailPanel({
       if (femStatic && femStatic !== homeFem) {
         push(femStatic);
       }
+      localHomeSources.forEach(push);
     }
 
     const home = d?.home?.[shiny ? "front_shiny" : "front_default"];

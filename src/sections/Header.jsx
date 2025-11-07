@@ -22,20 +22,17 @@ function HeaderSection({
         </h1>
         <CategoryToggle />
         <div className="search-row">
-          <div className="filters-toggle" aria-label="Filters visibility">
-            <span className="filters-toggle-label">Filters</span>
+          {!showFilters ? (
             <button
               type="button"
-              className={`ios-switch${showFilters ? " is-on" : ""}`}
-              role="switch"
-              aria-checked={showFilters}
-              aria-label={showFilters ? "Hide filters" : "Show filters"}
-              onClick={() => setShowFilters((v) => !v)}
+              className="filters-show-fab"
+              aria-label="Show filters"
+              onClick={() => setShowFilters(true)}
+              title="Show filters"
             >
-              <span className="ios-switch-track" aria-hidden="true"></span>
-              <span className="ios-switch-thumb" aria-hidden="true"></span>
+              ▼ Show filters
             </button>
-          </div>
+          ) : null}
           <input
             className="search"
             placeholder="Search Pokemon"

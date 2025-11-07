@@ -4,6 +4,7 @@ const CATEGORIES = [
   { key: "pokemon", label: "Pokemon", hash: "" },
   { key: "moves", label: "Moves", hash: "#/moves" },
   { key: "abilities", label: "Abilities", hash: "#/abilities" },
+  { key: "ev", label: "EV Training", hash: "#/ev-training" },
   { key: "whosthat", label: "Who's That?", hash: "#/whosthat" },
 ];
 
@@ -12,6 +13,7 @@ function getActiveCategory() {
   if (hash.startsWith("#/items")) return "items";
   if (hash.startsWith("#/moves")) return "moves";
   if (hash.startsWith("#/abilities")) return "abilities";
+  if (hash.startsWith("#/ev-training") || hash.startsWith("#/ev")) return "ev";
   if (hash.startsWith("#/whosthat")) return "whosthat";
   return "pokemon";
 }

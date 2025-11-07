@@ -14,6 +14,7 @@ export default function FilterTabs({
   setSelectedGame,
   setSelectedDex,
   clearSelection,
+  setShowFilters,
 }) {
   const [activeTab, setActiveTab] = useState("types");
 
@@ -23,8 +24,19 @@ export default function FilterTabs({
         {/* Desktop: Show all filters */}
         <div className="filters-desktop">
           <div className="filters-row">
-            <div className="filter-box-wrap">
+            <div className="filter-box-wrap has-hide-control">
               <div className="filter-box-title">Types</div>
+              {setShowFilters ? (
+                <button
+                  type="button"
+                  className="filters-hide-affix"
+                  aria-label="Hide filters"
+                  onClick={() => setShowFilters(false)}
+                  title="Hide filters"
+                >
+                  ▲ Hide filters
+                </button>
+              ) : null}
               <div className="filter-box">
                 <div className="type-filters">
                   {ALL_TYPES.map((t) => (
