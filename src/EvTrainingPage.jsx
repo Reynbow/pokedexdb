@@ -225,7 +225,6 @@ function getTargetsForGame(gameKey) {
                 { stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Near Sandgem Town" },
             ];
         case "scarlet-violet":
-        case "legends-za":
             return [
                 { stat: "HP", species: ["marill", "azumarill"], ev: "+2 HP" },
                 { stat: "HP", species: ["azumarill"], ev: "+3 HP" },
@@ -238,6 +237,26 @@ function getTargetsForGame(gameKey) {
                 { stat: "Sp. Def", species: ["swablu", "altaria"], ev: "+2 Sp. Def" },
                 { stat: "Speed", species: ["murkrow", "pawmi", "deerling", "rookidee", "wattrel"], ev: "+1 Speed" },
                 { stat: "Speed", species: ["corvisquire", "cyclizar"], ev: "+2 Speed" },
+            ];
+        case "legends-za":
+            return [
+                // HP — Wild Zone 12
+                { stat: "HP", species: ["snorunt"], ev: "+1 HP", location: "Wild Zone 12" },
+                { stat: "HP", species: ["gogoat"], ev: "+2 HP", location: "Wild Zone 12" },
+                // Attack — Wild Zone 13
+                { stat: "Attack", species: ["scyther", "phantump"], ev: "+1 Attack", location: "Wild Zone 13" },
+                { stat: "Attack", species: ["weepinbell", "pinsir", "heracross"], ev: "+2 Attack", location: "Wild Zone 13" },
+                // Defense — Wild Zone 14
+                { stat: "Defense", species: ["onix", "aron"], ev: "+1 Defense", location: "Wild Zone 14" },
+                { stat: "Defense", species: ["lairon"], ev: "+2 Defense", location: "Wild Zone 14" },
+                // Sp. Atk — Wild Zone 17
+                { stat: "Sp. Atk", species: ["lampent", "pyroar"], ev: "+2 Sp. Atk", location: "Wild Zone 17" },
+                // Sp. Def — Wild Zone 18
+                { stat: "Sp. Def", species: ["swablu"], ev: "+1 Sp. Def", location: "Wild Zone 18" },
+                { stat: "Sp. Def", species: ["altaria"], ev: "+2 Sp. Def", location: "Wild Zone 18" },
+                // Speed — Wild Zone 3
+                { stat: "Speed", species: ["fletchling", "espurr"], ev: "+1 Speed", location: "Wild Zone 3" },
+                { stat: "Speed", species: ["pikachu"], ev: "+2 Speed", location: "Wild Zone 3" },
             ];
         default:
             return null;
@@ -900,26 +919,41 @@ export default function EvTrainingPage() {
 			);
 		}
 		if (inList(gen9)) {
+			if (gameKey === "scarlet-violet") {
+				return (
+					<div className="matchup-grid">
+						<div className="matchup-box">
+							<div className="matchup-title">Scarlet & Violet: Quick Start</div>
+							<ul className="game-modal-method-description">
+								<li>Power Items add +8 EVs; 1 EV foes give 9 EVs total, so 28 KOs hits 252.</li>
+								<li>2 EV foes (e.g., Cyclizar) give 10 EVs; only 26 KOs needed.</li>
+								<li>Your whole party gains EVs from battles, so box anything you don't want training.</li>
+								<li>Auto-battles (R button) give zero EVs; battle manually.</li>
+								<li>Vitamins jump straight to 252 in a stat if you prefer spending cash/LP.</li>
+							</ul>
+						</div>
+						{/* Go-To Targets are rendered in the right column via the main layout */}
+						<div className="matchup-box">
+							<div className="matchup-title">Shop Cheat Sheet</div>
+							<ul className="game-modal-method-description">
+								<li>Power Items: Delibird Presents (Mesagoza/Levincia/Cascarrafa) for 10,000₽.</li>
+								<li>Vitamins & Feathers: Chansey Supply (same cities) for 10,000₽ per vitamin.</li>
+								<li>Feathers & EV berries also show up via Porto Marinada auctions and overworld pickups.</li>
+								<li>Track KOs via move PP or the in-game EV graph to stay on script.</li>
+							</ul>
+						</div>
+					</div>
+				);
+			}
+			// Legends: Z-A
 			return (
 				<div className="matchup-grid">
 					<div className="matchup-box">
-						<div className="matchup-title">Scarlet & Violet: Quick Start</div>
+						<div className="matchup-title">Legends: Z-A: EV Training</div>
 						<ul className="game-modal-method-description">
-							<li>Power Items add +8 EVs; 1 EV foes give 9 EVs total, so 28 KOs hits 252.</li>
-							<li>2 EV foes (e.g., Cyclizar) give 10 EVs; only 26 KOs needed.</li>
-							<li>Your whole party gains EVs from battles, so box anything you don't want training.</li>
-							<li>Auto-battles (R button) give zero EVs; battle manually.</li>
-							<li>Vitamins jump straight to 252 in a stat if you prefer spending cash/LP.</li>
-						</ul>
-					</div>
-					{/* Go-To Targets are rendered in the right column via the main layout */}
-					<div className="matchup-box">
-						<div className="matchup-title">Shop Cheat Sheet</div>
-						<ul className="game-modal-method-description">
-							<li>Power Items: Delibird Presents (Mesagoza/Levincia/Cascarrafa) for 10,000₽.</li>
-							<li>Vitamins & Feathers: Chansey Supply (same cities) for 10,000₽ per vitamin.</li>
-							<li>Feathers & EV berries also show up via Porto Marinada auctions and overworld pickups.</li>
-							<li>Track KOs via move PP or the in-game EV graph to stay on script.</li>
+							<li>Farm EVs by battling in Wild Zones. Each Wild Zone concentrates species that award the same stat.</li>
+							<li>Several zones offer +1 to +2 EVs per KO across many species; focus on zones with dense spawns.</li>
+							<li>Use wide-coverage or AoE moves to clear aggressive packs efficiently (e.g., in Wild Zone 8).</li>
 						</ul>
 					</div>
 				</div>
@@ -1184,15 +1218,28 @@ export default function EvTrainingPage() {
 									const mapFn = (["scarlet-violet", "legends-za", "sword-shield"]).includes(selectedGame)
 										? (stat) => {
 											if (selectedGame === "scarlet-violet" || selectedGame === "legends-za") {
-												const sv = new Map([
-													["HP", "/maps/scarletviolet/hp.webp"],
-													["Attack", "/maps/scarletviolet/attack.webp"],
-													["Defense", "/maps/scarletviolet/defense.webp"],
-													["Sp. Atk", "/maps/scarletviolet/spattack.webp"],
-													["Sp. Def", "/maps/scarletviolet/spdef.webp"],
-													["Speed", "/maps/scarletviolet/speed.webp"],
-												]);
-												return sv.get(String(stat));
+												if (selectedGame === "scarlet-violet") {
+													const sv = new Map([
+														["HP", "/maps/scarletviolet/hp.webp"],
+														["Attack", "/maps/scarletviolet/attack.webp"],
+														["Defense", "/maps/scarletviolet/defense.webp"],
+														["Sp. Atk", "/maps/scarletviolet/spattack.webp"],
+														["Sp. Def", "/maps/scarletviolet/spdef.webp"],
+														["Speed", "/maps/scarletviolet/speed.webp"],
+													]);
+													return sv.get(String(stat));
+												}
+												if (selectedGame === "legends-za") {
+													const za = new Map([
+														["HP", "/maps/legendsza/hp.webp"],
+														["Attack", "/maps/legendsza/attack.webp"],
+														["Defense", "/maps/legendsza/defense.webp"],
+														["Sp. Atk", "/maps/legendsza/spattack.webp"],
+														["Sp. Def", "/maps/legendsza/spdef.webp"],
+														["Speed", "/maps/legendsza/speed.webp"],
+													]);
+													return za.get(String(stat));
+												}
 											}
 											if (selectedGame === "sword-shield") {
 												const swsh = new Map([
@@ -1213,9 +1260,11 @@ export default function EvTrainingPage() {
 										// Build location text
 										let locText = "";
 										if (ctx?.type === "split") {
-											const left = String((ctx.leftLocs || []).join(" / ")).trim();
-											const right = String((ctx.rightLocs || []).join(" / ")).trim();
-											locText = [left, right].filter(Boolean).join(" / ");
+											const combined = [...(ctx.leftLocs || []), ...(ctx.rightLocs || [])]
+												.map((s) => String(s || "").trim())
+												.filter(Boolean);
+											const unique = Array.from(new Set(combined));
+											locText = unique.join(" / ");
 										} else {
 											locText = String((ctx.locLines || []).join(" / ")).trim();
 										}
@@ -1238,7 +1287,7 @@ export default function EvTrainingPage() {
 				<div className="ev-map-modal" onClick={() => setOpenMapSrc(null)}>
 					<div className="ev-map-modal-inner" onClick={(e) => e.stopPropagation()}>
 						<img src={openMapSrc} alt="Full map" />
-						<button className="ev-map-close" onClick={() => setOpenMapSrc(null)} aria-label="Close map">×</button>
+						<button className="ev-map-close ev-badge ev-badge-top" onClick={() => setOpenMapSrc(null)} aria-label="Close map">×</button>
 					</div>
 				</div>
 			) : null}
