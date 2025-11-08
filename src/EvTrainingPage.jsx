@@ -100,7 +100,7 @@ function getMapCandidatesForStat(statLabel) {
     return files;
 }
 
-function MapImage({ statLabel = null, src = null, onOpen, overlayLeft = null, overlayRight = null }) {
+function MapImage({ statLabel = null, src = null, onOpen, overlayLeft = null, overlayRight = null, overlayTopRight = null }) {
     const inferred = useMemo(() => (src ? [src] : getMapCandidatesForStat(statLabel)), [statLabel, src]);
     const [index, setIndex] = useState(0);
     if (inferred.length === 0) return null;
@@ -110,6 +110,7 @@ function MapImage({ statLabel = null, src = null, onOpen, overlayLeft = null, ov
     return (
         <div className="ev-map-wrap">
             <img className="ev-map" src={current} alt={`${statLabel || "map"} map`} onError={handleError} onClick={handleClick} loading="lazy" />
+			{overlayTopRight}
             {(overlayLeft || overlayRight) ? (
                 <div className="ev-map-overlay" aria-hidden="true">
                     <div className="ev-map-overlay-left">{overlayLeft}</div>
@@ -207,12 +208,12 @@ function getTargetsForGame(gameKey) {
             ];
         case "sword-shield":
             return [
-                { stat: "HP", species: ["skwovet"], ev: "+1 HP each", location: "Route 1" },
-                { stat: "Attack", species: ["timburr"], ev: "+1 Attack each", location: "Galar Mine No. 1" },
-                { stat: "Defense", species: ["rolycoly"], ev: "+1 Defense each", location: "Route 3" },
-                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Watchtower Ruins" },
-                { stat: "Sp. Def", species: ["duskull"], ev: "+1 Sp. Def each", location: "Watchtower Ruins (night)" },
-                { stat: "Speed", species: ["rookidee"], ev: "+1 Speed each", location: "Route 2" },
+                { stat: "Attack", species: ["perrserker"], ev: "+2 Attack", location: "Route 7" },
+                { stat: "Defense", species: ["torkoal", "carkol"], ev: "+2 Defense", location: "Wild Area" },
+                { stat: "Speed", species: ["liepard", "galvantula"], ev: "+2 Speed", location: "Route 7" },
+                { stat: "Sp. Atk", species: ["maractus"], ev: "+2 Sp. Atk", location: "Wild Area / Route 6" },
+                { stat: "Sp. Def", species: ["duskull"], ev: "+1 Sp. Def", location: "Wild Area" },
+                { stat: "HP", species: ["wobbuffet", "diggersby", "noctowl"], ev: "+2 HP", location: "Wild Area" },
             ];
         case "brilliant-diamond-shining-pearl":
             return [
@@ -252,7 +253,7 @@ function parseSimpleEvNumber(evText) {
     return Number.isFinite(n) ? n : null;
 }
 
-function renderGoToTargets(items, onOpenMap, getMapSrc) {
+function renderGoToTargets(items, onOpenMap, getMapSrc, getOverlayTopRight) {
     if (!Array.isArray(items) || items.length === 0) return null;
     // Group by stat label
     const groups = new Map();
@@ -297,20 +298,31 @@ function renderGoToTargets(items, onOpenMap, getMapSrc) {
             const rightSpecies = rightItems.flatMap((it) => Array.isArray(it.species) ? it.species : []).filter(Boolean);
             const leftLocs = Array.from(new Set(leftItems.map((it) => it.location).filter(Boolean))).map((loc) => String(loc).split(" / ").map((s) => s.trim()).filter(Boolean).join(" / ")).filter(Boolean);
             const rightLocs = Array.from(new Set(rightItems.map((it) => it.location).filter(Boolean))).map((loc) => String(loc).split(" / ").map((s) => s.trim()).filter(Boolean).join(" / ")).filter(Boolean);
-            cards.push(
+			const shouldShowTopRight = !getOverlayTopRight;
+			cards.push(
                 <div key={`g-${groupIndex++}-${statLabel}`} className="ev-target" role="listitem">
                     {getMapSrc ? (
                         <MapImage
                             src={getMapSrc(statLabel)}
                             onOpen={onOpenMap}
                             overlayLeft={<span className="ev-badge">{`+${low} ${statLabel}`}</span>}
-                            overlayRight={<span className="ev-badge">{`+${high} ${statLabel}`}</span>}
+							overlayRight={<span className="ev-badge">{`+${high} ${statLabel}`}</span>}
+							overlayTopRight={
+								typeof getOverlayTopRight === "function"
+									? getOverlayTopRight({
+											type: "split",
+											statLabel,
+											leftLocs,
+											rightLocs,
+									  })
+									: null
+							}
                         />
                     ) : null}
-                    {renderTopRight([
-                        leftLocs.join(" / "),
-                        rightLocs.join(" / "),
-                    ].filter(Boolean), `g-${groupIndex}`)}
+					{shouldShowTopRight ? renderTopRight([
+						leftLocs.join(" / "),
+						rightLocs.join(" / "),
+					].filter(Boolean), `g-${groupIndex}`) : null}
                     <div className="ev-split">
                         <div className="ev-split-col">
                             {leftSpecies.map((name) => (
@@ -334,9 +346,10 @@ function renderGoToTargets(items, onOpenMap, getMapSrc) {
             continue;
         }
 
-        // Fallback: render each entry as its own card
+		// Fallback: render each entry as its own card
         list.forEach((it, idx) => {
             const locLines = Array.isArray(it.location) ? it.location : String(it.location || "").split(" / ").map((s) => s.trim()).filter(Boolean);
+			const shouldShowTopRight = !getOverlayTopRight;
             cards.push(
                 <div key={`g-${groupIndex}-${statLabel}-${idx}`} className="ev-target" role="listitem">
                     {getMapSrc ? (
@@ -344,9 +357,18 @@ function renderGoToTargets(items, onOpenMap, getMapSrc) {
                             src={getMapSrc(it.stat)}
                             onOpen={onOpenMap}
                             overlayLeft={<span className="ev-badge">{String(it.ev || "").replace(/\s*each\b/gi, "")}</span>}
+							overlayTopRight={
+								typeof getOverlayTopRight === "function"
+									? getOverlayTopRight({
+											type: "single",
+											statLabel: it.stat,
+											locLines,
+									  })
+									: null
+							}
                         />
                     ) : null}
-                    {renderTopRight(locLines, `g-${groupIndex}-${idx}`)}
+					{shouldShowTopRight ? renderTopRight(locLines, `g-${groupIndex}-${idx}`) : null}
                     <div className="ev-target-sprites">
                         {(it.species || []).map((name) => (
                             <div key={name} className="ev-target-sprite-wrap" title={name} aria-label={name}>
@@ -1159,23 +1181,53 @@ export default function EvTrainingPage() {
 						{selectedGame ? (() => {
 							const items = getTargetsForGame(selectedGame);
 							if (!items || items.length === 0) return null;
-									const mapFn = (["scarlet-violet", "legends-za"]).includes(selectedGame)
+									const mapFn = (["scarlet-violet", "legends-za", "sword-shield"]).includes(selectedGame)
 										? (stat) => {
-											const m = new Map([
-												["HP", "/maps/scarletviolet/hp.webp"],
-												["Attack", "/maps/scarletviolet/attack.webp"],
-												["Defense", "/maps/scarletviolet/defense.webp"],
-												["Sp. Atk", "/maps/scarletviolet/spattack.webp"],
-												["Sp. Def", "/maps/scarletviolet/spdef.webp"],
-												["Speed", "/maps/scarletviolet/speed.webp"],
-											]);
-											return m.get(String(stat));
+											if (selectedGame === "scarlet-violet" || selectedGame === "legends-za") {
+												const sv = new Map([
+													["HP", "/maps/scarletviolet/hp.webp"],
+													["Attack", "/maps/scarletviolet/attack.webp"],
+													["Defense", "/maps/scarletviolet/defense.webp"],
+													["Sp. Atk", "/maps/scarletviolet/spattack.webp"],
+													["Sp. Def", "/maps/scarletviolet/spdef.webp"],
+													["Speed", "/maps/scarletviolet/speed.webp"],
+												]);
+												return sv.get(String(stat));
+											}
+											if (selectedGame === "sword-shield") {
+												const swsh = new Map([
+													["HP", "/maps/swordshield/hp.webp"],
+													["Attack", "/maps/swordshield/attack.webp"],
+													["Defense", "/maps/swordshield/defense.webp"],
+													["Sp. Atk", "/maps/swordshield/spattack.webp"],
+													["Sp. Def", "/maps/swordshield/spdef.webp"],
+													["Speed", "/maps/swordshield/speed.webp"],
+												]);
+												return swsh.get(String(stat));
+											}
+											return undefined;
 										}
 										: undefined;
+							const overlayTopRightFn = (selectedGame && selectedGame !== "scarlet-violet" && mapFn)
+								? (ctx) => {
+										// Build location text
+										let locText = "";
+										if (ctx?.type === "split") {
+											const left = String((ctx.leftLocs || []).join(" / ")).trim();
+											const right = String((ctx.rightLocs || []).join(" / ")).trim();
+											locText = [left, right].filter(Boolean).join(" / ");
+										} else {
+											locText = String((ctx.locLines || []).join(" / ")).trim();
+										}
+										if (!locText) return null;
+										// Render location pill at top-right of the image
+										return <span className="ev-badge ev-location-badge ev-badge-top">{locText}</span>;
+								  }
+								: undefined;
 							return (
 							<div className="matchup-box">
 								<div className="matchup-title">Go-To Targets</div>
-								{renderGoToTargets(items, setOpenMapSrc, mapFn)}
+								{renderGoToTargets(items, setOpenMapSrc, mapFn, overlayTopRightFn)}
 							</div>
 						);
 						})() : null}

@@ -6539,6 +6539,28 @@
   border-color: rgba(0, 0, 0, 0.6);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
+/* Ensure top-right map name pills match the dark stat pill style */
+.ev-map-wrap > .ev-badge.ev-location-badge {
+  background: rgba(17, 24, 39, 0.82);
+  color: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.ev-map-overlay-right-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+.ev-location-badge {
+  display: block;        /* allow wrapping */
+  max-width: 100%;       /* let pill expand to fit text within image */
+  text-align: right;
+  white-space: normal;   /* enable wrapping */
+  overflow: visible;     /* no cropping */
+  text-overflow: clip;
+  word-break: break-word; /* break long words if needed */
+}
 
 /* Modal for full-size map */
 .ev-map-modal {
