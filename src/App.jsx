@@ -35,6 +35,30 @@ import {
   REGION_FEATURES,
 } from "./constants/games.js";
 
+// Extra custom Pokémon entries that don't exist in PokeAPI but should appear in the Pokédex
+const EXTRA_POKEMON = [
+  // Use base Zygarde's pokemon URL so selecting the card still loads details
+  { name: "zygarde-mega", url: "https://pokeapi.co/api/v2/pokemon/718" },
+];
+
+// Extra custom alternate forms keyed by base species id
+// Note: Use id >= 100000 to avoid collisions with real PokeAPI pokemon ids
+const EXTRA_FORMS_BY_SPECIES = new Map([
+  [
+    718, // Zygarde (50% Forme) base species id
+    [
+      {
+        id: 100718,
+        name: "zygarde-mega",
+        displayName: "Zygarde Mega",
+        isDefault: false,
+        tags: ["Mega", "Legendary"],
+        isCurrent: false,
+      },
+    ],
+  ],
+]);
+
 const itemGenerationCache = new Map();
 const locationGenerationCache = new Map();
 const moveGenerationCache = new Map();
@@ -1856,7 +1880,15 @@ function App() {
         const list = Array.isArray(data.results) ? data.results : [];
         // Filter out any Totem forms from the root list
         const filtered = list.filter((entry) => !String(entry?.name || "").toLowerCase().includes("totem"));
-        setPokemon(filtered);
+        // Append custom extras if not already present
+        const merged = filtered.slice();
+        const hasByName = (n) => merged.some((e) => String(e?.name || "").toLowerCase() === String(n || "").toLowerCase());
+        EXTRA_POKEMON.forEach((extra) => {
+          if (extra?.name && extra?.url && !hasByName(extra.name)) {
+            merged.push({ name: extra.name, url: extra.url });
+          }
+        });
+        setPokemon(merged);
       });
   }, []);
 
@@ -4058,6 +4090,30 @@ function DetailPanel({
           const altForms = mapVarietiesToForms(data, { includeDefault: false });
           if (altForms.length) {
             formsBySpeciesId.set(speciesId, altForms);
+          }
+        });
+        // Inject custom extra forms (e.g., zygarde-mega) for relevant species
+        EXTRA_FORMS_BY_SPECIES.forEach((extras, sidNum) => {
+          const key = String(sidNum);
+          const existing = formsBySpeciesId.get(key) || [];
+          const existingIds = new Set(existing.map((f) => (f?.id != null ? String(f.id) : null)).filter(Boolean));
+          const mergedForms = existing.slice();
+          (Array.isArray(extras) ? extras : []).forEach((f) => {
+            const fid = f?.id != null ? String(f.id) : null;
+            if (!fid || existingIds.has(fid)) return;
+            mergedForms.push({
+              id: f.id,
+              name: f.name,
+              displayName: f.displayName || humanizeName(f.name),
+              isDefault: !!f.isDefault,
+              tags: Array.isArray(f.tags) ? f.tags.slice() : [],
+              isCurrent: !!f.isCurrent,
+              baseSpeciesId: key,
+            });
+          });
+          if (mergedForms.length !== existing.length) {
+            mergedForms.sort(compareForms);
+            formsBySpeciesId.set(key, mergedForms);
           }
         });
         if (!chain?.chain) return;

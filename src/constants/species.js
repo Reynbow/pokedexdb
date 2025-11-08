@@ -129,6 +129,7 @@ export const LEGENDARY_NAMES = new Set([
   "xerneas",
   "yveltal",
   "zygarde",
+  "zygarde-mega",
   "zygarde-10-power-construct",
   "zygarde-50-power-construct",
   "zygarde-complete",
