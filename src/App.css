@@ -1,8 +1,11 @@
 /* Two-column layout: left stacks all info, right shows vitamins and targets */
 .ev-layout {
   display: grid;
-  grid-template-columns: 40% 60%;
+  grid-template-columns: 2fr 3fr; /* avoid percentage + gap overflow */
   gap: 16px;
+}
+.ev-layout.pla-layout {
+  grid-template-columns: 13fr 7fr; /* approx 65/35 without gap overflow */
 }
 .ev-col-left,
 .ev-col-right {
@@ -1782,6 +1785,34 @@
   height: 36px;
   flex-shrink: 0;
   object-fit: contain;
+}
+/* Legends: Arceus Grit panel - enlarge icons without affecting layout box size */
+.grit-items-panel .grit-icon-wrap {
+  width: 36px;          /* match normal icon box */
+  height: 36px;         /* keep row height stable */
+  position: relative;
+  overflow: visible;     /* allow image to overflow bounds */
+  display: inline-block; /* keep layout inline with text */
+  flex: 0 0 auto;
+}
+.grit-items-panel .grit-icon {
+  width: 64px;          /* larger than wrapper to overflow */
+  height: 64px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+/* Make PLA grit panel single-column and allow text to span full width */
+.grit-items-panel .vitamin-columns {
+  grid-template-columns: 1fr;
+}
+.grit-items-panel .vitamin-item {
+  align-items: flex-start;
+}
+.grit-items-panel .vitamin-item > div {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 @media (max-width: 720px) {
   .matchup-grid {

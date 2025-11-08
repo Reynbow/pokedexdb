@@ -371,6 +371,7 @@ function renderGoToTargets(items, onOpenMap, getMapSrc) {
 export default function EvTrainingPage() {
 	const [selectedGame, setSelectedGame] = useState(null);
 	const [openMapSrc, setOpenMapSrc] = useState(null);
+	const isLegendsArceus = selectedGame === "legends-arceus";
 
 	const availableGames = useMemo(() => NATIONAL_GAME_OPTIONS, []);
 	const selectedDex = "national";
@@ -791,14 +792,20 @@ export default function EvTrainingPage() {
 					<div className="matchup-box">
 						<div className="matchup-title">Legends: Arceus: Effort Levels (ELs)</div>
 						<ul className="game-modal-method-description">
-							<li>No EVs. Uses Effort Levels (0–10) per stat, boosted with Grit items.</li>
-							<li>ELs increase stats directly; mechanics are separate from traditional EVs.</li>
+							<li>No IVs or traditional EV training; stats use Effort Levels (ELs) per stat.</li>
+							<li>ELs are 0–10 and increase stats directly; base stats are comparative, not formulaic.</li>
+							<li>Natures still modify stats; battles do not grant EVs like mainline games.</li>
+							<li>ELs are raised only by using Grit items.</li>
 						</ul>
 					</div>
 					<div className="matchup-box">
-						<div className="matchup-title">EL Items and where to buy</div>
+						<div className="matchup-title">How to get Grit</div>
 						<ul className="game-modal-method-description">
-							<li>Grit Dust/Gravel/Pebble/Rock: Trading Post (Jubilife Village) for Merit Points (MP); also drops and requests.</li>
+							<li>Defeat or capture Alpha Pokémon.</li>
+							<li>Mass release Pokémon from Pastures (most efficient).</li>
+							<li>Defeat or capture Pokémon after reaching 5th Star Rank.</li>
+							<li>Release Pokémon to receive Grit.</li>
+							<li>Trade lower-tier Grit for higher at the Training Area (Zisu) (pricey exchange rate).</li>
 						</ul>
 					</div>
 				</div>
@@ -929,18 +936,20 @@ export default function EvTrainingPage() {
 						resolveLogoUrls={resolveLogoUrls}
 					/>
 				)}
-				<section className="content ev-layout" style={{ paddingTop: 16 }}>
+				<section className={`content ev-layout${isLegendsArceus ? " pla-layout" : ""}`} style={{ paddingTop: 16 }}>
 					<div className="ev-col-left">
-						<div className="matchup-box">
-							<div className="matchup-title">EV Basics</div>
-							<ul className="game-modal-method-description">
-							<li>Each Pokémon can invest up to 510 EVs overall, with no more than 252 EVs in a single stat.</li>
-							<li>Every 4 EVs in a stat translate to roughly +1 actual stat point at level 100 (less at lower levels).</li>
-							<li>Defeating or catching a Pokémon grants EVs based on its species; battling with Pokérus or Power Items multiplies those gains.</li>
-							<li>Vitamins instantly add 10 EVs per use (up to the 252 cap), while feathers and Power Items give precise +1 or +8 boosts.</li>
-							<li>Natures modify final stats by ±10%; pair your EV spread with a matching nature to squeeze the most value out of each point.</li>
-						</ul>
-					</div>
+						{!isLegendsArceus && (
+							<div className="matchup-box">
+								<div className="matchup-title">EV Basics</div>
+								<ul className="game-modal-method-description">
+									<li>Each Pokémon can invest up to 510 EVs overall, with no more than 252 EVs in a single stat.</li>
+									<li>Every 4 EVs in a stat translate to roughly +1 actual stat point at level 100 (less at lower levels).</li>
+									<li>Defeating or catching a Pokémon grants EVs based on its species; battling with Pokérus or Power Items multiplies those gains.</li>
+									<li>Vitamins instantly add 10 EVs per use (up to the 252 cap), while feathers and Power Items give precise +1 or +8 boosts.</li>
+									<li>Natures modify final stats by ±10%; pair your EV spread with a matching nature to squeeze the most value out of each point.</li>
+								</ul>
+							</div>
+						)}
 						{selectedGame ? (
 							renderGuideFor(selectedGame)
 						) : (
@@ -953,8 +962,9 @@ export default function EvTrainingPage() {
 						)}
 					</div>
 					<div className="ev-col-right">
-						<div className="matchup-box">
-							<div className="vitamin-columns">
+						{!isLegendsArceus && (
+							<div className="matchup-box">
+								<div className="vitamin-columns">
 						<div className="vitamin-column">
 							<div className="vitamin-column-title">Vitamins</div>
 							<ul className="game-modal-method-description vitamin-list">
@@ -1096,8 +1106,56 @@ export default function EvTrainingPage() {
 								</li>
 							</ul>
 						</div>
+								</div>
 							</div>
+						)}
+						{isLegendsArceus && (
+							<div className="matchup-box grit-items-panel">
+								<div className="vitamin-columns">
+						<div className="vitamin-column">
+							<div className="vitamin-column-title">Grit Items</div>
+							<ul className="game-modal-method-description vitamin-list">
+								<li className="vitamin-item">
+									<span className="grit-icon-wrap">
+										<img className="vitamin-icon grit-icon" src="/items/images/gritdust.png" alt="Grit Dust" loading="lazy" />
+									</span>
+									<div>
+										<strong>Grit Dust</strong>
+										<div>Raises EL up to 3</div>
+									</div>
+								</li>
+								<li className="vitamin-item">
+									<span className="grit-icon-wrap">
+										<img className="vitamin-icon grit-icon" src="/items/images/gritgravel.png" alt="Grit Gravel" loading="lazy" />
+									</span>
+									<div>
+										<strong>Grit Gravel</strong>
+										<div>Raises EL up to 5</div>
+									</div>
+								</li>
+								<li className="vitamin-item">
+									<span className="grit-icon-wrap">
+										<img className="vitamin-icon grit-icon" src="/items/images/gritpebble.png" alt="Grit Pebble" loading="lazy" />
+									</span>
+									<div>
+										<strong>Grit Pebble</strong>
+										<div>Raises EL up to 8</div>
+									</div>
+								</li>
+								<li className="vitamin-item">
+									<span className="grit-icon-wrap">
+										<img className="vitamin-icon grit-icon" src="/items/images/gritrock.png" alt="Grit Rock" loading="lazy" />
+									</span>
+									<div>
+										<strong>Grit Rock</strong>
+										<div>Raises EL up to 9</div>
+									</div>
+								</li>
+							</ul>
 						</div>
+								</div>
+							</div>
+						)}
 						{selectedGame ? (() => {
 							const items = getTargetsForGame(selectedGame);
 							if (!items || items.length === 0) return null;
