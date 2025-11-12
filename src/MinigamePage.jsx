@@ -375,6 +375,10 @@ export default function MinigamePage() {
     const record = initialDataRef.current.history.find((entry) => entry.date === todayKey);
     return record?.solvedAtStep ?? null;
   });
+  const [revealedLetters, setRevealedLetters] = useState(() => {
+    // Initialize as empty array, will be set when Pokemon loads
+    return [];
+  });
 
   const dailyPokemonId = useMemo(() => computeDailyPokemonId(dailyKey), [dailyKey]);
 
@@ -426,7 +430,15 @@ export default function MinigamePage() {
       setFeedbackType("info");
     }
     setConfettiPieces([]);
-  }, [pokemon?.id, completion.isCompleted]);
+    // Initialize revealed letters array when Pokemon changes
+    if (pokemon?.name) {
+      const baseName = getBasePokemonName(pokemon.name);
+      const nameLength = baseName.length;
+      setRevealedLetters(new Array(nameLength).fill(false));
+    } else {
+      setRevealedLetters([]);
+    }
+  }, [pokemon?.id, completion.isCompleted, pokemon?.name]);
 
   useEffect(() => {
     if (completion.isCompleted && currentRecord && !feedback) {
@@ -598,6 +610,38 @@ export default function MinigamePage() {
     return toTitleCase(baseName);
   }, [pokemon?.name]);
 
+  // Compute the name clue display (letters and underscores)
+  const nameClueDisplay = useMemo(() => {
+    if (!pokemon?.name) return null;
+    
+    const baseName = getBasePokemonName(pokemon.name);
+    
+    // Show full name if game is completed
+    if (completion.isCompleted) {
+      return toTitleCase(baseName);
+    }
+    
+    const displayChars = [];
+    
+    // Build display array with revealed letters or underscores
+    // We need to map revealed letters to their positions in the base name
+    for (let i = 0; i < baseName.length; i++) {
+      if (revealedLetters[i]) {
+        // Show the letter - convert to title case for display
+        const char = baseName[i];
+        // Check if this is the start of a word (after space/hyphen or first char)
+        const isWordStart = i === 0 || /[-_\s]/.test(baseName[i - 1]);
+        displayChars.push(isWordStart ? char.toUpperCase() : char.toLowerCase());
+      } else {
+        // Show underscore
+        displayChars.push("_");
+      }
+    }
+    
+    // Convert hyphens to spaces for display
+    return displayChars.join("").replace(/-/g, " ");
+  }, [pokemon?.name, revealedLetters, completion.isCompleted]);
+
   const typeLabel = useMemo(() => {
     if (!pokemon?.types || pokemon.types.length === 0) return "Unknown";
     return pokemon.types.map((t) => toTitleCase(t)).join(" / ");
@@ -657,6 +701,51 @@ export default function MinigamePage() {
     setShowHistory((prev) => !prev);
   }, []);
 
+  // Reveal matching letters from guess in Pokemon name (position-by-position matching)
+  const revealMatchingLetters = useCallback((guess) => {
+    if (!pokemon?.name || !guess) return;
+    
+    const baseName = getBasePokemonName(pokemon.name);
+    const normalizedBaseName = normalizeName(baseName);
+    const normalizedGuess = normalizeName(guess);
+    
+    if (!normalizedGuess || normalizedGuess.length === 0) return;
+    
+    // Create a mapping from normalized positions to original baseName positions
+    // This handles cases where baseName has hyphens/spaces that are removed in normalization
+    const normalizedToOriginal = [];
+    let normalizedIdx = 0;
+    for (let i = 0; i < baseName.length; i++) {
+      const char = baseName[i];
+      // Only map alphanumeric characters (those that survive normalization)
+      if (/[a-z0-9]/i.test(char)) {
+        normalizedToOriginal[normalizedIdx] = i;
+        normalizedIdx++;
+      }
+    }
+    
+    setRevealedLetters((prev) => {
+      const newRevealed = [...prev];
+      let hasChanges = false;
+      
+      // Match characters position-by-position
+      // Compare each character at the same position in both normalized strings
+      const minLength = Math.min(normalizedBaseName.length, normalizedGuess.length);
+      for (let i = 0; i < minLength; i++) {
+        if (normalizedBaseName[i] === normalizedGuess[i]) {
+          // Characters match at this position, reveal the corresponding letter
+          const originalPos = normalizedToOriginal[i];
+          if (originalPos !== undefined && !newRevealed[originalPos]) {
+            newRevealed[originalPos] = true;
+            hasChanges = true;
+          }
+        }
+      }
+      
+      return hasChanges ? newRevealed : prev;
+    });
+  }, [pokemon?.name]);
+
   const handleGuessSubmit = useCallback(
      (event) => {
        event.preventDefault();
@@ -681,6 +770,9 @@ export default function MinigamePage() {
         return;
        }
  
+       // Reveal matching letters from the guess
+       revealMatchingLetters(rawGuess);
+
        if (normalizedGuess === normalizedTargetName) {
          const resolvedStep = currentStep;
          setStep(STEP_COUNT);
@@ -712,7 +804,7 @@ export default function MinigamePage() {
          }
        }
      },
-   [pokemon, completion.isCompleted, loading, guess, step, normalizedTargetName, generateConfetti, markCompletion]
+   [pokemon, completion.isCompleted, loading, guess, step, normalizedTargetName, generateConfetti, markCompletion, revealMatchingLetters]
    );
 
   const totalHistory = fullHistory.length;
@@ -732,7 +824,7 @@ export default function MinigamePage() {
   const revealDetailsStep = STEP_COUNT - 1;
   const showRevealDetails = step >= revealDetailsStep;
   const showFinalReveal = step >= STEP_COUNT;
-  const headerTitle = showFinalReveal && friendlyName ? friendlyName : "Who's That Pokémon?";
+  const headerTitle = "Who's That Pokémon?";
   const isPixelatedSprite = step <= 1;
   const isHiddenSprite = step <= 3;
   const spriteClassName = [
@@ -847,6 +939,24 @@ export default function MinigamePage() {
                       onDragStart={(e) => e.preventDefault()}
                     />
                   </div>
+                  {nameClueDisplay && (
+                    <div className="minigame-name-clue">
+                      {nameClueDisplay.split("").map((char, index) => {
+                        const isUnderscore = char === "_";
+                        const isSpace = char === " ";
+                        return (
+                          <span
+                            key={index}
+                            className={`minigame-name-clue-char ${
+                              isUnderscore ? "is-underscore" : isSpace ? "is-space" : "is-letter"
+                            }`}
+                          >
+                            {char}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

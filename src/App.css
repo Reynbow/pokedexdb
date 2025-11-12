@@ -6389,11 +6389,13 @@
 
 .minigame-stage-center {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
   position: relative;
   z-index: 2;
+  gap: 16px;
 }
 
 .minigame-guess-form {
@@ -6525,6 +6527,42 @@
 .minigame-sprite.is-pixelated {
   image-rendering: pixelated;
   filter: brightness(0) saturate(150%) contrast(120%);
+}
+
+.minigame-name-clue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-family: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(20px, 3vw, 32px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #f8fafc;
+  text-align: center;
+  line-height: 1.2;
+  margin-top: 8px;
+  min-height: 40px;
+}
+
+.minigame-name-clue-char {
+  display: inline-block;
+  min-width: 0.6em;
+  text-align: center;
+}
+
+.minigame-name-clue-char.is-letter {
+  color: #f8fafc;
+}
+
+.minigame-name-clue-char.is-underscore {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.minigame-name-clue-char.is-space {
+  width: 0.3em;
 }
 
 .minigame-loader,
