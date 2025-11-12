@@ -17,6 +17,17 @@ const toTitleCase = (value) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+// Extract base name from Pokemon names with form-specific suffixes
+// e.g., "lycanroc-midday" -> "lycanroc", "lycanroc-dusk" -> "lycanroc"
+const getBasePokemonName = (name) => {
+  if (!name) return "";
+  const lowerName = String(name).toLowerCase();
+  // Split by hyphen and take the first part as the base name
+  // This handles form-specific names like "lycanroc-midday", "lycanroc-dusk", etc.
+  const parts = lowerName.split("-");
+  return parts[0] || lowerName;
+};
+
 const formatGeneration = (gen) => {
   if (!gen?.name) return "Unknown";
   const match = /generation-(\w+)/i.exec(gen.name);
@@ -372,7 +383,11 @@ export default function MinigamePage() {
     [history, dailyKey]
   );
 
-  const normalizedTargetName = useMemo(() => normalizeName(pokemon?.name), [pokemon?.name]);
+  const normalizedTargetName = useMemo(() => {
+    if (!pokemon?.name) return "";
+    const baseName = getBasePokemonName(pokemon.name);
+    return normalizeName(baseName);
+  }, [pokemon?.name]);
 
   useEffect(() => {
     if (currentRecord && !completion.isCompleted) {
@@ -577,7 +592,11 @@ export default function MinigamePage() {
   const canGoPrevious = getPreviousDate(dailyKey) !== null;
   const canGoNext = getNextDate(dailyKey) !== null;
 
-  const friendlyName = useMemo(() => toTitleCase(pokemon?.name), [pokemon?.name]);
+  const friendlyName = useMemo(() => {
+    if (!pokemon?.name) return "";
+    const baseName = getBasePokemonName(pokemon.name);
+    return toTitleCase(baseName);
+  }, [pokemon?.name]);
 
   const typeLabel = useMemo(() => {
     if (!pokemon?.types || pokemon.types.length === 0) return "Unknown";
@@ -603,10 +622,11 @@ export default function MinigamePage() {
       if (!pokemon) return;
       if (completion.isCompleted && currentRecord) return;
 
+      const baseName = getBasePokemonName(pokemon.name);
       const record = {
         date: dailyKey,
         pokemonId: pokemon.id,
-        pokemonName: toTitleCase(pokemon.name),
+        pokemonName: toTitleCase(baseName),
         completedAt: new Date().toISOString(),
         solvedAtStep: resolvedStep ?? STEP_COUNT,
       };
