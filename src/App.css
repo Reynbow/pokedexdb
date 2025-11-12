@@ -6198,6 +6198,53 @@
   box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.18);
 }
 
+.minigame-nav-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.minigame-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(15, 23, 42, 0.58);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+  box-shadow: 0 4px 8px rgba(8, 12, 24, 0.3);
+}
+
+.minigame-nav-button:hover:not(:disabled),
+.minigame-nav-button:focus-visible:not(:disabled) {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: rgba(226, 232, 240, 1);
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+.minigame-nav-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(8, 12, 24, 0.3);
+}
+
+.minigame-nav-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background: rgba(15, 23, 42, 0.3);
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
 .minigame-status-button {
   display: inline-flex;
   align-items: center;
@@ -6356,12 +6403,13 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 12px;
-  max-width: 560px;
+  max-width: 640px;
 }
 
 .minigame-guess-input {
   flex: 1 1 260px;
-  min-width: 220px;
+  width: 280px;
+  min-width: 280px;
   max-width: 380px;
   padding: 12px 16px;
   border-radius: var(--pill-radius);
@@ -6370,6 +6418,7 @@
   color: #f8fafc;
   font-size: 0.95rem;
   transition: border 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
 }
 
 .minigame-guess-input:focus,
@@ -6386,6 +6435,8 @@
 
 .minigame-guess-button {
   flex: 0 0 auto;
+  width: 140px;
+  min-width: 140px;
   background: linear-gradient(135deg, #2563eb, #7c3aed);
   border: none;
   color: #f8fafc;
@@ -6396,6 +6447,7 @@
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.3);
+  box-sizing: border-box;
 }
 
 .minigame-guess-button:hover,
@@ -6453,9 +6505,17 @@
   max-width: 100%;
   max-height: clamp(260px, 40vw, 380px);
   object-fit: contain;
-  transition: filter 0.5s ease, transform 0.5s ease, opacity 0.5s ease;
+  transition: none;
   image-rendering: auto;
   transform-origin: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
 }
 
 .minigame-sprite.is-hidden {
@@ -6653,6 +6713,8 @@
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: rgba(15, 23, 42, 0.65);
+  overflow: hidden;
+  position: relative;
 }
 
 .minigame-history-entry.is-uncompleted {
@@ -6669,6 +6731,9 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .minigame-history-name {
@@ -6682,6 +6747,34 @@
   color: rgba(148, 163, 184, 0.75);
 }
 
+.minigame-history-entry-sprite {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: auto;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.minigame-history-entry-sprite img {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  object-fit: none;
+  object-position: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  display: block;
+  opacity: 0.2;
+}
+
 .minigame-history-entry-meta {
   display: flex;
   flex-direction: column;
@@ -6689,11 +6782,44 @@
   align-items: flex-end;
   font-size: 0.82rem;
   color: rgba(148, 163, 184, 0.75);
+  flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .minigame-history-id {
   font-weight: 600;
   color: rgba(226, 232, 240, 0.85);
+}
+
+.minigame-history-time {
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.minigame-history-play-button {
+  margin-top: 4px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.95);
+  background-color: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.minigame-history-play-button:hover,
+.minigame-history-play-button:focus-visible {
+  background-color: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: rgba(226, 232, 240, 1);
+  outline: none;
+}
+
+.minigame-history-play-button:active {
+  background-color: rgba(59, 130, 246, 0.35);
+  transform: scale(0.98);
 }
 
 .minigame-history-attempts {
