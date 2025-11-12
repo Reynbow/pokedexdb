@@ -4226,11 +4226,18 @@
 }
 .evo-tree-node { display: flex; flex-direction: column; gap: 2px; }
 .evo-tree-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding-left: calc(var(--level, 0) * 18px);
   min-height: 24px;
+}
+.evo-tree-pokemon-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 .evo-tree-cond {
   font-size: 0.75rem;
@@ -4323,6 +4330,45 @@
   height: 38px;
 }
 .evo-tree-name { letter-spacing: 0.01em; }
+.evo-tree-forms-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-left: 2px;
+}
+.evo-tree-form-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.evo-tree-form-inline:hover,
+.evo-tree-form-inline:focus-visible {
+  border-color: rgba(124, 140, 255, 0.5);
+  background: rgba(59, 130, 246, 0.15);
+  transform: scale(1.1);
+  outline: none;
+}
+.evo-tree-form-inline.is-current {
+  border-color: rgba(124, 140, 255, 0.7);
+  background: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 0 2px rgba(124, 140, 255, 0.3);
+}
+.evo-tree-form-inline img {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 2px 4px rgba(8, 12, 24, 0.3));
+}
+/* Legacy styles - kept for backward compatibility but not used in new layout */
 .evo-tree-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -4337,24 +4383,31 @@
 }
 .evo-tree { position: relative; }
 .evo-tree-actions {
+  position: absolute;
+  top: 8px;
+  right: 10px;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  z-index: 1;
+  padding: 2px 4px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
 }
 .alt-forms-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid rgba(59, 130, 246, 0.40);
   background: rgba(37, 99, 235, 0.22);
   color: #dbeafe;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
@@ -4841,14 +4894,38 @@
     overflow-x: auto;
     overflow-wrap: break-word;
   }
+  .evo-tree-actions {
+    top: 6px;
+    right: 8px;
+    gap: 5px;
+  }
+  .alt-forms-button {
+    padding: 4px 8px;
+    font-size: 0.65rem;
+    gap: 3px;
+  }
   .evo-tree-row { 
     gap: 4px; 
     padding-left: calc(var(--level, 0) * 12px);
     flex-wrap: wrap;
   }
-  .evo-tree-split { grid-template-columns: 1fr; }
+  .evo-tree-pokemon-group {
+    gap: 3px;
+  }
   .evo-tree-pokemon { font-size: 0.88rem; }
   .evo-tree-pokemon.is-root { font-size: 0.93rem; }
+  .evo-tree-forms-inline {
+    gap: 2px;
+    margin-left: 2px;
+  }
+  .evo-tree-form-inline {
+    width: 24px;
+    height: 24px;
+  }
+  .evo-tree-form-inline img {
+    width: 20px;
+    height: 20px;
+  }
   .evo-tree-forms { margin-left: calc(var(--level, 0) * 12px + 16px); }
   .evo-tree-cond { 
     white-space: normal;
@@ -5114,13 +5191,36 @@
   }
   
   /* Even more compact evolution tree on very small screens */
+  .evo-tree-actions {
+    top: 5px;
+    right: 6px;
+    gap: 4px;
+  }
+  .alt-forms-button {
+    padding: 3px 7px;
+    font-size: 0.62rem;
+  }
   .evo-tree-row {
     padding-left: calc(var(--level, 0) * 8px);
     gap: 3px;
   }
   
-  .evo-tree-forms {
-    margin-left: calc(var(--level, 0) * 8px + 12px);
+  .evo-tree-pokemon-group {
+    gap: 2px;
+  }
+  
+  .evo-tree-forms-inline {
+    gap: 2px;
+  }
+  
+  .evo-tree-form-inline {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .evo-tree-form-inline img {
+    width: 18px;
+    height: 18px;
   }
   
   .evo-tree-icon img {

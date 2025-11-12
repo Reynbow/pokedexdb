@@ -3791,47 +3791,43 @@ function DetailPanel({
 
     return (
       <li key={`${keyPrefix}-${nodeKey}`} className="evo-tree-node">
-        <div className="evo-tree-split" style={{ "--level": level }}>
-          <div className="evo-tree-left">
-            <div className="evo-tree-row">
-              {incomingCondition?.text ? (
-                <button
-                  type="button"
-                  className="evo-tree-cond"
-                  onClick={handleConditionClick}
-                  title="Click for details"
-                >
-                  {incomingCondition.text}
-                </button>
-              ) : null}
-              {incomingCondition?.itemSprite ? (
-                <button
-                  type="button"
-                  className="evo-tree-item-wrapper"
-                  onClick={handleConditionClick}
-                  title="Click for details"
-                >
-                  <img
-                    src={incomingCondition.itemSprite}
-                    alt=""
-                    width={20}
-                    height={20}
-                    loading="lazy"
-                    className="evo-tree-item"
-                  />
-                </button>
-              ) : null}
-              {level > 0 && (
-                <span className="evo-tree-arrow" aria-hidden="true">
-                  &rarr;
-                </span>
-              )}
-              {renderEvolutionPokemon(primaryDisplayNode, { isCurrent: isCurrentNode, isRoot: level === 0, clickOptions: primaryClickOptions })}
-            </div>
-          </div>
-          <div className="evo-tree-right">
+        <div className="evo-tree-row" style={{ "--level": level }}>
+          {incomingCondition?.text ? (
+            <button
+              type="button"
+              className="evo-tree-cond"
+              onClick={handleConditionClick}
+              title="Click for details"
+            >
+              {incomingCondition.text}
+            </button>
+          ) : null}
+          {incomingCondition?.itemSprite ? (
+            <button
+              type="button"
+              className="evo-tree-item-wrapper"
+              onClick={handleConditionClick}
+              title="Click for details"
+            >
+              <img
+                src={incomingCondition.itemSprite}
+                alt=""
+                width={20}
+                height={20}
+                loading="lazy"
+                className="evo-tree-item"
+              />
+            </button>
+          ) : null}
+          {level > 0 && (
+            <span className="evo-tree-arrow" aria-hidden="true">
+              &rarr;
+            </span>
+          )}
+          <div className="evo-tree-pokemon-group">
+            {renderEvolutionPokemon(primaryDisplayNode, { isCurrent: isCurrentNode, isRoot: level === 0, clickOptions: primaryClickOptions })}
             {inlineForms.length > 0 && (
-              <div className="evo-tree-forms">
+              <div className="evo-tree-forms-inline">
                 {inlineForms.map((form) => {
                   const formId = form?.id != null ? String(form.id) : null;
                   if (!formId) return null;
@@ -3842,7 +3838,7 @@ function DetailPanel({
                     <button
                       key={`${nodeKey}-form-${formId}`}
                       type="button"
-                      className={`evo-tree-form${isActiveForm ? " is-current" : ""}`}
+                      className={`evo-tree-form-inline${isActiveForm ? " is-current" : ""}`}
                       onClick={() =>
                         onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`, clickOptions || undefined)
                       }
@@ -3852,12 +3848,11 @@ function DetailPanel({
                       <SpriteImage
                         id={form.id}
                         alt={form.name}
-                        width={30}
-                        height={30}
+                        width={24}
+                        height={24}
                         loading="lazy"
                         shiny={shiny}
                       />
-                      <span className="evo-tree-form-name">{formName}</span>
                     </button>
                   );
                 })}
@@ -5874,41 +5869,41 @@ function DetailPanel({
             </section>
             {evoPaths.length > 0 && (
               <section className="evo-section">
-                {(hasAnyAlternateForms || hasMegaForms || hasGmaxForms) && (
-                  <div className="evo-tree-actions">
-                    {hasMegaForms && (
-                      <button
-                        type="button"
-                        className="alt-forms-button mega"
-                        onClick={handleMegaClick}
-                        title="Mega"
-                      >
-                        mega
-                      </button>
-                    )}
-                    {hasGmaxForms && (
-                      <button
-                        type="button"
-                        className="alt-forms-button gmax"
-                        onClick={handleGmaxClick}
-                        title="Gigantamax"
-                      >
-                        gmax
-                      </button>
-                    )}
-                    {hasAnyAlternateForms && (
-                      <button
-                        type="button"
-                        className="alt-forms-button"
-                        onClick={openAggregatedAltForms}
-                        title="Alt forms"
-                      >
-                        alt forms
-                      </button>
-                    )}
-                  </div>
-                )}
                 <div className="evo-tree">
+                  {(hasAnyAlternateForms || hasMegaForms || hasGmaxForms) && (
+                    <div className="evo-tree-actions">
+                      {hasMegaForms && (
+                        <button
+                          type="button"
+                          className="alt-forms-button mega"
+                          onClick={handleMegaClick}
+                          title="Mega"
+                        >
+                          mega
+                        </button>
+                      )}
+                      {hasGmaxForms && (
+                        <button
+                          type="button"
+                          className="alt-forms-button gmax"
+                          onClick={handleGmaxClick}
+                          title="Gigantamax"
+                        >
+                          gmax
+                        </button>
+                      )}
+                      {hasAnyAlternateForms && (
+                        <button
+                          type="button"
+                          className="alt-forms-button"
+                          onClick={openAggregatedAltForms}
+                          title="Alt forms"
+                        >
+                          alt forms
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {evolutionTree.length > 0 ? (
                     <ul className="evo-tree-roots">
                       {evolutionTree.map((entry, idx) =>
