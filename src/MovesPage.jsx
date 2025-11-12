@@ -394,7 +394,7 @@ export default function MovesPage() {
               </div>
             </div>
             <aside className="detail-panel">
-              <div className="detail-inner">
+              <div className="detail-inner moves-detail-inner">
                 <MoveDetailPanel
                   move={selectedMove}
                   onClose={clearSelection}
@@ -404,6 +404,7 @@ export default function MovesPage() {
                     if (found) selectMove(found);
                   }}
                 />
+                <MoveLearnersPanel move={selectedMove} />
               </div>
             </aside>
           </section>
@@ -418,10 +419,6 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [learners, setLearners] = useState([]);
-  const [learnersLoading, setLearnersLoading] = useState(false);
-  const [learnersError, setLearnersError] = useState(null);
-  const [typesMap, setTypesMap] = useState(() => new Map()); // id -> [types]
 
   const englishEffect = useMemo(() => {
     const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
@@ -482,95 +479,31 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
     };
   }, [move]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadLearners() {
-      if (!data?.learned_by_pokemon) { setLearners([]); return; }
-      setLearnersLoading(true);
-      setLearnersError(null);
-      try {
-        const list = Array.isArray(data.learned_by_pokemon) ? data.learned_by_pokemon : [];
-        const objs = list
-          .map((p) => {
-            const name = p?.name;
-            const url = p?.url;
-            if (!name || !url) return null;
-            const parts = String(url).split("/").filter(Boolean);
-            const id = parts[parts.length - 1];
-            return id ? { name, id, url } : null;
-          })
-          .filter(Boolean)
-          .slice(0, 60);
-        if (!cancelled) setLearners(objs);
-      } catch (e) {
-        if (!cancelled) setLearnersError(e);
-      } finally {
-        if (!cancelled) setLearnersLoading(false);
-      }
-    }
-    loadLearners();
-    return () => { cancelled = true; };
-  }, [data?.learned_by_pokemon]);
-
-  const goToPokemon = useCallback((pokemon) => {
-    if (!pokemon) return;
-    const slug = pokemon.name || String(pokemon.id || "").trim();
-    if (!slug) return;
-    updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
-    try {
-      window.location.hash = "";
-    } catch {}
-  }, []);
-
-  // Load types for learners to render type pills
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTypes() {
-      const pending = learners.filter((p) => p && !typesMap.has(p.id));
-      if (pending.length === 0) return;
-      try {
-        const results = await Promise.all(
-          pending.map(async (p) => {
-            try {
-              const j = await fetch(p.url).then((r) => r.json());
-              const types = Array.isArray(j?.types)
-                ? j.types.map((t) => t?.type?.name).filter(Boolean)
-                : [];
-              return { id: p.id, types };
-            } catch {
-              return { id: p.id, types: [] };
-            }
-          })
-        );
-        if (!cancelled) {
-          setTypesMap((prev) => {
-            const next = new Map(prev);
-            for (const res of results) next.set(res.id, res.types);
-            return next;
-          });
-        }
-      } catch {}
-    }
-    loadTypes();
-    return () => { cancelled = true; };
-  }, [learners, typesMap]);
-
-  if (!move) return <div />;
+  if (!move) {
+    return (
+      <div className="move-detail-frame">
+        <div className="detail-title detail-title-top" style={{ display: "none" }} />
+        <div className="move-hero-container" style={{ display: "none" }}>
+          <div className="detail-hero single-col" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
+    <div className="move-detail-frame">
       <div className="detail-title detail-title-top">
         <h2>{move.name.replaceAll("-", " ")}</h2>
       </div>
-      <div className="detail-hero single-col">
-        <div className="hero-right hero-right-split">
+      <div className="move-hero-container">
+        <div className="detail-hero single-col">
+        <div className="hero-right">
           {loading ? (
             <div className="list-empty">Loading</div>
           ) : error ? (
             <div className="list-empty">Failed to load move.</div>
           ) : (
-            <>
-              <div className="main-col">
+            <div className="main-col">
                 <section className="about">
                   <h3 className="list-subheading" style={{ textAlign: "left" }}>Overview</h3>
                   <div className="about-list" style={{padding: 0}}>
@@ -660,33 +593,64 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                 ) : null}
 
                 {mentionsStages ? (
-                  <div className="effect-window">
-                    <div className="effect-summary">What is a "stage"?</div>
-                    <ul className="effect-list">
-                      <li>Stats change in steps from −6 to +6. Each step is a stage.</li>
-                      <li>
-                        Main stats (Atk, Def, Sp. Atk, Sp. Def, Speed):
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-                          <span className="move-stat-chip positive">+1 → 1.5×</span>
-                          <span className="move-stat-chip positive">+2 → 2×</span>
-                          <span className="move-stat-chip positive">+6 → 4×</span>
-                          <span className="move-stat-chip negative">−1 → 0.67×</span>
-                          <span className="move-stat-chip negative">−2 → 0.5×</span>
-                          <span className="move-stat-chip negative">−6 → 0.25×</span>
+                  <div className="effect-window stage-info-panel">
+                    <div className="stage-info-header">
+                      <h3 className="stage-info-title">Understanding Stat Stages</h3>
+                      <p className="stage-info-intro">
+                        When moves mention "stages," they're referring to stat modifiers that change your Pokémon's effectiveness. 
+                        Stages range from <strong>−6</strong> (lowest) to <strong>+6</strong> (highest), with each stage representing a multiplier.
+                      </p>
+                    </div>
+                    
+                    <div className="stage-info-section">
+                      <h4 className="stage-info-subtitle">Battle Stats</h4>
+                      <p className="stage-info-description">
+                        Attack, Defense, Special Attack, Special Defense, and Speed:
+                      </p>
+                      <div className="stage-info-chips">
+                        <div className="stage-info-chip-group">
+                          <span className="stage-info-label">Boosts:</span>
+                          <div className="stage-info-chip-row">
+                            <span className="move-stat-chip positive">+1 stage = 1.5×</span>
+                            <span className="move-stat-chip positive">+2 stages = 2×</span>
+                            <span className="move-stat-chip positive">+6 stages = 4×</span>
+                          </div>
                         </div>
-                      </li>
-                      <li>
-                        Accuracy/Evasion:
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-                          <span className="move-stat-chip positive">+1 → 1.33×</span>
-                          <span className="move-stat-chip positive">+2 → 1.67×</span>
-                          <span className="move-stat-chip positive">+3 → 2×</span>
-                          <span className="move-stat-chip negative">−1 → 0.75×</span>
-                          <span className="move-stat-chip negative">−2 → 0.6×</span>
-                          <span className="move-stat-chip negative">−3 → 0.5×</span>
+                        <div className="stage-info-chip-group">
+                          <span className="stage-info-label">Drops:</span>
+                          <div className="stage-info-chip-row">
+                            <span className="move-stat-chip negative">−1 stage = 0.67×</span>
+                            <span className="move-stat-chip negative">−2 stages = 0.5×</span>
+                            <span className="move-stat-chip negative">−6 stages = 0.25×</span>
+                          </div>
                         </div>
-                      </li>
-                    </ul>
+                      </div>
+                    </div>
+
+                    <div className="stage-info-section">
+                      <h4 className="stage-info-subtitle">Accuracy & Evasion</h4>
+                      <p className="stage-info-description">
+                        These stats use different multipliers and cap at ±3 stages:
+                      </p>
+                      <div className="stage-info-chips">
+                        <div className="stage-info-chip-group">
+                          <span className="stage-info-label">Boosts:</span>
+                          <div className="stage-info-chip-row">
+                            <span className="move-stat-chip positive">+1 stage = 1.33×</span>
+                            <span className="move-stat-chip positive">+2 stages = 1.67×</span>
+                            <span className="move-stat-chip positive">+3 stages = 2×</span>
+                          </div>
+                        </div>
+                        <div className="stage-info-chip-group">
+                          <span className="stage-info-label">Drops:</span>
+                          <div className="stage-info-chip-row">
+                            <span className="move-stat-chip negative">−1 stage = 0.75×</span>
+                            <span className="move-stat-chip negative">−2 stages = 0.6×</span>
+                            <span className="move-stat-chip negative">−3 stages = 0.5×</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : null}
 
@@ -705,64 +669,163 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                     </div>
                   </section>
                 ) : null}
-              </div>
-
-              <aside className="side-col">
-                <h4 className="side-title">Learnt By</h4>
-                {learnersLoading ? (
-                  <div className="list-empty">Loading</div>
-                ) : learnersError ? (
-                  <div className="list-empty">Failed to load</div>
-                ) : learners.length === 0 ? (
-                  <div className="list-empty">No data</div>
-                ) : (
-                  <ul className="side-list" role="list">
-                    {learners.map((p) => {
-                      const types = typesMap.get(p.id) || [];
-                      return (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            className="side-poke-button"
-                            onClick={() => goToPokemon(p)}
-                            title={`Open ${humanize(p.name)}`}
-                          >
-                            <img
-                              className="side-poke-sprite"
-                              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
-                              alt=""
-                              loading="lazy"
-                            />
-                            <span className="label">{humanize(p.name)}</span>
-                            <span className="types-vertical">
-                              {types.map((t) => (
-                                <span key={t} className={`type-chip type-${t}`}>
-                                  <img 
-                                    src={getTypeIconUrl(t)} 
-                                    alt={t} 
-                                    className="type-icon"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      e.target.style.display = 'none';
-                                    }}
-                                  />
-                                  <span className="type-name">{t}</span>
-                                </span>
-                              ))}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </aside>
-            </>
+            </div>
           )}
         </div>
       </div>
-      
-    </>
+      </div>
+    </div>
+  );
+}
+
+function MoveLearnersPanel({ move }) {
+  const [data, setData] = useState(null);
+  const [learners, setLearners] = useState([]);
+  const [learnersLoading, setLearnersLoading] = useState(false);
+  const [learnersError, setLearnersError] = useState(null);
+  const [typesMap, setTypesMap] = useState(() => new Map());
+
+  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!move) {
+        setData(null);
+        setLearners([]);
+        return;
+      }
+      setLearnersLoading(true);
+      setLearnersError(null);
+      try {
+        const url = `https://pokeapi.co/api/v2/move/${move.name}`;
+        const j = await fetch(url).then((r) => r.json());
+        if (!cancelled) {
+          setData(j);
+          const list = Array.isArray(j?.learned_by_pokemon) ? j.learned_by_pokemon : [];
+          const objs = list
+            .map((p) => {
+              const name = p?.name;
+              const url = p?.url;
+              if (!name || !url) return null;
+              const parts = String(url).split("/").filter(Boolean);
+              const id = parts[parts.length - 1];
+              return id ? { name, id, url } : null;
+            })
+            .filter(Boolean)
+            .slice(0, 60);
+          setLearners(objs);
+        }
+      } catch (e) {
+        if (!cancelled) setLearnersError(e);
+      } finally {
+        if (!cancelled) setLearnersLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [move]);
+
+  const goToPokemon = useCallback((pokemon) => {
+    if (!pokemon) return;
+    const slug = pokemon.name || String(pokemon.id || "").trim();
+    if (!slug) return;
+    updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
+    try {
+      window.location.hash = "";
+    } catch {}
+  }, []);
+
+  // Load types for learners to render type pills
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTypes() {
+      const pending = learners.filter((p) => p && !typesMap.has(p.id));
+      if (pending.length === 0) return;
+      try {
+        const results = await Promise.all(
+          pending.map(async (p) => {
+            try {
+              const j = await fetch(p.url).then((r) => r.json());
+              const types = Array.isArray(j?.types)
+                ? j.types.map((t) => t?.type?.name).filter(Boolean)
+                : [];
+              return { id: p.id, types };
+            } catch {
+              return { id: p.id, types: [] };
+            }
+          })
+        );
+        if (!cancelled) {
+          setTypesMap((prev) => {
+            const next = new Map(prev);
+            for (const res of results) next.set(res.id, res.types);
+            return next;
+          });
+        }
+      } catch {}
+    }
+    loadTypes();
+    return () => { cancelled = true; };
+  }, [learners, typesMap]);
+
+  if (!move) {
+    return <aside className="learners-panel" style={{ display: 'none' }} />;
+  }
+
+  return (
+    <aside className="learners-panel">
+      <h4 className="learners-title">Learnt By</h4>
+      {learnersLoading ? (
+        <div className="learners-empty">Loading</div>
+      ) : learnersError ? (
+        <div className="learners-empty">Failed to load</div>
+      ) : learners.length === 0 ? (
+        <div className="learners-empty">No data</div>
+      ) : (
+        <ul className="learners-list" role="list">
+          {learners.map((p) => {
+            const types = typesMap.get(p.id) || [];
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="learners-poke-button"
+                  onClick={() => goToPokemon(p)}
+                  title={`Open ${humanize(p.name)}`}
+                >
+                  <img
+                    className="learners-poke-sprite"
+                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
+                    alt=""
+                    loading="lazy"
+                  />
+                  <span className="label">{humanize(p.name)}</span>
+                  <span className="types-vertical">
+                    {types.map((t) => (
+                      <span key={t} className={`type-chip type-${t}`}>
+                        <img 
+                          src={getTypeIconUrl(t)} 
+                          alt={t} 
+                          className="type-icon"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <span className="type-name">{t}</span>
+                      </span>
+                    ))}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </aside>
   );
 }
 
