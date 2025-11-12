@@ -442,11 +442,14 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
     const raw = String(englishEffect || "");
     const cleaned = raw.replace(/\s+/g, " ").trim();
     if (!cleaned) return [];
+    const shortEffectCleaned = String(englishShortEffect || "").replace(/\s+/g, " ").trim();
+    // If the full effect is the same as the short effect, don't show lines (to avoid duplication)
+    if (cleaned === shortEffectCleaned && shortEffectCleaned) return [];
     return cleaned
       .split(/(?<=[.!?])\s+|;\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
-  }, [englishEffect]);
+  }, [englishEffect, englishShortEffect]);
 
   const mentionsStages = useMemo(() => {
     const text = `${englishShortEffect || ""} ${englishEffect || ""}`.toLowerCase();
@@ -658,7 +661,7 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                   <section className="about">
                     <div className="flavor-window">
                       {data.flavor_text_entries
-                        .filter((e) => e?.language?.name === "en")
+                        .filter((e) => e?.language?.name === "en" && (e.text || e.flavor_text))
                         .slice(0, 6)
                         .map((e, idx) => (
                           <div key={idx} className="flavor-row">

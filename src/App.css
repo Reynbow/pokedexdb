@@ -1710,7 +1710,6 @@
 .detail-inner { box-sizing: border-box; }
 .detail-hero { box-sizing: border-box; }
 .flavor-window { box-sizing: border-box; }
-.flavor-text { margin-right: 0; }
 
 .hero-right-split .side-poke-button {
   width: 100%;
@@ -1899,8 +1898,16 @@
   background: rgba(255,255,255,0.06);
   padding: 12px 14px;
   margin-top: 0;
+  margin-bottom: 0;
   box-sizing: border-box;
   max-width: 100%;
+}
+
+.effect-window + .effect-window,
+.effect-window + .stage-info-panel,
+.effect-window + .about,
+.stage-info-panel + .about {
+  margin-top: 16px;
 }
 .effect-summary { margin-bottom: 8px; opacity: 0.95; }
 .effect-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
@@ -1911,6 +1918,8 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  margin-top: 16px;
+  margin-bottom: 0;
 }
 
 .stage-info-header {
@@ -2994,6 +3003,10 @@
   padding: 4px 0 8px;
   margin-bottom: 16px;
 }
+
+.about:has(.flavor-window) {
+  padding-top: 0;
+}
 .flavor-window {
   width: 100%;
   border-radius: 12px;
@@ -3003,13 +3016,48 @@
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   box-sizing: border-box;
   max-width: 100%;
 }
-.flavor-row { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
-.flavor-meta { color: #cbd5e1; font-size: 0.82rem; }
-.flavor-text { white-space: normal; overflow-wrap: normal; word-break: normal; }
+
+.flavor-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.flavor-row:hover {
+  border-color: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+}
+
+.flavor-meta {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0;
+}
+
+.flavor-text {
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 !important;
+  padding: 0;
+  display: block;
+}
 .about-list { padding: 0 16px; display: grid; gap: 8px; }
 .about-row { display: grid; grid-template-columns: 120px 1fr; align-items: start; gap: 8px; }
 .about-row .label { color: #cbd5e1; }
