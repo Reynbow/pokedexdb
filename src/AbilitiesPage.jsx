@@ -2,6 +2,72 @@ import React, { useMemo, useState, useEffect, useCallback } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { updatePokemonLocation } from "./utils/url.js";
+import { getTypeIconUrl } from "./utils/typeIcons.js";
+
+// Abilities to exclude (no description and no pokemon data)
+const EXCLUDED_ABILITIES = new Set([
+  "as-one-glastrier",
+  "as-one-spectrier",
+  // Pokemon Conquest abilities
+  "aqua-boost",
+  "black-hole",
+  "bodyguard",
+  "bonanza",
+  "calming",
+  "celebrate",
+  "climber",
+  "confidence",
+  "conqueror",
+  "daze",
+  "decoy",
+  "deep-sleep",
+  "disgust",
+  "dodge",
+  "explode",
+  "flame-boost",
+  "fortune",
+  "frighten",
+  "frostbite",
+  "grass-cloak",
+  "gulp",
+  "herbivore",
+  "hero",
+  "high-rise",
+  "hot-blooded",
+  "instinct",
+  "interference",
+  "jagged-edge",
+  "last-bastion",
+  "life-force",
+  "lunchbox",
+  "lullaby",
+  "medic",
+  "melee",
+  "mood-maker",
+  "mountaineer",
+  "omnipotent",
+  "parry",
+  "perception",
+  "power-nap",
+  "pride",
+  "run-up",
+  "sandpit",
+  "sequence",
+  "shackle",
+  "shadow-dash",
+  "share",
+  "shield",
+  "skater",
+  "spirit",
+  "sponge",
+  "sprint",
+  "stealth",
+  "tenacity",
+  "thrust",
+  "vanguard",
+  "warm-blanket",
+  "wave-rider",
+]);
 
 export default function AbilitiesPage() {
   const [query, setQuery] = useState("");
@@ -25,7 +91,10 @@ export default function AbilitiesPage() {
       try {
         const r = await fetch("https://pokeapi.co/api/v2/ability?limit=20000");
         const j = await r.json();
-        if (!cancelled) setAbilities(Array.isArray(j.results) ? j.results : []);
+        const allAbilities = Array.isArray(j.results) ? j.results : [];
+        // Filter out excluded abilities
+        const filteredAbilities = allAbilities.filter((a) => !EXCLUDED_ABILITIES.has(a.name));
+        if (!cancelled) setAbilities(filteredAbilities);
       } catch (e) {
         if (!cancelled) setError(e);
       } finally {
@@ -134,8 +203,9 @@ export default function AbilitiesPage() {
               </div>
             </div>
             <aside className="detail-panel">
-              <div className="detail-inner">
+              <div className="detail-inner moves-detail-inner">
                 <AbilityDetailPanel ability={selectedAbility} onClose={clearSelection} />
+                <AbilityLearnersPanel ability={selectedAbility} />
               </div>
             </aside>
           </section>
@@ -150,10 +220,6 @@ function AbilityDetailPanel({ ability, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [learners, setLearners] = useState([]);
-  const [learnersLoading, setLearnersLoading] = useState(false);
-  const [learnersError, setLearnersError] = useState(null);
-  const [typesMap, setTypesMap] = useState(() => new Map()); // id -> [types]
 
   const englishEffect = useMemo(() => {
     const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
@@ -171,11 +237,14 @@ function AbilityDetailPanel({ ability, onClose }) {
     const raw = String(englishEffect || "");
     const cleaned = raw.replace(/\s+/g, " ").trim();
     if (!cleaned) return [];
+    const shortEffectCleaned = String(englishShortEffect || "").replace(/\s+/g, " ").trim();
+    // If the full effect is the same as the short effect, don't show lines (to avoid duplication)
+    if (cleaned === shortEffectCleaned && shortEffectCleaned) return [];
     return cleaned
       .split(/(?<=[.!?])\s+|;\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
-  }, [englishEffect]);
+  }, [englishEffect, englishShortEffect]);
 
   const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -202,35 +271,101 @@ function AbilityDetailPanel({ ability, onClose }) {
     };
   }, [ability]);
 
+  if (!ability) {
+    return (
+      <div className="move-detail-frame">
+        <div className="detail-title detail-title-top" style={{ display: "none" }} />
+        <div className="move-hero-container" style={{ display: "none" }}>
+          <div className="detail-hero single-col" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="move-detail-frame">
+      <div className="detail-title detail-title-top">
+        <h2>{ability.name.replaceAll("-", " ")}</h2>
+      </div>
+      <div className="move-hero-container">
+        <div className="detail-hero single-col">
+          <div className="hero-right">
+            {loading ? (
+              <div className="list-empty">Loading</div>
+            ) : error ? (
+              <div className="list-empty">Failed to load ability.</div>
+            ) : (
+              <div className="main-col">
+                {englishShortEffect || englishEffect ? (
+                  <div className="effect-window">
+                    {englishShortEffect ? <div className="effect-summary">{englishShortEffect}</div> : null}
+                    {effectLines.length > 0 ? (
+                      <ul className="effect-list">
+                        {effectLines.map((line, idx) => (
+                          <li key={idx}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AbilityLearnersPanel({ ability }) {
+  const [data, setData] = useState(null);
+  const [learners, setLearners] = useState([]);
+  const [learnersLoading, setLearnersLoading] = useState(false);
+  const [learnersError, setLearnersError] = useState(null);
+  const [typesMap, setTypesMap] = useState(() => new Map());
+
+  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
   useEffect(() => {
     let cancelled = false;
-    async function loadLearners() {
-      const entries = Array.isArray(data?.pokemon) ? data.pokemon : [];
-      if (entries.length === 0) { setLearners([]); return; }
+    async function load() {
+      if (!ability) {
+        setData(null);
+        setLearners([]);
+        return;
+      }
       setLearnersLoading(true);
       setLearnersError(null);
       try {
-        const list = entries
-          .map((entry) => {
-            const name = entry?.pokemon?.name;
-            const url = entry?.pokemon?.url;
-            if (!name || !url) return null;
-            const parts = String(url).split("/").filter(Boolean);
-            const id = parts[parts.length - 1];
-            return id ? { name, id, url } : null;
-          })
-          .filter(Boolean)
-          .slice(0, 60);
-        if (!cancelled) setLearners(list);
+        const url = `https://pokeapi.co/api/v2/ability/${ability.name}`;
+        const j = await fetch(url).then((r) => r.json());
+        if (!cancelled) {
+          setData(j);
+          const entries = Array.isArray(j?.pokemon) ? j.pokemon : [];
+          const list = entries
+            .map((entry) => {
+              const name = entry?.pokemon?.name;
+              const url = entry?.pokemon?.url;
+              if (!name || !url) return null;
+              const parts = String(url).split("/").filter(Boolean);
+              const id = parts[parts.length - 1];
+              return id ? { name, id, url } : null;
+            })
+            .filter(Boolean)
+            .slice(0, 60);
+          setLearners(list);
+        }
       } catch (e) {
         if (!cancelled) setLearnersError(e);
       } finally {
         if (!cancelled) setLearnersLoading(false);
       }
     }
-    loadLearners();
-    return () => { cancelled = true; };
-  }, [data?.pokemon]);
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [ability]);
 
   const goToPokemon = useCallback((pokemon) => {
     if (!pokemon) return;
@@ -275,82 +410,61 @@ function AbilityDetailPanel({ ability, onClose }) {
     return () => { cancelled = true; };
   }, [learners, typesMap]);
 
-  if (!ability) return <div />;
+  if (!ability) {
+    return <aside className="learners-panel" style={{ display: 'none' }} />;
+  }
 
   return (
-    <>
-      <div className="detail-title detail-title-top">
-        <h2>{ability.name.replaceAll("-", " ")}</h2>
-      </div>
-      <div className="detail-hero single-col">
-        <div className="hero-right hero-right-split">
-          {loading ? (
-            <div className="list-empty">Loading</div>
-          ) : error ? (
-            <div className="list-empty">Failed to load ability.</div>
-          ) : (
-            <>
-              <div className="main-col">
-                {englishShortEffect || englishEffect ? (
-                  <div className="effect-window">
-                    {englishShortEffect ? <div className="effect-summary">{englishShortEffect}</div> : null}
-                    {effectLines.length > 0 ? (
-                      <ul className="effect-list">
-                        {effectLines.map((line, idx) => (
-                          <li key={idx}>{line}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {/* Removed Known Pokémon section as requested */}
-              </div>
-
-              <aside className="side-col">
-                <h4 className="side-title">Has Ability</h4>
-                {learnersLoading ? (
-                  <div className="list-empty">Loading</div>
-                ) : learnersError ? (
-                  <div className="list-empty">Failed to load</div>
-                ) : learners.length === 0 ? (
-                  <div className="list-empty">No data</div>
-                ) : (
-                  <ul className="side-list" role="list">
-                    {learners.map((p) => {
-                      const types = typesMap.get(p.id) || [];
-                      return (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            className="side-poke-button"
-                            onClick={() => goToPokemon(p)}
-                            title={`Open ${humanize(p.name)}`}
-                          >
-                            <img
-                              className="side-poke-sprite"
-                              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
-                              alt=""
-                              loading="lazy"
-                            />
-                            <span className="label">{humanize(p.name)}</span>
-                            <span className="types-vertical">
-                              {types.map((t) => (
-                                <span key={t} className={`type-chip type-${t}`}>{t}</span>
-                              ))}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </aside>
-            </>
-          )}
-        </div>
-      </div>
-    </>
+    <aside className="learners-panel">
+      <h4 className="learners-title">Has Ability</h4>
+      {learnersLoading ? (
+        <div className="learners-empty">Loading</div>
+      ) : learnersError ? (
+        <div className="learners-empty">Failed to load</div>
+      ) : learners.length === 0 ? (
+        <div className="learners-empty">No data</div>
+      ) : (
+        <ul className="learners-list" role="list">
+          {learners.map((p) => {
+            const types = typesMap.get(p.id) || [];
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="learners-poke-button"
+                  onClick={() => goToPokemon(p)}
+                  title={`Open ${humanize(p.name)}`}
+                >
+                  <img
+                    className="learners-poke-sprite"
+                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
+                    alt=""
+                    loading="lazy"
+                  />
+                  <span className="label">{humanize(p.name)}</span>
+                  <span className="types-vertical">
+                    {types.map((t) => (
+                      <span key={t} className={`type-chip type-${t}`}>
+                        <img 
+                          src={getTypeIconUrl(t)} 
+                          alt={t} 
+                          className="type-icon"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <span className="type-name">{t}</span>
+                      </span>
+                    ))}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </aside>
   );
 }
 
