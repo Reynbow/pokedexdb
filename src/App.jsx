@@ -41,6 +41,12 @@ const EXTRA_POKEMON = [
   { name: "zygarde-mega", url: "https://pokeapi.co/api/v2/pokemon/718" },
 ];
 
+// Extra species allowed to appear in the Mega/Gigantamax preview list per game,
+// even if their base species is not present in the active dex list.
+const EXTRA_MEGA_SPECIES_BY_GAME = new Map([
+  ["legends-za", [718]], // Allow Mega Zygarde to appear in Legends: Z-A
+]);
+
 // Extra custom alternate forms keyed by base species id
 // Note: Use id >= 100000 to avoid collisions with real PokeAPI pokemon ids
 const EXTRA_FORMS_BY_SPECIES = new Map([
@@ -1938,6 +1944,15 @@ function App() {
               finalMap.set(idNum, number);
             }
           }
+          // Custom injections for specific Pokédex lists
+          // Ensure Legends: Z-A (lumiose-city) includes Diancie and Mewtwo with desired numbering
+          const keySet = new Set(names.map((n) => String(n).toLowerCase()));
+          if (keySet.has("lumiose-city")) {
+            // Diancie (species 719) should be #231 in Legends: Z-A
+            finalMap.set(719, 231);
+            // Mewtwo (species 150) should be #232 in Legends: Z-A
+            finalMap.set(150, 232);
+          }
           pokedexCacheRef.current.set(cacheKey, finalMap);
           return finalMap;
         } finally {
@@ -2392,7 +2407,16 @@ function App() {
       const isGmax = tags.includes("Gigantamax");
       const isMegaOrGmax = isMega || isGmax;
       if (!isMegaOrGmax) continue;
-      if (speciesId == null || !speciesIdsToConsider.includes(speciesId)) continue;
+      // Allow mega/gmax entries for species either in-scope OR explicitly allowed for the selected game
+      const extraAllowed =
+        selectedGame && Array.isArray(EXTRA_MEGA_SPECIES_BY_GAME.get(selectedGame))
+          ? EXTRA_MEGA_SPECIES_BY_GAME.get(selectedGame)
+          : null;
+      const inScope =
+        speciesId != null &&
+        (speciesIdsToConsider.includes(speciesId) ||
+          (Array.isArray(extraAllowed) && extraAllowed.includes(speciesId)));
+      if (!inScope) continue;
       // Gate by selected game/region feature support
       if (selectedGame) {
         const gf = GAME_FEATURES.get(selectedGame) || { mega: false, gmax: false };
@@ -2403,8 +2427,19 @@ function App() {
       } else {
         // National dex without a game selected: allow both
       }
-      if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(p.name))) {
-        continue;
+      if (hasTypeFilter) {
+        let passesType =
+          !!typeIntersection && typeIntersection.has(p.name);
+        if (!passesType) {
+          // Fallback for custom extras (e.g., zygarde-mega) that don't exist in PokeAPI type indexes:
+          // check the base species canonical name instead.
+          const baseNameForTypes =
+            speciesId != null ? pokemonIdLookup.get(speciesId) : null;
+          if (baseNameForTypes && typeIntersection.has(baseNameForTypes)) {
+            passesType = true;
+          }
+        }
+        if (!passesType) continue;
       }
       if (hasTagFilter) {
         let hasAllTags = true;

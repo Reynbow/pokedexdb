@@ -266,7 +266,7 @@ export const GAME_FEATURES = new Map([
   ["sword-shield", { mega: false, gmax: true }],
   ["legends-arceus", { mega: false, gmax: false }],
   ["scarlet-violet", { mega: false, gmax: false }],
-  ["legends-za", { mega: false, gmax: false }],
+  ["legends-za", { mega: true, gmax: false }],
 ]);
 
 export const REGION_FEATURES = new Map([
