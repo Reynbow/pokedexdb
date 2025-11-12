@@ -442,20 +442,17 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
     const raw = String(englishEffect || "");
     const cleaned = raw.replace(/\s+/g, " ").trim();
     if (!cleaned) return [];
-    const shortEffectCleaned = String(englishShortEffect || "").replace(/\s+/g, " ").trim();
-    // If the full effect is the same as the short effect, don't show lines (to avoid duplication)
-    if (cleaned === shortEffectCleaned && shortEffectCleaned) return [];
     return cleaned
       .split(/(?<=[.!?])\s+|;\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
-  }, [englishEffect, englishShortEffect]);
+  }, [englishEffect]);
 
   const mentionsStages = useMemo(() => {
-    const text = `${englishShortEffect || ""} ${englishEffect || ""}`.toLowerCase();
+    const text = String(englishEffect || "").toLowerCase();
     if (!text.includes("stage")) return false;
     return /(raise|raises|boost|boosts|increase|increases|lower|lowers|decrease|decreases|drop|drops)/.test(text);
-  }, [englishShortEffect, englishEffect]);
+  }, [englishEffect]);
 
   const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -582,9 +579,8 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
                   ) : null}
                 </section>
 
-                {englishShortEffect || englishEffect ? (
+                {englishEffect ? (
                   <div className="effect-window">
-                    {englishShortEffect ? <div className="effect-summary">{englishShortEffect}</div> : null}
                     {effectLines.length > 0 ? (
                       <ul className="effect-list">
                         {effectLines.map((line, idx) => (
