@@ -21,8 +21,23 @@ export const buildSpriteSources = (id, variant, options = {}) => {
   const basePath = getBasePath();
   const local = (p) => `${basePath}${p.startsWith("/") ? p.slice(1) : p}`;
   const preferShowdownAnimated = variant === "animated" || variant === "showdown";
+  const preferHome = variant === "home";
 
   if (clean) {
+    // If variant is "home", prioritize home sprites from /sprites/pokemon/other/home/
+    if (preferHome) {
+      // Local home sprites first
+      if (shiny) {
+        push(local(`/sprites/pokemon/other/home/shiny/${clean}.png`));
+      }
+      push(local(`/sprites/pokemon/other/home/${clean}.png`));
+      // Remote home sprite fallbacks
+      if (shiny) {
+        push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${clean}.png`);
+      }
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${clean}.png`);
+    }
+
     // If gameSpritePath is provided, prioritize game-specific sprites
     if (gameSpritePath) {
       const baseUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/";
@@ -41,24 +56,28 @@ export const buildSpriteSources = (id, variant, options = {}) => {
       push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.gif`);
     }
 
-    // Prefer locally hosted sprites first (never use "home" variant)
-    if (shiny) {
-      push(local(`/sprites/pokemon/shiny/${clean}.png`));
-    }
-    push(local(`/sprites/pokemon/${clean}.png`));
-    push(local(`/sprites/pokemon/other/showdown/${clean}.png`));
-
-    // Remote fallbacks (never use "home" variant)
-    if (shiny) {
-      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${clean}.png`);
-    }
-    if (preferShowdownAnimated) {
+    // Prefer locally hosted sprites first (skip if using home variant)
+    if (!preferHome) {
       if (shiny) {
-        push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${clean}.png`);
+        push(local(`/sprites/pokemon/shiny/${clean}.png`));
       }
-      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.png`);
+      push(local(`/sprites/pokemon/${clean}.png`));
+      push(local(`/sprites/pokemon/other/showdown/${clean}.png`));
     }
-    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${clean}.png`);
+
+    // Remote fallbacks (skip if using home variant)
+    if (!preferHome) {
+      if (shiny) {
+        push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${clean}.png`);
+      }
+      if (preferShowdownAnimated) {
+        if (shiny) {
+          push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${clean}.png`);
+        }
+        push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.png`);
+      }
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${clean}.png`);
+    }
   }
 
   const baseSpeciesId = (() => {
@@ -134,8 +153,17 @@ export const buildSpriteSources = (id, variant, options = {}) => {
   }
 
   // Add unknown pokemon sprite as fallback before placeholder
-  // Try shiny unknown sprite first if shiny is enabled (never use "home" variant)
-  if (shiny) {
+  // If variant is "home", try home sprites first
+  if (preferHome) {
+    if (shiny) {
+      push(local(`/sprites/pokemon/other/home/shiny/0.png`));
+      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/0.png`);
+    }
+    push(local(`/sprites/pokemon/other/home/0.png`));
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/0.png`);
+  }
+  // Try shiny unknown sprite first if shiny is enabled (skip if using home variant)
+  if (!preferHome && shiny) {
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/0.png`);
   }
   // Try animated/showdown unknown sprite if variant prefers showdown assets
@@ -147,8 +175,10 @@ export const buildSpriteSources = (id, variant, options = {}) => {
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/0.gif`);
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/0.png`);
   }
-  // Regular unknown sprite fallback (never use "home" variant)
-  push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png`);
+  // Regular unknown sprite fallback (skip if using home variant)
+  if (!preferHome) {
+    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png`);
+  }
   
   push(SPRITE_PLACEHOLDER);
   return sources;

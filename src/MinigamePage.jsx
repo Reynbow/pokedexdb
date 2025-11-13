@@ -638,8 +638,10 @@ export default function MinigamePage() {
       }
     }
     
-    // Convert hyphens to spaces for display
-    return displayChars.join("").replace(/-/g, " ");
+    // Join characters without any spaces - remove all spaces
+    let result = displayChars.join("").replace(/\s+/g, "");
+    
+    return result;
   }, [pokemon?.name, revealedLetters, completion.isCompleted]);
 
   const typeLabel = useMemo(() => {
@@ -924,23 +926,10 @@ export default function MinigamePage() {
                     </div>
                   </div>
                 )}
-                <div className="minigame-stage-center">
-                  <div className={spriteWrapperClassName}>
-                    <SpriteImage
-                      id={pokemon.id}
-                      alt={showFinalReveal ? friendlyName : "Silhouette of a mystery Pokémon"}
-                      className={spriteClassName}
-                      variant="home"
-                      width={256}
-                      height={256}
-                      loading="lazy"
-                      draggable="false"
-                      onContextMenu={(e) => e.preventDefault()}
-                      onDragStart={(e) => e.preventDefault()}
-                    />
-                  </div>
-                  {nameClueDisplay && (
-                    <div className="minigame-name-clue">
+                {nameClueDisplay && (
+                  <div className="minigame-name-clue">
+                    <span className="minigame-name-clue-title">Name</span>
+                    <div className="minigame-name-clue-content">
                       {nameClueDisplay.split("").map((char, index) => {
                         const isUnderscore = char === "_";
                         const isSpace = char === " ";
@@ -956,7 +945,23 @@ export default function MinigamePage() {
                         );
                       })}
                     </div>
-                  )}
+                  </div>
+                )}
+                <div className="minigame-stage-center">
+                  <div className={spriteWrapperClassName}>
+                    <SpriteImage
+                      id={pokemon.id}
+                      alt={showFinalReveal ? friendlyName : "Silhouette of a mystery Pokémon"}
+                      className={spriteClassName}
+                      variant="home"
+                      width={256}
+                      height={256}
+                      loading="lazy"
+                      draggable="false"
+                      onContextMenu={(e) => e.preventDefault()}
+                      onDragStart={(e) => e.preventDefault()}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
