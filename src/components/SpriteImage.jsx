@@ -6,7 +6,7 @@ const SPRITE_PLACEHOLDER =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
 
 export const buildSpriteSources = (id, variant, options = {}) => {
-  const { formName, speciesId, pokemonUrl, dexNumber, shiny = false } = options;
+  const { formName, speciesId, pokemonUrl, dexNumber, shiny = false, gameSpritePath = null } = options;
   const clean = String(id ?? "").trim();
   const lowerName = String(formName || "").toLowerCase();
   const sources = [];
@@ -23,6 +23,16 @@ export const buildSpriteSources = (id, variant, options = {}) => {
   const preferShowdownAnimated = variant === "animated" || variant === "showdown";
 
   if (clean) {
+    // If gameSpritePath is provided, prioritize game-specific sprites
+    if (gameSpritePath) {
+      const baseUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/";
+      // Try shiny version first if shiny is enabled
+      if (shiny) {
+        push(`${baseUrl}${gameSpritePath}shiny/${clean}.png`);
+      }
+      // Always try regular version
+      push(`${baseUrl}${gameSpritePath}${clean}.png`);
+    }
 
     if (preferShowdownAnimated) {
       if (shiny) {
@@ -31,26 +41,14 @@ export const buildSpriteSources = (id, variant, options = {}) => {
       push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${clean}.gif`);
     }
 
-    // Prefer locally hosted sprites first
-    if (shiny && variant === "home") {
-      push(local(`/sprites/pokemon/other/home/shiny/${clean}.png`));
-    }
-    if (variant === "home") {
-      push(local(`/sprites/pokemon/other/home/${clean}.png`));
-    }
+    // Prefer locally hosted sprites first (never use "home" variant)
     if (shiny) {
       push(local(`/sprites/pokemon/shiny/${clean}.png`));
     }
     push(local(`/sprites/pokemon/${clean}.png`));
     push(local(`/sprites/pokemon/other/showdown/${clean}.png`));
 
-    // Remote fallbacks
-    if (shiny && variant === "home") {
-      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${clean}.png`);
-    }
-    if (variant === "home") {
-      push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${clean}.png`);
-    }
+    // Remote fallbacks (never use "home" variant)
     if (shiny) {
       push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${clean}.png`);
     }
@@ -136,10 +134,7 @@ export const buildSpriteSources = (id, variant, options = {}) => {
   }
 
   // Add unknown pokemon sprite as fallback before placeholder
-  // Try shiny unknown sprite first if shiny is enabled
-  if (shiny && variant === "home") {
-    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/0.png`);
-  }
+  // Try shiny unknown sprite first if shiny is enabled (never use "home" variant)
   if (shiny) {
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/0.png`);
   }
@@ -152,11 +147,7 @@ export const buildSpriteSources = (id, variant, options = {}) => {
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/0.gif`);
     push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/0.png`);
   }
-  // Try home variant unknown sprite
-  if (variant === "home") {
-    push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/0.png`);
-  }
-  // Regular unknown sprite fallback
+  // Regular unknown sprite fallback (never use "home" variant)
   push(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png`);
   
   push(SPRITE_PLACEHOLDER);
@@ -173,12 +164,13 @@ export default function SpriteImage({
   pokemonUrl = null,
   dexNumber = null,
   shiny = false,
+  gameSpritePath = null,
   onLoad,
   ...rest
 }) {
   const sources = useMemo(
-    () => buildSpriteSources(id, variant, { formName, speciesId, pokemonUrl, dexNumber, shiny }),
-    [id, variant, formName, speciesId, pokemonUrl, dexNumber, shiny]
+    () => buildSpriteSources(id, variant, { formName, speciesId, pokemonUrl, dexNumber, shiny, gameSpritePath }),
+    [id, variant, formName, speciesId, pokemonUrl, dexNumber, shiny, gameSpritePath]
   );
   const [index, setIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);

@@ -5785,6 +5785,7 @@
   height: 144px;
   object-fit: contain;
   object-position: center;
+  /* Use pixelated rendering for crisp integer scaling - prevents blur */
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
@@ -5802,9 +5803,25 @@
 /* Tighter spacing in preview cards between sprite, name, and types */
 .card .sprite { margin: 0 auto 10px; position: relative; z-index: 1; padding-bottom: 8px; }
 .card .sprite {
+  /* Parallax values are rounded to integers in JS to prevent sub-pixel blur */
   transform: translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0);
   transition: transform 0.12s ease-out;
   will-change: transform;
+  /* Ensure crisp integer scaling with pixelated rendering */
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+/* Reduce sprite size for X & Y and Ruby/Sapphire/Emerald pokedex filters */
+/* Using 96px (2x) instead of 120px (2.5x) for integer scaling */
+/* All preview sprites use integer scaling - 144px (3x) or 96px (2x) based on 48px base */
+.card[data-game="x-y"] .sprite,
+.card[data-dex="kalos"] .sprite,
+.card[data-game="ruby-sapphire-emerald"] .sprite,
+.card[data-dex="hoenn"] .sprite {
+  width: 96px !important;
+  height: 96px !important;
+  /* Integer scaling already enforced by .card .sprite rule above */
 }
 .card .name { margin-top: 0; }
 .card .types { display: flex; justify-content: center; gap: 6px; margin-top: 2px; margin-bottom: 0; }
@@ -5856,12 +5873,7 @@
 }
 
 /* Add subtle type-colored glow to sprite on hover or when previously selected */
-.card:hover .sprite,
-.card.is-previous .sprite {
-  filter:
-    drop-shadow(0 0 10px rgba(var(--type-rgb), 0.5))
-    drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
-}
+/* Removed filter from .card:hover .sprite to prevent blurriness - filters cause blurriness on sprites */
 
 /* Type color accents */
 .type-normal { background: linear-gradient(135deg, #b0aa79, #8a855e); border-color: rgba(138, 133, 94, 0.92); color: #ffffff; }

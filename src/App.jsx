@@ -2749,6 +2749,7 @@ function App() {
               dexNumber={dexDisplay}
               shiny={shiny}
               selectedGame={selectedGame}
+              selectedDex={selectedDex}
               detailsCache={detailsCache}
               eagerLoad={index < 6}
             />
@@ -2801,6 +2802,7 @@ function App() {
               dexNumber={dexDisplay}
               shiny={shiny}
               selectedGame={selectedGame}
+              selectedDex={selectedDex}
               detailsCache={detailsCache}
               eagerLoad={index < 8}
             />

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import SpriteImage from "./SpriteImage.jsx";
 import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "../constants/tags.js";
-import { GAME_LOGO_LOOKUP, VERSION_LOGO_FILES, VERSION_COLORS } from "../constants/games.js";
+import { GAME_LOGO_LOOKUP, VERSION_LOGO_FILES, VERSION_COLORS, GAME_GENERATION_LOOKUP } from "../constants/games.js";
 import { getExclusiveVersionForSpecies } from "../constants/exclusives.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, LEGENDARY_NAMES, MYTHICAL_NAMES } from "../constants/species.js";
 
@@ -113,7 +113,40 @@ const deriveSpecialTags = (name) => {
   return tags;
 };
 
-function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null, eagerLoad = false }) {
+// Mapping from game keys to their sprite API paths
+const GAME_SPRITE_PATHS = new Map([
+  ["red-blue-yellow", "generation-i/yellow/transparent/"],
+  ["gold-silver-crystal", "generation-ii/gold/transparent/"],
+  ["ruby-sapphire-emerald", "generation-iii/ruby-sapphire/"],
+  ["firered-leafgreen", "generation-iii/firered-leafgreen/"],
+  ["diamond-pearl", "generation-iv/diamond-pearl/"],
+  ["platinum", "generation-iv/platinum/"],
+  ["heartgold-soulsilver", "generation-iv/heartgold-soulsilver/"],
+  ["black-white", "generation-v/black-white/"],
+  ["black-2-white-2", "generation-v/black-white/"],
+  ["x-y", "generation-vi/x-y/"],
+  ["omega-ruby-alpha-sapphire", "generation-vii/ultra-sun-ultra-moon/"],
+  ["sun-moon", "generation-vii/ultra-sun-ultra-moon/"],
+  ["ultra-sun-ultra-moon", "generation-vii/ultra-sun-ultra-moon/"],
+]);
+
+// Determine sprite variant and game-specific path based on selected game
+// For games in GAME_SPRITE_PATHS, use game-specific sprite paths
+// Never use "home" variant - fall back to local sprites instead
+const getSpriteVariantForGame = (selectedGame) => {
+  if (!selectedGame) return { variant: null, gameSpritePath: null };
+  const gameSpritePath = GAME_SPRITE_PATHS.get(selectedGame) || null;
+  
+  // If game has a specific sprite path, use it
+  if (gameSpritePath) {
+    return { variant: null, gameSpritePath };
+  }
+  
+  // Never use "home" variant - use null to fall back to local sprites
+  return { variant: null, gameSpritePath: null };
+};
+
+function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null, selectedDex = null, eagerLoad = false }) {
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
   const intersectionOptions = useMemo(() => ({ root: null, rootMargin: "600px 0px", threshold: 0.01 }), []);
@@ -179,6 +212,10 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
     const color = VERSION_COLORS.get(versionKey) || null;
     return { logoUrl, label, color, versionKey };
   }, [selectedGame, baseSpeciesName]);
+
+  const { variant: spriteVariant, gameSpritePath } = useMemo(() => {
+    return getSpriteVariantForGame(selectedGame);
+  }, [selectedGame]);
 
   useEffect(() => {
     let ignore = false;
@@ -256,8 +293,9 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       const relY = (y - centerY) / (bounds.height / 2);
       const clamp = (v) => Math.max(-1, Math.min(1, v));
       const maxOffset = 4; // px
-      const offsetX = (clamp(relX) * maxOffset).toFixed(2);
-      const offsetY = (clamp(relY) * maxOffset).toFixed(2);
+      // Round to integers to prevent sub-pixel blur
+      const offsetX = Math.round(clamp(relX) * maxOffset);
+      const offsetY = Math.round(clamp(relY) * maxOffset);
       el.style.setProperty("--parallax-x", `${offsetX}px`);
       el.style.setProperty("--parallax-y", `${offsetY}px`);
     });
@@ -281,6 +319,12 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
 
   const dexNo = dexNumber || `#${id}`;
 
+  const isSmallSpriteFilter = 
+    selectedGame === "x-y" || 
+    selectedDex === "kalos" || 
+    selectedGame === "ruby-sapphire-emerald" || 
+    selectedDex === "hoenn";
+  
   return (
     <div
       className={`card${selected ? " is-selected" : ""}${exclusiveBadge ? " has-exclusive" : ""}`}
@@ -296,6 +340,8 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
       aria-current={selected ? "true" : undefined}
       data-id={id}
       data-type={types && types.length > 0 ? types[0] : undefined}
+      data-game={selectedGame === "x-y" || selectedGame === "ruby-sapphire-emerald" ? selectedGame : undefined}
+      data-dex={selectedDex === "kalos" || selectedDex === "hoenn" ? selectedDex : undefined}
     >
       {exclusiveBadge ? (
         <>
@@ -332,14 +378,27 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
         </div>
       )}
       <div className="dexno">{dexNo}</div>
-      <div className="sprite-container" style={{ position: 'relative', width: 144, height: 144 }}>
+      <div 
+        className="sprite-container" 
+        style={{ 
+          position: 'relative', 
+          width: isSmallSpriteFilter ? 96 : 144, 
+          height: isSmallSpriteFilter ? 96 : 144,
+        }}
+      >
         {inView ? (
           <SpriteImage
             className="sprite"
             id={id}
             alt={name}
-            width={144}
-            height={144}
+            width={isSmallSpriteFilter ? 96 : 144}
+            height={isSmallSpriteFilter ? 96 : 144}
+            style={{
+              width: isSmallSpriteFilter ? 96 : 144,
+              height: isSmallSpriteFilter ? 96 : 144,
+              // Ensure integer scaling for all preview sprites
+              // CSS will handle image-rendering via .card .sprite rule
+            }}
             loading={eagerLoad ? "eager" : "lazy"}
             fetchpriority={eagerLoad ? "high" : undefined}
             formName={name}
@@ -347,13 +406,15 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
             pokemonUrl={url}
             dexNumber={dexNumber}
             shiny={shiny}
+            variant={spriteVariant}
+            gameSpritePath={gameSpritePath}
           />
         ) : (
           <div 
             className="sprite-placeholder" 
             style={{ 
-              width: 144, 
-              height: 144, 
+              width: isSmallSpriteFilter ? 96 : 144, 
+              height: isSmallSpriteFilter ? 96 : 144, 
               background: 'linear-gradient(90deg, #202631 0%, #2a2f3a 50%, #202631 100%)',
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.5s infinite',
