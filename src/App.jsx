@@ -2754,6 +2754,29 @@ function App() {
             />
           );
         })}
+        {
+          (() => {
+            const eagerCount = 6;
+            const prefetchCount = 48;
+            const items = entries
+              .slice(eagerCount, eagerCount + prefetchCount)
+              .map((p) => {
+                const pref = getRegionPreferredEntry(p);
+                const parts = pref.url.split("/").filter(Boolean);
+                const id = parts[parts.length - 1];
+                const idNum = Number(id);
+                const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                return {
+                  id,
+                  name: pref.name,
+                  url: pref.url,
+                  dexNumber: dexDisplay,
+                  shiny,
+                };
+              });
+            return <PrefetchSprites items={items} limit={48} />;
+          })()
+        }
       </div>
     );
   };
@@ -2786,7 +2809,7 @@ function App() {
         {
           (() => {
             const eagerCount = 8;
-            const prefetchCount = 24;
+            const prefetchCount = 48;
             const items = entries
               .slice(eagerCount, eagerCount + prefetchCount)
               .map((p) => {
@@ -2803,7 +2826,7 @@ function App() {
                   shiny,
                 };
               });
-            return <PrefetchSprites items={items} limit={24} />;
+            return <PrefetchSprites items={items} limit={48} />;
           })()
         }
       </section>

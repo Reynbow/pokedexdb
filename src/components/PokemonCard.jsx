@@ -10,17 +10,30 @@ const localDetailsCache = new Map();
 
 function useInView(options) {
   const ref = useRef(null);
+  const optionsRef = useRef(options);
   const [inView, setInView] = useState(false);
+  
+  // Update options ref when options change
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
+  
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const opts = optionsRef.current || { root: null, rootMargin: "1000px 0px", threshold: 0.01 };
     const obs = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      options || { root: null, rootMargin: "1000px 0px", threshold: 0.01 }
+      (entries) => {
+        // Handle all entries (though typically just one)
+        entries.forEach((entry) => {
+          setInView(entry.isIntersecting);
+        });
+      },
+      opts
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [options]);
+  }, []); // Empty deps - observer is created once and uses ref for options
   return [ref, inView];
 }
 
@@ -103,7 +116,8 @@ const deriveSpecialTags = (name) => {
 function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null, eagerLoad = false }) {
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
-  const [cardRef, inView] = useInView({ root: null, rootMargin: "300px 0px", threshold: 0.01 });
+  const intersectionOptions = useMemo(() => ({ root: null, rootMargin: "600px 0px", threshold: 0.01 }), []);
+  const [cardRef, inView] = useInView(intersectionOptions);
   const baseSpeciesId = useMemo(() => {
     if (!dexNumber) return null;
     const match = String(dexNumber).match(/\d+/);
@@ -318,24 +332,37 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
         </div>
       )}
       <div className="dexno">{dexNo}</div>
-      {inView ? (
-        <SpriteImage
-          className="sprite"
-          id={id}
-          alt={name}
-          width={144}
-          height={144}
-          loading={eagerLoad ? "eager" : "lazy"}
-          fetchpriority={eagerLoad ? "high" : undefined}
-          formName={name}
-          speciesId={baseSpeciesId}
-          pokemonUrl={url}
-          dexNumber={dexNumber}
-          shiny={shiny}
-        />
-      ) : (
-        <div style={{ width: 144, height: 144 }} />
-      )}
+      <div className="sprite-container" style={{ position: 'relative', width: 144, height: 144 }}>
+        {inView ? (
+          <SpriteImage
+            className="sprite"
+            id={id}
+            alt={name}
+            width={144}
+            height={144}
+            loading={eagerLoad ? "eager" : "lazy"}
+            fetchpriority={eagerLoad ? "high" : undefined}
+            formName={name}
+            speciesId={baseSpeciesId}
+            pokemonUrl={url}
+            dexNumber={dexNumber}
+            shiny={shiny}
+          />
+        ) : (
+          <div 
+            className="sprite-placeholder" 
+            style={{ 
+              width: 144, 
+              height: 144, 
+              background: 'linear-gradient(90deg, #202631 0%, #2a2f3a 50%, #202631 100%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              borderRadius: '8px'
+            }} 
+            aria-hidden="true"
+          />
+        )}
+      </div>
       <div className="name">{formatDisplayName(name)}</div>
       <div className="types">
         {types.length === 0 ? (

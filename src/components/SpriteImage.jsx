@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { getBasePath } from "../utils/url.js";
 
@@ -173,6 +173,7 @@ export default function SpriteImage({
   pokemonUrl = null,
   dexNumber = null,
   shiny = false,
+  onLoad,
   ...rest
 }) {
   const sources = useMemo(
@@ -180,17 +181,32 @@ export default function SpriteImage({
     [id, variant, formName, speciesId, pokemonUrl, dexNumber, shiny]
   );
   const [index, setIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const imgRef = useRef(null);
+
+  const src = sources[Math.min(index, sources.length - 1)];
 
   useEffect(() => {
     setIndex(0);
+    setIsLoading(true);
   }, [id, shiny]);
+
+  // Check if image is already loaded (cached) after src changes
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalHeight !== 0) {
+      setIsLoading(false);
+    }
+  }, [src]);
 
   const handleError = (event) => {
     setIndex((prev) => {
       const next = prev + 1;
       if (next < sources.length) {
+        setIsLoading(true);
         return next;
       }
+      setIsLoading(false);
       if (onError) {
         onError(event);
       }
@@ -198,10 +214,34 @@ export default function SpriteImage({
     });
   };
 
-  const src = sources[Math.min(index, sources.length - 1)];
+  const handleLoad = (event) => {
+    setIsLoading(false);
+    if (onLoad) {
+      onLoad(event);
+    }
+  };
   // Add lazy loading by default if not explicitly set
   const loading = rest.loading !== undefined ? rest.loading : "lazy";
-  return <img {...rest} alt={alt} src={src} onError={handleError} loading={loading} />;
+  
+  // Fade in the image when it loads - but don't hide if it's already loaded
+  const imgStyle = {
+    ...rest.style,
+    opacity: isLoading && src !== SPRITE_PLACEHOLDER ? 0 : 1,
+    transition: isLoading && src !== SPRITE_PLACEHOLDER ? 'opacity 0.2s ease-in' : 'none',
+  };
+  
+  return (
+    <img
+      {...rest}
+      ref={imgRef}
+      alt={alt}
+      src={src}
+      onError={handleError}
+      onLoad={handleLoad}
+      loading={loading}
+      style={imgStyle}
+    />
+  );
 }
 
 
