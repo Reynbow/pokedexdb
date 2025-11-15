@@ -31,6 +31,9 @@ const GEN1_POKEMON_NAMES = [
   "zapdos", "moltres", "dratini", "dragonair", "dragonite", "mewtwo",
   "mew"
 ];
+const GEN1_SLUG_TO_POKEDEX_ID = new Map(
+  GEN1_POKEMON_NAMES.map((slug, index) => [slug, index + 1])
+);
 
 // Pokemon Yellow save file offsets
 // According to Bulbapedia: https://bulbapedia.bulbagarden.net/wiki/Save_data_structure_(Generation_I)
@@ -53,6 +56,8 @@ const POKEDEX_DATA_LOCATIONS = [
 ];
 const LEGACY_CSV_FILENAME = "data/pokemon_yellow_legacy_list.csv";
 const DEFAULT_METHOD_LABEL = "Grass";
+const PARTY_DATA_OFFSETS = [0x2F2C, BANK1_START + 0x2F2C];
+const PARTY_MAX_SIZE = 6;
 
 let legacyEncounterCache = null;
 let legacyEncounterPromise = null;
@@ -136,6 +141,162 @@ const RAW_EVOLUTION_DATA = [
   "Tentacool~-/-~Level 30~-/-~Tentacruel",
   "Venonat~-/-~Level 31~-/-~Venomoth",
 ];
+const SPECIES_INDEX_TO_SLUG = new Map([
+  [1, "rhydon"],
+  [2, "kangaskhan"],
+  [3, "nidoran-m"],
+  [4, "clefairy"],
+  [5, "spearow"],
+  [6, "voltorb"],
+  [7, "nidoking"],
+  [8, "slowbro"],
+  [9, "ivysaur"],
+  [10, "exeggutor"],
+  [11, "lickitung"],
+  [12, "exeggcute"],
+  [13, "grimer"],
+  [14, "gengar"],
+  [15, "nidoran-f"],
+  [16, "nidoqueen"],
+  [17, "cubone"],
+  [18, "rhyhorn"],
+  [19, "lapras"],
+  [20, "arcanine"],
+  [21, "mew"],
+  [22, "gyarados"],
+  [23, "shellder"],
+  [24, "tentacool"],
+  [25, "gastly"],
+  [26, "scyther"],
+  [27, "staryu"],
+  [28, "blastoise"],
+  [29, "pinsir"],
+  [30, "tangela"],
+  [33, "growlithe"],
+  [34, "onix"],
+  [35, "fearow"],
+  [36, "pidgey"],
+  [37, "slowpoke"],
+  [38, "kadabra"],
+  [39, "graveler"],
+  [40, "chansey"],
+  [41, "machoke"],
+  [42, "mr-mime"],
+  [43, "hitmonlee"],
+  [44, "hitmonchan"],
+  [45, "arbok"],
+  [46, "parasect"],
+  [47, "psyduck"],
+  [48, "drowzee"],
+  [49, "golem"],
+  [51, "magmar"],
+  [53, "electabuzz"],
+  [54, "magneton"],
+  [55, "koffing"],
+  [57, "mankey"],
+  [58, "seel"],
+  [59, "diglett"],
+  [60, "tauros"],
+  [64, "farfetchd"],
+  [65, "venonat"],
+  [66, "dragonite"],
+  [70, "doduo"],
+  [71, "poliwag"],
+  [72, "jynx"],
+  [73, "moltres"],
+  [74, "articuno"],
+  [75, "zapdos"],
+  [76, "ditto"],
+  [77, "meowth"],
+  [78, "krabby"],
+  [82, "vulpix"],
+  [83, "ninetales"],
+  [84, "pikachu"],
+  [85, "raichu"],
+  [88, "dratini"],
+  [89, "dragonair"],
+  [90, "kabuto"],
+  [91, "kabutops"],
+  [92, "horsea"],
+  [93, "seadra"],
+  [96, "sandshrew"],
+  [97, "sandslash"],
+  [98, "omanyte"],
+  [99, "omastar"],
+  [100, "jigglypuff"],
+  [101, "wigglytuff"],
+  [102, "eevee"],
+  [103, "flareon"],
+  [104, "jolteon"],
+  [105, "vaporeon"],
+  [106, "machop"],
+  [107, "zubat"],
+  [108, "ekans"],
+  [109, "paras"],
+  [110, "poliwhirl"],
+  [111, "poliwrath"],
+  [112, "weedle"],
+  [113, "kakuna"],
+  [114, "beedrill"],
+  [116, "dodrio"],
+  [117, "primeape"],
+  [118, "dugtrio"],
+  [119, "venomoth"],
+  [120, "dewgong"],
+  [123, "caterpie"],
+  [124, "metapod"],
+  [125, "butterfree"],
+  [126, "machamp"],
+  [128, "golduck"],
+  [129, "hypno"],
+  [130, "golbat"],
+  [131, "mewtwo"],
+  [132, "snorlax"],
+  [133, "magikarp"],
+  [136, "muk"],
+  [138, "kingler"],
+  [139, "cloyster"],
+  [141, "electrode"],
+  [142, "clefable"],
+  [143, "weezing"],
+  [144, "persian"],
+  [145, "marowak"],
+  [147, "haunter"],
+  [148, "abra"],
+  [149, "alakazam"],
+  [150, "pidgeotto"],
+  [151, "pidgeot"],
+  [152, "starmie"],
+  [153, "bulbasaur"],
+  [154, "venusaur"],
+  [155, "tentacruel"],
+  [157, "goldeen"],
+  [158, "seaking"],
+  [163, "ponyta"],
+  [164, "rapidash"],
+  [165, "rattata"],
+  [166, "raticate"],
+  [167, "nidorino"],
+  [168, "nidorina"],
+  [169, "geodude"],
+  [170, "porygon"],
+  [171, "aerodactyl"],
+  [173, "magnemite"],
+  [176, "charmander"],
+  [177, "squirtle"],
+  [178, "charmeleon"],
+  [179, "wartortle"],
+  [180, "charizard"],
+  [182, "fossil-kabutops"],
+  [183, "fossil-aerodactyl"],
+  [184, "mon-ghost"],
+  [185, "oddish"],
+  [186, "gloom"],
+  [187, "vileplume"],
+  [188, "bellsprout"],
+  [189, "weepinbell"],
+  [190, "victreebel"],
+]);
 
 const buildEvolutionRequirements = (rawEntries) => {
   const map = new Map();
@@ -173,6 +334,39 @@ const buildEvolutionRequirements = (rawEntries) => {
 };
 
 const EVOLUTION_REQUIREMENTS = buildEvolutionRequirements(RAW_EVOLUTION_DATA);
+
+function parsePartyPokemon(data) {
+  for (const offset of PARTY_DATA_OFFSETS) {
+    if (offset + 1 >= data.length) continue;
+    const count = data[offset];
+    if (!Number.isFinite(count) || count < 0 || count > PARTY_MAX_SIZE) {
+      continue;
+    }
+    if (offset + 1 + PARTY_MAX_SIZE > data.length) {
+      continue;
+    }
+    const speciesBuffer = Array.from(data.slice(offset + 1, offset + 1 + PARTY_MAX_SIZE));
+    const entries = [];
+    for (let i = 0; i < Math.min(count, speciesBuffer.length); i++) {
+      const speciesId = speciesBuffer[i];
+      if (!Number.isFinite(speciesId) || speciesId <= 0 || speciesId === 0xff) {
+        continue;
+      }
+      const slug = SPECIES_INDEX_TO_SLUG.get(speciesId) || null;
+      const dexId = slug ? GEN1_SLUG_TO_POKEDEX_ID.get(slug) || null : null;
+      entries.push({
+        slot: i + 1,
+        speciesId,
+        slug,
+        dexId,
+      });
+    }
+    if (entries.length > 0 || count === 0) {
+      return entries;
+    }
+  }
+  return [];
+}
 
 function formatLegacyLocationName(raw) {
   if (!raw) return "";
@@ -435,6 +629,7 @@ export default function SavPage() {
   const [fileName, setFileName] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
   const [fileData, setFileData] = useState(null);
+  const [partyMembers, setPartyMembers] = useState([]);
   const [manualOffset, setManualOffset] = useState('0x25A3');
   const [manualBitOrder, setManualBitOrder] = useState('lsb');
   const [showDebugTools, setShowDebugTools] = useState(false);
@@ -496,6 +691,7 @@ export default function SavPage() {
     setError(null);
     setFileName(file.name);
     setCaughtPokemon([]);
+    setPartyMembers([]);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -528,11 +724,15 @@ export default function SavPage() {
           usedLabel: sourceLabel,
         });
         
+        const party = parsePartyPokemon(data);
+
         setCaughtPokemon(caught);
+        setPartyMembers(party);
         setError(null);
       } catch (err) {
         setError(`Error parsing save file: ${err.message}`);
         setCaughtPokemon([]);
+        setPartyMembers([]);
         setDebugInfo(null);
         setFileData(null);
       } finally {
@@ -611,6 +811,9 @@ export default function SavPage() {
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
   const hasSaveData = fileData instanceof Uint8Array;
   const legacyMapReady = legacyEncountersReady && legacyEncounters instanceof Map;
+  const partySlots = useMemo(() => {
+    return Array.from({ length: PARTY_MAX_SIZE }, (_, index) => partyMembers[index] || null);
+  }, [partyMembers]);
   const combinedResults = useMemo(() => {
     if (!hasSaveData) {
       return [];
@@ -653,7 +856,6 @@ export default function SavPage() {
         <section className="sav-page__grid">
           <article className="sav-card sav-card--primary">
             <div className="sav-card__header">
-              <span className="sav-card__eyebrow">Step 1</span>
               <h2 className="sav-card__title">Upload your save</h2>
               <p className="sav-card__description">
                 Works with emulator exports or flash-cart backups (32KB Pokemon Yellow saves in .sav or .srm format).
@@ -685,7 +887,6 @@ export default function SavPage() {
           {debugInfo && (
             <article className="sav-card sav-card--debug">
               <div className="sav-card__header">
-                <span className="sav-card__eyebrow">Step 2</span>
                 <h2 className="sav-card__title">Debug details</h2>
                 <p className="sav-card__description">
                   Review the offsets we attempted or manually try a different bit order.
@@ -811,9 +1012,57 @@ export default function SavPage() {
         </section>
 
         {hasSaveData && (
+          <section className="sav-card sav-party-card">
+            <div className="sav-card__header">
+              <h2 className="sav-card__title">Current Party ({partyMembers.length} / {PARTY_MAX_SIZE})</h2>
+              <p className="sav-card__description">
+                These are the Pokémon currently stored in your party slots.
+              </p>
+            </div>
+            <div className="sav-card__body">
+                      {partySlots.some(Boolean) ? (
+                        <div className="sav-party-grid">
+                          {partySlots.map((slot, index) => (
+                            <div
+                              key={`party-slot-${index}`}
+                              className={`sav-party-slot ${slot ? "has-pokemon" : "is-empty"}`}
+                            >
+                              {slot ? (
+                                <>
+                                  <div className="sav-party-slot__sprite">
+                                    <SpriteImage
+                                      id={slot.dexId ?? slot.speciesId ?? 0}
+                                      alt={slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesId}`}
+                                      gameSpritePath="generation-i/yellow/transparent/"
+                                      style={{ width: "96px", height: "96px", imageRendering: "pixelated" }}
+                                    />
+                                  </div>
+                                  <div className="sav-party-slot__meta">
+                                    <div className="sav-party-slot__label">Slot {slot.slot}</div>
+                                    <div className="sav-party-slot__name">
+                                      {slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesId}`}
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                        <div className="sav-party-slot__empty">
+                          <span className="sav-party-slot__label">Slot {index + 1}</span>
+                          <span className="sav-party-slot__name">Empty</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="sav-party-empty">Party data unavailable (or party is empty).</div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {hasSaveData && (
           <section className="sav-card sav-results-card">
             <div className="sav-card__header">
-              <span className="sav-card__eyebrow">Results</span>
               <h2 className="sav-card__title">
                 Caught Pokemon ({caughtPokemon.length} / {GEN1_POKEMON_COUNT})
               </h2>

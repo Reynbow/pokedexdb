@@ -7584,6 +7584,73 @@
   gap: 16px;
 }
 
+.sav-party-card .sav-card__body {
+  padding-top: 4px;
+}
+
+.sav-party-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.sav-party-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.65);
+  min-height: 72px;
+}
+
+.sav-party-slot__sprite {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sav-party-slot__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sav-party-slot__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.sav-party-slot__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.sav-party-slot.is-empty {
+  border-style: dashed;
+  color: #94a3b8;
+}
+
+.sav-party-slot__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sav-party-empty {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+  text-align: center;
+}
+
 .sav-results-list {
   display: flex;
   flex-direction: column;
