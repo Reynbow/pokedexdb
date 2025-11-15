@@ -76,6 +76,22 @@ function resolveLegacyCsvUrl() {
   return `${String(baseUrl || "/").replace(/\/+$/, "/")}${LEGACY_CSV_FILENAME}`;
 }
 
+function resolveStaticDataUrl(filename) {
+  let baseUrl = "/";
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) {
+      baseUrl = import.meta.env.BASE_URL;
+    }
+  } catch {
+    baseUrl = "/";
+  }
+  return `${String(baseUrl || "/").replace(/\/+$/, "/")}${filename}`;
+}
+
+function resolveYellowReferenceUrl() {
+  return resolveStaticDataUrl("data/pokemon_yellow_reference.json");
+}
+
 function readUint16(data, offset) {
   if (offset + 1 >= data.length) return 0;
   return (data[offset] << 8) | data[offset + 1];
@@ -120,6 +136,16 @@ function resolveTypeName(code) {
     return "Normal";
   }
   return "Unknown";
+}
+
+function formatHeight(decimeters) {
+  if (!Number.isFinite(decimeters)) return "Unknown";
+  return `${(decimeters / 10).toFixed(1)} m`;
+}
+
+function formatWeight(hectograms) {
+  if (!Number.isFinite(hectograms)) return "Unknown";
+  return `${(hectograms / 10).toFixed(1)} kg`;
 }
 
 function normalizeLegacyPokemonName(rawName) {
@@ -810,6 +836,8 @@ export default function SavPage() {
   const [legacyEncounters, setLegacyEncounters] = useState(null);
   const [legacyEncountersReady, setLegacyEncountersReady] = useState(false);
   const [legacyEncounterError, setLegacyEncounterError] = useState(null);
+  const [yellowReference, setYellowReference] = useState(null);
+  const [yellowReferenceError, setYellowReferenceError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [showCaught, setShowCaught] = useState(true);
@@ -846,6 +874,38 @@ export default function SavPage() {
           `Encounter location data is unavailable right now (${err?.message || "unknown error"}).`
         );
         setLegacyEncountersReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(resolveYellowReferenceUrl())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load Yellow reference data (${response.status})`);
+        }
+        return response.json();
+      })
+      .then((records) => {
+        if (cancelled) return;
+        const map = new Map();
+        (Array.isArray(records) ? records : []).forEach((record) => {
+          if (record?.slug) {
+            map.set(record.slug, record);
+          }
+        });
+        setYellowReference(map);
+        setYellowReferenceError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setYellowReference(new Map());
+        setYellowReferenceError(
+          `Pokemon Yellow reference data is unavailable right now (${err?.message || "unknown error"}).`
+        );
       });
     return () => {
       cancelled = true;
@@ -905,6 +965,7 @@ export default function SavPage() {
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
   const hasSaveData = fileData instanceof Uint8Array;
   const legacyMapReady = legacyEncountersReady && legacyEncounters instanceof Map;
+  const yellowReferenceReady = yellowReference instanceof Map;
   const partySlots = useMemo(() => {
     return Array.from({ length: PARTY_MAX_SIZE }, (_, index) => partyMembers[index] || null);
   }, [partyMembers]);
@@ -1286,15 +1347,23 @@ export default function SavPage() {
                 <div className="sav-alert sav-alert--error">{legacyEncounterError}</div>
               )}
               <div className="sav-results-list">
-                {filteredResults.length > 0 ? (
-                  filteredResults.map((entry) => {
+                  {filteredResults.length > 0 ? (
+                    filteredResults.map((entry) => {
                     const pokemonName = toTitleCase(entry.name);
-                  const cardClassNames = [
-                    "sav-result-row",
-                    entry.caught ? "is-caught" : "is-uncaught",
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
+                    const yellowSlug = normalizeLegacyPokemonName(entry.name);
+                    const yellowRecord = yellowReferenceReady ? yellowReference.get(yellowSlug) : null;
+                    const speciesLabel = yellowRecord?.species || "Species unknown";
+                    const heightLabel = formatHeight(yellowRecord?.height);
+                    const weightLabel = formatWeight(yellowRecord?.weight);
+                    const entryText = yellowRecord?.entry || "Yellow Pokedex entry unavailable.";
+                    const hasLocationInfo = legacyMapReady && entry.visibleEntries.length > 0;
+                    const cardClassNames = [
+                      "sav-result-row",
+                      entry.caught ? "is-caught" : "is-uncaught",
+                      hasLocationInfo ? "sav-result-row--has-locations" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
 
                   return (
                     <div key={entry.id} className={cardClassNames}>
@@ -1427,6 +1496,62 @@ export default function SavPage() {
                             )
                           ) : (
                             <div className="sav-location-empty">Loading encounter data...</div>
+                          )}
+                        </div>
+                        <div className="sav-result-row__yellow-hover-panel" aria-hidden="true">
+                          {yellowReferenceReady ? (
+                            yellowRecord ? (
+                              <div className="sav-party-slot sav-party-slot--dex-preview">
+                                <div className="sav-party-slot__content">
+                                  <div className="sav-party-slot__sprite-area">
+                                    <div className="sav-party-slot__sprite-panel">
+                                      <div className="sav-party-slot__sprite-wrapper">
+                                        <SpriteImage
+                                          id={entry.id}
+                                          alt={pokemonName}
+                                          gameSpritePath="generation-i/yellow/transparent/"
+                                          style={{
+                                            width: "192px",
+                                            height: "192px",
+                                            imageRendering: "pixelated",
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="sav-party-slot__info-area">
+                                    <div className="sav-party-slot__header-row">
+                                      <div className="sav-party-slot__display-name">{pokemonName}</div>
+                                    </div>
+                                    <div className="sav-party-slot__hp">
+                                      <div className="sav-party-slot__hp-row">
+                                        <span className="sav-party-slot__hp-label">{speciesLabel}</span>
+                                      </div>
+                                    <div className="sav-party-slot__stat-row">
+                                      <span className="sav-party-slot__meta-label">Height</span>
+                                      <span className="sav-party-slot__meta-value">{heightLabel}</span>
+                                    </div>
+                                  </div>
+                                  <div className="sav-party-slot__stat-row">
+                                    <span className="sav-party-slot__meta-label">Weight</span>
+                                    <span className="sav-party-slot__meta-value">{weightLabel}</span>
+                                  </div>
+                                  </div>
+                                  <div className="sav-party-slot__entry-block">
+                                    <div className="sav-party-slot__entry-label">Yellow Pokedex entry</div>
+                                    <p className="sav-party-slot__entry-text">{entryText}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="sav-result-row__yellow-hover-placeholder">
+                                Yellow Pokedex entry unavailable.
+                              </div>
+                            )
+                          ) : (
+                            <div className="sav-result-row__yellow-hover-placeholder">
+                              {yellowReferenceError || "Loading Yellow data..."}
+                            </div>
                           )}
                         </div>
                         {entry.evolutionRequirement && (

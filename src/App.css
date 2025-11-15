@@ -7925,8 +7925,20 @@
   font-size: 0.8rem;
 }
 
+.sav-party-slot__stat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  font-size: 0.78rem;
+  justify-content: flex-start;
+}
+
 .sav-party-slot__status {
-  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #cbd5f5;
@@ -8023,6 +8035,7 @@
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   color: #94a3b8;
+  text-transform: uppercase;
 }
 
 .sav-party-slot__meta-label--hidden {
@@ -8031,7 +8044,36 @@
 
 .sav-party-slot__meta-value {
   font-weight: 600;
-  text-align: right;
+  text-align: left;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.sav-party-slot__entry-block {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 4px;
+  background: rgba(10, 16, 28, 0.85);
+  min-height: 0;
+}
+
+.sav-party-slot__entry-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.sav-party-slot__entry-text {
+  font-size: 0.85rem;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .sav-party-empty {
@@ -8052,6 +8094,7 @@
   display: flex;
   gap: 12px;
   align-items: stretch;
+  position: relative;
   padding: 14px 16px;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -8146,6 +8189,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
 }
 
 .sav-location-list {
@@ -8266,6 +8310,51 @@
 .sav-location-row__hover-empty {
   font-size: 0.76rem;
   color: #94a3b8;
+}
+
+.sav-result-row__yellow-hover-panel {
+  position: absolute;
+  left: -284px;
+  bottom: calc(100% + 12px);
+  top: auto;
+  transform: translate(0, 4px);
+  width: min(280px, 85vw);
+  max-width: 85vw;
+  border-radius: 18px;
+  background: transparent;
+  border: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.sav-result-row__pokemon:hover + .sav-result-row__locations .sav-result-row__yellow-hover-panel,
+.sav-result-row__yellow-hover-panel:hover {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(0, -4px);
+  pointer-events: auto;
+}
+
+.sav-result-row__yellow-hover-panel .sav-party-slot {
+  width: 100%;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+}
+
+.sav-result-row__yellow-hover-placeholder {
+  min-width: 220px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.95);
+  font-size: 0.85rem;
+  text-align: center;
+  color: #cbd5f5;
 }
 
 .sav-location-row__name {

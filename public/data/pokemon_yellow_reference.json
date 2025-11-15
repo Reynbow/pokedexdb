@@ -1,0 +1,1210 @@
+[
+  {
+    "id": 1,
+    "slug": "bulbasaur",
+    "species": "Seed Pokemon",
+    "height": 7,
+    "weight": 69,
+    "entry": "It can go for days without eating a single morsel. In the bulb on its back, it stores energy."
+  },
+  {
+    "id": 2,
+    "slug": "ivysaur",
+    "species": "Seed Pokemon",
+    "height": 10,
+    "weight": 130,
+    "entry": "The bulb on its back grows by drawing energy. It gives off an aroma when it is ready to bloom."
+  },
+  {
+    "id": 3,
+    "slug": "venusaur",
+    "species": "Seed Pokemon",
+    "height": 20,
+    "weight": 1000,
+    "entry": "The flower on its back catches the sun's rays. The sunlight is then absorbed and used for energy."
+  },
+  {
+    "id": 4,
+    "slug": "charmander",
+    "species": "Lizard Pokemon",
+    "height": 6,
+    "weight": 85,
+    "entry": "The flame at the tip of its tail makes a sound as it burns. You can only hear it in quiet places."
+  },
+  {
+    "id": 5,
+    "slug": "charmeleon",
+    "species": "Flame Pokemon",
+    "height": 11,
+    "weight": 190,
+    "entry": "Tough fights could excite this POKeMON. When excited, it may blow out bluish- white flames."
+  },
+  {
+    "id": 6,
+    "slug": "charizard",
+    "species": "Flame Pokemon",
+    "height": 17,
+    "weight": 905,
+    "entry": "When expelling a blast of super hot fire, the red flame at the tip of its tail burns more intensely."
+  },
+  {
+    "id": 7,
+    "slug": "squirtle",
+    "species": "Tiny Turtle Pokemon",
+    "height": 5,
+    "weight": 90,
+    "entry": "Shoots water at prey while in the water. Withdraws into its shell when in danger."
+  },
+  {
+    "id": 8,
+    "slug": "wartortle",
+    "species": "Turtle Pokemon",
+    "height": 10,
+    "weight": 225,
+    "entry": "When tapped, this POKeMON will pull in its head, but its tail will still stick out a little bit."
+  },
+  {
+    "id": 9,
+    "slug": "blastoise",
+    "species": "Shellfish Pokemon",
+    "height": 16,
+    "weight": 855,
+    "entry": "Once it takes aim at its enemy, it blasts out water with even more force than a fire hose."
+  },
+  {
+    "id": 10,
+    "slug": "caterpie",
+    "species": "Worm Pokemon",
+    "height": 3,
+    "weight": 29,
+    "entry": "If you touch the feeler on top of its head, it will release a horrible stink to protect itself."
+  },
+  {
+    "id": 11,
+    "slug": "metapod",
+    "species": "Cocoon Pokemon",
+    "height": 7,
+    "weight": 99,
+    "entry": "Hardens its shell to protect itself. However, a large impact may cause it to pop out of its shell."
+  },
+  {
+    "id": 12,
+    "slug": "butterfree",
+    "species": "Butterfly Pokemon",
+    "height": 11,
+    "weight": 320,
+    "entry": "Its wings, covered with poisonous powders, repel water. This allows it to fly in the rain."
+  },
+  {
+    "id": 13,
+    "slug": "weedle",
+    "species": "Hairy Bug Pokemon",
+    "height": 3,
+    "weight": 32,
+    "entry": "Beware of the sharp stinger on its head. It hides in grass and bushes where it eats leaves."
+  },
+  {
+    "id": 14,
+    "slug": "kakuna",
+    "species": "Cocoon Pokemon",
+    "height": 6,
+    "weight": 100,
+    "entry": "Able to move only slightly. When endangered, it may stick out its stinger and poison its enemy."
+  },
+  {
+    "id": 15,
+    "slug": "beedrill",
+    "species": "Poison Bee Pokemon",
+    "height": 10,
+    "weight": 295,
+    "entry": "It has 3 poisonous stingers on its forelegs and its tail. They are used to jab its enemy repeatedly."
+  },
+  {
+    "id": 16,
+    "slug": "pidgey",
+    "species": "Tiny Bird Pokemon",
+    "height": 3,
+    "weight": 18,
+    "entry": "Very docile. If attacked, it will often kick up sand to protect itself rather than fight back."
+  },
+  {
+    "id": 17,
+    "slug": "pidgeotto",
+    "species": "Bird Pokemon",
+    "height": 11,
+    "weight": 300,
+    "entry": "This POKeMON is full of vitality. It constantly flies around its large territory in search of prey."
+  },
+  {
+    "id": 18,
+    "slug": "pidgeot",
+    "species": "Bird Pokemon",
+    "height": 15,
+    "weight": 395,
+    "entry": "This POKeMON flies at Mach 2 speed, seeking prey. Its large talons are feared as wicked weapons."
+  },
+  {
+    "id": 19,
+    "slug": "rattata",
+    "species": "Mouse Pokemon",
+    "height": 3,
+    "weight": 35,
+    "entry": "Will chew on any­ thing with its fangs. If you see one, it is certain that 40 more live in the area."
+  },
+  {
+    "id": 20,
+    "slug": "raticate",
+    "species": "Mouse Pokemon",
+    "height": 7,
+    "weight": 185,
+    "entry": "Its hind feet are webbed. They act as flippers, so it can swim in rivers and hunt for prey."
+  },
+  {
+    "id": 21,
+    "slug": "spearow",
+    "species": "Tiny Bird Pokemon",
+    "height": 3,
+    "weight": 20,
+    "entry": "Inept at flying high. However, it can fly around very fast to protect its ter­ ritory."
+  },
+  {
+    "id": 22,
+    "slug": "fearow",
+    "species": "Beak Pokemon",
+    "height": 12,
+    "weight": 380,
+    "entry": "A POKeMON that dates back many years. If it senses danger, it flies high and away, instantly."
+  },
+  {
+    "id": 23,
+    "slug": "ekans",
+    "species": "Snake Pokemon",
+    "height": 20,
+    "weight": 69,
+    "entry": "The older it gets, the longer it grows. At night, it wraps its long body around tree branches to rest."
+  },
+  {
+    "id": 24,
+    "slug": "arbok",
+    "species": "Cobra Pokemon",
+    "height": 35,
+    "weight": 650,
+    "entry": "The frightening patterns on its belly have been studied. Six variations have been confirmed."
+  },
+  {
+    "id": 25,
+    "slug": "pikachu",
+    "species": "Mouse Pokemon",
+    "height": 4,
+    "weight": 60,
+    "entry": "It keeps its tail raised to monitor its surroundings. If you yank its tail, it will try to bite you."
+  },
+  {
+    "id": 26,
+    "slug": "raichu",
+    "species": "Mouse Pokemon",
+    "height": 8,
+    "weight": 300,
+    "entry": "When electricity builds up inside its body, it becomes feisty. It also glows in the dark."
+  },
+  {
+    "id": 27,
+    "slug": "sandshrew",
+    "species": "Mouse Pokemon",
+    "height": 6,
+    "weight": 120,
+    "entry": "Its body is dry. When it gets cold at night, its hide is said to become coated with a fine dew."
+  },
+  {
+    "id": 28,
+    "slug": "sandslash",
+    "species": "Mouse Pokemon",
+    "height": 10,
+    "weight": 295,
+    "entry": "It is skilled at slashing enemies with its claws. If broken, they start to grow back in a day."
+  },
+  {
+    "id": 29,
+    "slug": "nidoran-f",
+    "species": "Poison Pin Pokemon",
+    "height": 4,
+    "weight": 70,
+    "entry": "A mild-mannered POKeMON that does not like to fight. Beware, its small horns secrete venom."
+  },
+  {
+    "id": 30,
+    "slug": "nidorina",
+    "species": "Poison Pin Pokemon",
+    "height": 8,
+    "weight": 200,
+    "entry": "When resting deep in its burrow, its thorns always retract. This is proof that it is relaxed."
+  },
+  {
+    "id": 31,
+    "slug": "nidoqueen",
+    "species": "Drill Pokemon",
+    "height": 13,
+    "weight": 600,
+    "entry": "Tough scales cover the sturdy body of this POKeMON. It appears that the scales grow in cycles."
+  },
+  {
+    "id": 32,
+    "slug": "nidoran-m",
+    "species": "Poison Pin Pokemon",
+    "height": 5,
+    "weight": 90,
+    "entry": "Its large ears are always kept upright. If it senses danger, it will attack with a poisonous sting."
+  },
+  {
+    "id": 33,
+    "slug": "nidorino",
+    "species": "Poison Pin Pokemon",
+    "height": 9,
+    "weight": 195,
+    "entry": "Its horns contain venom. If they are stabbed into an enemy, the impact makes the poison leak out."
+  },
+  {
+    "id": 34,
+    "slug": "nidoking",
+    "species": "Drill Pokemon",
+    "height": 14,
+    "weight": 620,
+    "entry": "Its steel-like hide adds to its powerful tackle. Its horns are so hard, they can pierce a diamond."
+  },
+  {
+    "id": 35,
+    "slug": "clefairy",
+    "species": "Fairy Pokemon",
+    "height": 6,
+    "weight": 75,
+    "entry": "Adored for their cute looks and playfulness. They are thought to be rare, as they do not appear often."
+  },
+  {
+    "id": 36,
+    "slug": "clefable",
+    "species": "Fairy Pokemon",
+    "height": 13,
+    "weight": 400,
+    "entry": "They appear to be very protective of their own world. It is a kind of fairy, rarely seen by people."
+  },
+  {
+    "id": 37,
+    "slug": "vulpix",
+    "species": "Fox Pokemon",
+    "height": 6,
+    "weight": 99,
+    "entry": "Both its fur and its tails are beautiful. As it grows, the tails split and form more tails."
+  },
+  {
+    "id": 38,
+    "slug": "ninetales",
+    "species": "Fox Pokemon",
+    "height": 11,
+    "weight": 199,
+    "entry": "According to an enduring legend, 9 noble saints were united and reincarnated as this POKeMON."
+  },
+  {
+    "id": 39,
+    "slug": "jigglypuff",
+    "species": "Balloon Pokemon",
+    "height": 5,
+    "weight": 55,
+    "entry": "Uses its alluring eyes to enrapture its foe. It then sings a pleasing melody that lulls the foe to sleep."
+  },
+  {
+    "id": 40,
+    "slug": "wigglytuff",
+    "species": "Balloon Pokemon",
+    "height": 10,
+    "weight": 120,
+    "entry": "Its body is full of elasticity. By inhaling deeply, it can continue to inflate itself without limit."
+  },
+  {
+    "id": 41,
+    "slug": "zubat",
+    "species": "Bat Pokemon",
+    "height": 8,
+    "weight": 75,
+    "entry": "Emits ultrasonic cries while it flies. They act as a sonar used to check for ob­ jects in its way."
+  },
+  {
+    "id": 42,
+    "slug": "golbat",
+    "species": "Bat Pokemon",
+    "height": 16,
+    "weight": 550,
+    "entry": "It attacks in a stealthy manner, without warning. Its sharp fangs are used to bite and suck blood."
+  },
+  {
+    "id": 43,
+    "slug": "oddish",
+    "species": "Weed Pokemon",
+    "height": 5,
+    "weight": 54,
+    "entry": "It may be mistaken for a clump of weeds. If you try to yank it out of the ground, it shrieks horribly."
+  },
+  {
+    "id": 44,
+    "slug": "gloom",
+    "species": "Weed Pokemon",
+    "height": 8,
+    "weight": 86,
+    "entry": "Smells incredibly foul! However, around 1 out of 1,000 people enjoy sniffing its nose- bending stink."
+  },
+  {
+    "id": 45,
+    "slug": "vileplume",
+    "species": "Flower Pokemon",
+    "height": 12,
+    "weight": 186,
+    "entry": "Flaps its broad flower petals to scatter its poisonous pollen. The flapping sound is very loud."
+  },
+  {
+    "id": 46,
+    "slug": "paras",
+    "species": "Mushroom Pokemon",
+    "height": 3,
+    "weight": 54,
+    "entry": "Burrows under the ground to gnaw on tree roots. The mushrooms on its back absorb most of the nutrition."
+  },
+  {
+    "id": 47,
+    "slug": "parasect",
+    "species": "Mushroom Pokemon",
+    "height": 10,
+    "weight": 295,
+    "entry": "The bug host is drained of energy by the mushrooms on its back. They appear to do all the thinking."
+  },
+  {
+    "id": 48,
+    "slug": "venonat",
+    "species": "Insect Pokemon",
+    "height": 10,
+    "weight": 300,
+    "entry": "Its large eyes act as radars. In a bright place, you can see that they are clusters of many tiny eyes."
+  },
+  {
+    "id": 49,
+    "slug": "venomoth",
+    "species": "Poison Moth Pokemon",
+    "height": 15,
+    "weight": 125,
+    "entry": "The powdery scales on its wings are hard to remove. They also contain poison that leaks out on contact."
+  },
+  {
+    "id": 50,
+    "slug": "diglett",
+    "species": "Mole Pokemon",
+    "height": 2,
+    "weight": 8,
+    "entry": "It prefers dark places. It spends most of its time underground, though it may pop up in caves."
+  },
+  {
+    "id": 51,
+    "slug": "dugtrio",
+    "species": "Mole Pokemon",
+    "height": 7,
+    "weight": 333,
+    "entry": "A team of triplets that can burrow over 60 MPH. Due to this, some people think it's an earthquake."
+  },
+  {
+    "id": 52,
+    "slug": "meowth",
+    "species": "Scratch Cat Pokemon",
+    "height": 4,
+    "weight": 42,
+    "entry": "Appears to be more active at night. It loves round and shiny things. It can't stop from picking them up."
+  },
+  {
+    "id": 53,
+    "slug": "persian",
+    "species": "Classy Cat Pokemon",
+    "height": 10,
+    "weight": 320,
+    "entry": "The gem in its forehead glows on its own! It walks with all the grace and elegance of a proud queen."
+  },
+  {
+    "id": 54,
+    "slug": "psyduck",
+    "species": "Duck Pokemon",
+    "height": 8,
+    "weight": 196,
+    "entry": "Always tormented by headaches. It uses psychic powers, but it is not known if it intends to do so."
+  },
+  {
+    "id": 55,
+    "slug": "golduck",
+    "species": "Duck Pokemon",
+    "height": 17,
+    "weight": 766,
+    "entry": "Its slim and long limbs end in broad flippers. They are used for swim­ ming gracefully in lakes."
+  },
+  {
+    "id": 56,
+    "slug": "mankey",
+    "species": "Pig Monkey Pokemon",
+    "height": 5,
+    "weight": 280,
+    "entry": "An agile POKeMON that lives in trees. It angers easily and will not hesitate to attack anything."
+  },
+  {
+    "id": 57,
+    "slug": "primeape",
+    "species": "Pig Monkey Pokemon",
+    "height": 10,
+    "weight": 320,
+    "entry": "It stops being angry only when nobody else is around. To view this moment is very difficult."
+  },
+  {
+    "id": 58,
+    "slug": "growlithe",
+    "species": "Puppy Pokemon",
+    "height": 7,
+    "weight": 190,
+    "entry": "A POKeMON with a friendly nature. However, it will bark fiercely at anything invading its territory."
+  },
+  {
+    "id": 59,
+    "slug": "arcanine",
+    "species": "Legendary Pokemon",
+    "height": 19,
+    "weight": 1550,
+    "entry": "A legendary POKe­ MON in China. Many people are charmed by its grace and beauty while running."
+  },
+  {
+    "id": 60,
+    "slug": "poliwag",
+    "species": "Tadpole Pokemon",
+    "height": 6,
+    "weight": 124,
+    "entry": "The direction of the spiral on the belly differs by area. It is more adept at swimming than walking."
+  },
+  {
+    "id": 61,
+    "slug": "poliwhirl",
+    "species": "Tadpole Pokemon",
+    "height": 10,
+    "weight": 200,
+    "entry": "Under attack, it uses its belly spiral to put the foe to sleep. It then makes its escape."
+  },
+  {
+    "id": 62,
+    "slug": "poliwrath",
+    "species": "Tadpole Pokemon",
+    "height": 13,
+    "weight": 540,
+    "entry": "Swims powerfully using all the muscles in its body. It can even overtake champion swimmers."
+  },
+  {
+    "id": 63,
+    "slug": "abra",
+    "species": "Psi Pokemon",
+    "height": 9,
+    "weight": 195,
+    "entry": "Sleeps 18 hours a day. If it senses danger, it will teleport itself to safety even as it sleeps."
+  },
+  {
+    "id": 64,
+    "slug": "kadabra",
+    "species": "Psi Pokemon",
+    "height": 13,
+    "weight": 565,
+    "entry": "Many odd things happen if this POKeMON is close by. For example, it makes clocks run backwards."
+  },
+  {
+    "id": 65,
+    "slug": "alakazam",
+    "species": "Psi Pokemon",
+    "height": 15,
+    "weight": 480,
+    "entry": "A POKeMON that can memorize anything. It never forgets what it learns-- that's why this POKeMON is smart."
+  },
+  {
+    "id": 66,
+    "slug": "machop",
+    "species": "Superpower Pokemon",
+    "height": 8,
+    "weight": 195,
+    "entry": "Very powerful in spite of its small size. Its mastery of many types of martial arts makes it very tough."
+  },
+  {
+    "id": 67,
+    "slug": "machoke",
+    "species": "Superpower Pokemon",
+    "height": 15,
+    "weight": 705,
+    "entry": "The belt around its waist holds back its energy. Without it, this POKeMON would be unstoppable."
+  },
+  {
+    "id": 68,
+    "slug": "machamp",
+    "species": "Superpower Pokemon",
+    "height": 16,
+    "weight": 1300,
+    "entry": "One arm alone can move mountains. Using all four arms, this POKeMON fires off awesome punches."
+  },
+  {
+    "id": 69,
+    "slug": "bellsprout",
+    "species": "Flower Pokemon",
+    "height": 7,
+    "weight": 40,
+    "entry": "Prefers hot and humid places. It ensnares tiny insects with its vines and devours them."
+  },
+  {
+    "id": 70,
+    "slug": "weepinbell",
+    "species": "Flycatcher Pokemon",
+    "height": 10,
+    "weight": 64,
+    "entry": "When hungry, it swallows anything that moves. Its hapless prey is melted inside by strong acids."
+  },
+  {
+    "id": 71,
+    "slug": "victreebel",
+    "species": "Flycatcher Pokemon",
+    "height": 17,
+    "weight": 155,
+    "entry": "Lures prey with the sweet aroma of honey. Swallowed whole, the prey is melted in a day, bones and all."
+  },
+  {
+    "id": 72,
+    "slug": "tentacool",
+    "species": "Jellyfish Pokemon",
+    "height": 9,
+    "weight": 455,
+    "entry": "It can sometimes be found all dry and shriveled up on a beach. Toss it back into the sea to revive it."
+  },
+  {
+    "id": 73,
+    "slug": "tentacruel",
+    "species": "Jellyfish Pokemon",
+    "height": 16,
+    "weight": 550,
+    "entry": "Its 80 tentacles can stretch and contract freely. They wrap around prey and weaken it with poison."
+  },
+  {
+    "id": 74,
+    "slug": "geodude",
+    "species": "Rock Pokemon",
+    "height": 4,
+    "weight": 200,
+    "entry": "Commonly found near mountain trails, etc. If you step on one by accident, it gets angry."
+  },
+  {
+    "id": 75,
+    "slug": "graveler",
+    "species": "Rock Pokemon",
+    "height": 10,
+    "weight": 1050,
+    "entry": "Often seen rolling down mountain trails. Obstacles are just things to roll straight over, not avoid."
+  },
+  {
+    "id": 76,
+    "slug": "golem",
+    "species": "Megaton Pokemon",
+    "height": 14,
+    "weight": 3000,
+    "entry": "Once it sheds its skin, its body turns tender and whitish. Its hide hardens when it's exposed to air."
+  },
+  {
+    "id": 77,
+    "slug": "ponyta",
+    "species": "Fire Horse Pokemon",
+    "height": 10,
+    "weight": 300,
+    "entry": "Capable of jumping incredibly high. Its hooves and sturdy legs absorb the impact of a hard landing."
+  },
+  {
+    "id": 78,
+    "slug": "rapidash",
+    "species": "Fire Horse Pokemon",
+    "height": 17,
+    "weight": 950,
+    "entry": "Just loves to run. If it sees some­ thing faster than itself, it will give chase at top speed."
+  },
+  {
+    "id": 79,
+    "slug": "slowpoke",
+    "species": "Dopey Pokemon",
+    "height": 12,
+    "weight": 360,
+    "entry": "Incredibly slow and sluggish. It is quite content to loll about without worrying about the time."
+  },
+  {
+    "id": 80,
+    "slug": "slowbro",
+    "species": "Hermit Crab Pokemon",
+    "height": 16,
+    "weight": 785,
+    "entry": "Lives lazily by the sea. If the SHELLDER on its tail comes off, it becomes a SLOWPOKE again."
+  },
+  {
+    "id": 81,
+    "slug": "magnemite",
+    "species": "Magnet Pokemon",
+    "height": 3,
+    "weight": 60,
+    "entry": "It is born with the ability to defy gravity. It floats in air on powerful electro­ magnetic waves."
+  },
+  {
+    "id": 82,
+    "slug": "magneton",
+    "species": "Magnet Pokemon",
+    "height": 10,
+    "weight": 600,
+    "entry": "Generates strange radio signals. It raises the tem­ perature by 3.6F degrees within 3,300 feet."
+  },
+  {
+    "id": 83,
+    "slug": "farfetchd",
+    "species": "Wild Duck Pokemon",
+    "height": 8,
+    "weight": 150,
+    "entry": "Lives where reedy plants grow. They are rarely seen, so it's thought their numbers are decreasing."
+  },
+  {
+    "id": 84,
+    "slug": "doduo",
+    "species": "Twin Bird Pokemon",
+    "height": 14,
+    "weight": 392,
+    "entry": "Its short wings make flying dif­ ficult. Instead, this POKeMON runs at high speed on developed legs."
+  },
+  {
+    "id": 85,
+    "slug": "dodrio",
+    "species": "Triple Bird Pokemon",
+    "height": 18,
+    "weight": 852,
+    "entry": "One of DODUO's 2 heads splits to form a unique species. It runs close to 40 MPH in prairies."
+  },
+  {
+    "id": 86,
+    "slug": "seel",
+    "species": "Sea Lion Pokemon",
+    "height": 11,
+    "weight": 900,
+    "entry": "Loves freezing cold conditions. Relishes swimming in a frigid cli­ mate of around 14F degrees."
+  },
+  {
+    "id": 87,
+    "slug": "dewgong",
+    "species": "Sea Lion Pokemon",
+    "height": 17,
+    "weight": 1200,
+    "entry": "Its entire body is a snowy-white. Unharmed by even intense cold, it swims powerfully in icy waters."
+  },
+  {
+    "id": 88,
+    "slug": "grimer",
+    "species": "Sludge Pokemon",
+    "height": 9,
+    "weight": 300,
+    "entry": "Made of hardened sludge. It smells too putrid to touch. Even weeds won't grow in its path."
+  },
+  {
+    "id": 89,
+    "slug": "muk",
+    "species": "Sludge Pokemon",
+    "height": 12,
+    "weight": 300,
+    "entry": "Smells so awful, it can cause fainting. Through degeneration, it lost its sense of smell."
+  },
+  {
+    "id": 90,
+    "slug": "shellder",
+    "species": "Bivalve Pokemon",
+    "height": 3,
+    "weight": 40,
+    "entry": "The shell can withstand any attack. However, when it is open, the tender body is exposed."
+  },
+  {
+    "id": 91,
+    "slug": "cloyster",
+    "species": "Bivalve Pokemon",
+    "height": 15,
+    "weight": 1325,
+    "entry": "For protection, it uses its harder- than-diamonds shell. It also shoots spikes from the shell."
+  },
+  {
+    "id": 92,
+    "slug": "gastly",
+    "species": "Gas Pokemon",
+    "height": 13,
+    "weight": 1,
+    "entry": "Said to appear in decrepit, deserted buildings. It has no real shape as it appears to be made of a gas."
+  },
+  {
+    "id": 93,
+    "slug": "haunter",
+    "species": "Gas Pokemon",
+    "height": 16,
+    "weight": 1,
+    "entry": "By licking, it saps the victim's life. It causes shaking that won't stop until the victim's demise."
+  },
+  {
+    "id": 94,
+    "slug": "gengar",
+    "species": "Shadow Pokemon",
+    "height": 15,
+    "weight": 405,
+    "entry": "A GENGAR is close by if you feel a sudden chill. It may be trying to lay a curse on you."
+  },
+  {
+    "id": 95,
+    "slug": "onix",
+    "species": "Rock Snake Pokemon",
+    "height": 88,
+    "weight": 2100,
+    "entry": "Burrows at high speed in search of food. The tunnels it leaves are used as homes by DIGLETTs."
+  },
+  {
+    "id": 96,
+    "slug": "drowzee",
+    "species": "Hypnosis Pokemon",
+    "height": 10,
+    "weight": 324,
+    "entry": "If you sleep by it all the time, it will sometimes show you dreams it has eaten in the past."
+  },
+  {
+    "id": 97,
+    "slug": "hypno",
+    "species": "Hypnosis Pokemon",
+    "height": 16,
+    "weight": 756,
+    "entry": "Avoid eye contact if you come across one. It will try to put you to sleep by using its pendulum."
+  },
+  {
+    "id": 98,
+    "slug": "krabby",
+    "species": "River Crab Pokemon",
+    "height": 4,
+    "weight": 65,
+    "entry": "Its pincers are superb weapons. They sometimes break off during battle, but they grow back fast."
+  },
+  {
+    "id": 99,
+    "slug": "kingler",
+    "species": "Pincer Pokemon",
+    "height": 13,
+    "weight": 600,
+    "entry": "One claw grew massively and as hard as steel. It has 10,000-HP strength. However, it is too heavy."
+  },
+  {
+    "id": 100,
+    "slug": "voltorb",
+    "species": "Ball Pokemon",
+    "height": 5,
+    "weight": 104,
+    "entry": "It is said to camouflage itself as a POKe BALL. It will self-destruct with very little stimulus."
+  },
+  {
+    "id": 101,
+    "slug": "electrode",
+    "species": "Ball Pokemon",
+    "height": 12,
+    "weight": 666,
+    "entry": "Stores electrical energy inside its body. Even the slightest shock could trigger a huge explosion."
+  },
+  {
+    "id": 102,
+    "slug": "exeggcute",
+    "species": "Egg Pokemon",
+    "height": 4,
+    "weight": 25,
+    "entry": "The heads attract each other and spin around. There must be 6 heads for it to maintain balance."
+  },
+  {
+    "id": 103,
+    "slug": "exeggutor",
+    "species": "Coconut Pokemon",
+    "height": 20,
+    "weight": 1200,
+    "entry": "Its cries are very noisy. This is because each of the 3 heads thinks about whatever it likes."
+  },
+  {
+    "id": 104,
+    "slug": "cubone",
+    "species": "Lonely Pokemon",
+    "height": 4,
+    "weight": 65,
+    "entry": "Wears the skull of its deceased mother. Its cries echo inside the skull and come out as a sad melody."
+  },
+  {
+    "id": 105,
+    "slug": "marowak",
+    "species": "Bone Keeper Pokemon",
+    "height": 10,
+    "weight": 450,
+    "entry": "Small and weak, this POKeMON is adept with its bone club. It has grown more vicious over the ages."
+  },
+  {
+    "id": 106,
+    "slug": "hitmonlee",
+    "species": "Kicking Pokemon",
+    "height": 15,
+    "weight": 498,
+    "entry": "When kicking, the sole of its foot turns as hard as a diamond on im­ pact and destroys its enemy."
+  },
+  {
+    "id": 107,
+    "slug": "hitmonchan",
+    "species": "Punching Pokemon",
+    "height": 14,
+    "weight": 502,
+    "entry": "Punches in cork­ screw fashion. It can punch its way through a concrete wall in the same way as a drill."
+  },
+  {
+    "id": 108,
+    "slug": "lickitung",
+    "species": "Licking Pokemon",
+    "height": 12,
+    "weight": 655,
+    "entry": "Its tongue spans almost 7 feet and moves more freely than its forelegs. Its licks can cause paralysis."
+  },
+  {
+    "id": 109,
+    "slug": "koffing",
+    "species": "Poison Gas Pokemon",
+    "height": 6,
+    "weight": 10,
+    "entry": "In hot places, its internal gases could expand and explode without any warning. Be very careful!"
+  },
+  {
+    "id": 110,
+    "slug": "weezing",
+    "species": "Poison Gas Pokemon",
+    "height": 12,
+    "weight": 95,
+    "entry": "It lives and grows by absorbing dust, germs and poison gases that are contained in toxic waste and garbage."
+  },
+  {
+    "id": 111,
+    "slug": "rhyhorn",
+    "species": "Spikes Pokemon",
+    "height": 10,
+    "weight": 1150,
+    "entry": "A POKeMON with a one-track mind. Once it charges, it won't stop running until it falls asleep."
+  },
+  {
+    "id": 112,
+    "slug": "rhydon",
+    "species": "Drill Pokemon",
+    "height": 19,
+    "weight": 1200,
+    "entry": "Walks on its hind legs. Shows signs of intelligence. Its armor-like hide even repels molten lava."
+  },
+  {
+    "id": 113,
+    "slug": "chansey",
+    "species": "Egg Pokemon",
+    "height": 11,
+    "weight": 346,
+    "entry": "A gentle and kind­ hearted POKeMON that shares its nutritious eggs if it sees an injured POKeMON."
+  },
+  {
+    "id": 114,
+    "slug": "tangela",
+    "species": "Vine Pokemon",
+    "height": 10,
+    "weight": 350,
+    "entry": "Its identity is obscured by masses of thick, blue vines. The vines are said to never stop growing."
+  },
+  {
+    "id": 115,
+    "slug": "kangaskhan",
+    "species": "Parent Pokemon",
+    "height": 22,
+    "weight": 800,
+    "entry": "Raises its young in its belly pouch. Won't run from any fight to keep its young protected."
+  },
+  {
+    "id": 116,
+    "slug": "horsea",
+    "species": "Dragon Pokemon",
+    "height": 4,
+    "weight": 80,
+    "entry": "If it senses any danger, it will vigorously spray water or a special type of ink from its mouth."
+  },
+  {
+    "id": 117,
+    "slug": "seadra",
+    "species": "Dragon Pokemon",
+    "height": 12,
+    "weight": 250,
+    "entry": "Touching the back fin causes numb­ ness. It hooks its tail to coral to stay in place while sleeping."
+  },
+  {
+    "id": 118,
+    "slug": "goldeen",
+    "species": "Goldfish Pokemon",
+    "height": 6,
+    "weight": 150,
+    "entry": "When it is time for them to lay eggs, they can be seen swimming up rivers and falls in large groups."
+  },
+  {
+    "id": 119,
+    "slug": "seaking",
+    "species": "Goldfish Pokemon",
+    "height": 13,
+    "weight": 390,
+    "entry": "It is the male's job to make a nest by carving out boulders in a stream using the horn on its head."
+  },
+  {
+    "id": 120,
+    "slug": "staryu",
+    "species": "Star Shape Pokemon",
+    "height": 8,
+    "weight": 345,
+    "entry": "As long as the center section is unharmed, it can grow back fully even if it is chopped to bits."
+  },
+  {
+    "id": 121,
+    "slug": "starmie",
+    "species": "Mysterious Pokemon",
+    "height": 11,
+    "weight": 800,
+    "entry": "The center section is named the core. People think it is communicating when it glows in 7 colors."
+  },
+  {
+    "id": 122,
+    "slug": "mr-mime",
+    "species": "Barrier Pokemon",
+    "height": 13,
+    "weight": 545,
+    "entry": "Always practices its pantomime act. It makes enemies believe something exists that really doesn't."
+  },
+  {
+    "id": 123,
+    "slug": "scyther",
+    "species": "Mantis Pokemon",
+    "height": 15,
+    "weight": 560,
+    "entry": "Leaps out of tall grass and slices prey with its scythes. The move­ ment looks like that of a ninja."
+  },
+  {
+    "id": 124,
+    "slug": "jynx",
+    "species": "Human Shape Pokemon",
+    "height": 14,
+    "weight": 406,
+    "entry": "Appears to move to a rhythm of its own, as if it were dancing. It wiggles its hips as it walks."
+  },
+  {
+    "id": 125,
+    "slug": "electabuzz",
+    "species": "Electric Pokemon",
+    "height": 11,
+    "weight": 300,
+    "entry": "If a major power outage occurs, it is certain that this POKeMON has eaten electricity at a power plant."
+  },
+  {
+    "id": 126,
+    "slug": "magmar",
+    "species": "Spitfire Pokemon",
+    "height": 13,
+    "weight": 445,
+    "entry": "Born in an active volcano. Its body is always cloaked in flames, so it looks like a big ball of fire."
+  },
+  {
+    "id": 127,
+    "slug": "pinsir",
+    "species": "Stag Beetle Pokemon",
+    "height": 15,
+    "weight": 550,
+    "entry": "Grips its prey in its pincers and squeezes hard! It can't move if it's cold, so it lives in warm places."
+  },
+  {
+    "id": 128,
+    "slug": "tauros",
+    "species": "Wild Bull Pokemon",
+    "height": 14,
+    "weight": 884,
+    "entry": "A rowdy POKeMON with a lot of stamina. Once running, it won't stop until it hits something."
+  },
+  {
+    "id": 129,
+    "slug": "magikarp",
+    "species": "Fish Pokemon",
+    "height": 9,
+    "weight": 100,
+    "entry": "Famous for being very unreliable. It can be found swimming in seas, lakes, rivers and shallow puddles."
+  },
+  {
+    "id": 130,
+    "slug": "gyarados",
+    "species": "Atrocious Pokemon",
+    "height": 65,
+    "weight": 2350,
+    "entry": "Brutally vicious and enormously destructive. Known for totally destroying cities in ancient times."
+  },
+  {
+    "id": 131,
+    "slug": "lapras",
+    "species": "Transport Pokemon",
+    "height": 25,
+    "weight": 2200,
+    "entry": "A gentle soul that can read the minds of people. It can ferry people across the sea on its back."
+  },
+  {
+    "id": 132,
+    "slug": "ditto",
+    "species": "Transform Pokemon",
+    "height": 3,
+    "weight": 40,
+    "entry": "When it spots an enemy, its body transfigures into an almost perfect copy of its oppo­ nent."
+  },
+  {
+    "id": 133,
+    "slug": "eevee",
+    "species": "Evolution Pokemon",
+    "height": 3,
+    "weight": 65,
+    "entry": "Its genetic code is unstable, so it could evolve in a variety of ways. There are only a few alive."
+  },
+  {
+    "id": 134,
+    "slug": "vaporeon",
+    "species": "Bubble Jet Pokemon",
+    "height": 10,
+    "weight": 290,
+    "entry": "Its cell structure is similar to water molecules. It will melt away and become invis­ ible in water."
+  },
+  {
+    "id": 135,
+    "slug": "jolteon",
+    "species": "Lightning Pokemon",
+    "height": 8,
+    "weight": 245,
+    "entry": "A sensitive POKe­ MON that easily becomes sad or angry. Every time its mood changes, it charges power."
+  },
+  {
+    "id": 136,
+    "slug": "flareon",
+    "species": "Flame Pokemon",
+    "height": 9,
+    "weight": 250,
+    "entry": "It has a flame chamber inside its body. It inhales, then blows out fire that is over 3,000F degrees."
+  },
+  {
+    "id": 137,
+    "slug": "porygon",
+    "species": "Virtual Pokemon",
+    "height": 8,
+    "weight": 365,
+    "entry": "The only POKeMON people anticipate can fly into space. None has managed the feat yet, however."
+  },
+  {
+    "id": 138,
+    "slug": "omanyte",
+    "species": "Spiral Pokemon",
+    "height": 4,
+    "weight": 75,
+    "entry": "An ancient POKeMON that was recovered from a fossil. It swims by cleverly twisting its 10 tentacles about."
+  },
+  {
+    "id": 139,
+    "slug": "omastar",
+    "species": "Spiral Pokemon",
+    "height": 10,
+    "weight": 350,
+    "entry": "Sharp beaks ring its mouth. Its shell was too big for it to move freely, so it became extinct."
+  },
+  {
+    "id": 140,
+    "slug": "kabuto",
+    "species": "Shellfish Pokemon",
+    "height": 5,
+    "weight": 115,
+    "entry": "A POKeMON that was recovered from a fossil. It uses the eyes on its back while hiding on the sea floor."
+  },
+  {
+    "id": 141,
+    "slug": "kabutops",
+    "species": "Shellfish Pokemon",
+    "height": 13,
+    "weight": 405,
+    "entry": "A slim and fast swimmer. It slices its prey with its sharp sickles and drinks the body fluids."
+  },
+  {
+    "id": 142,
+    "slug": "aerodactyl",
+    "species": "Fossil Pokemon",
+    "height": 18,
+    "weight": 590,
+    "entry": "A savage POKeMON that died out in ancient times. It was resurrected using DNA taken from amber."
+  },
+  {
+    "id": 143,
+    "slug": "snorlax",
+    "species": "Sleeping Pokemon",
+    "height": 21,
+    "weight": 4600,
+    "entry": "Will eat anything, even if the food happens to be a little moldy. It never gets an upset stomach."
+  },
+  {
+    "id": 144,
+    "slug": "articuno",
+    "species": "Freeze Pokemon",
+    "height": 17,
+    "weight": 554,
+    "entry": "A legendary bird POKeMON. It freezes water that is contained in winter air and makes it snow."
+  },
+  {
+    "id": 145,
+    "slug": "zapdos",
+    "species": "Electric Pokemon",
+    "height": 16,
+    "weight": 526,
+    "entry": "This legendary bird POKeMON is said to appear when the sky turns dark and lightning showers down."
+  },
+  {
+    "id": 146,
+    "slug": "moltres",
+    "species": "Flame Pokemon",
+    "height": 20,
+    "weight": 600,
+    "entry": "A legendary bird POKeMON. As it flaps its flaming wings, even the night sky will turn red."
+  },
+  {
+    "id": 147,
+    "slug": "dratini",
+    "species": "Dragon Pokemon",
+    "height": 18,
+    "weight": 33,
+    "entry": "The existence of this mythical POKeMON was only recently confirmed by a fisherman who caught one."
+  },
+  {
+    "id": 148,
+    "slug": "dragonair",
+    "species": "Dragon Pokemon",
+    "height": 40,
+    "weight": 165,
+    "entry": "According to a witness, its body was surrounded by a strange aura that gave it a mystical look."
+  },
+  {
+    "id": 149,
+    "slug": "dragonite",
+    "species": "Dragon Pokemon",
+    "height": 22,
+    "weight": 2100,
+    "entry": "It is said that this POKeMON lives somewhere in the sea and that it flies. However, it is only a rumor."
+  },
+  {
+    "id": 150,
+    "slug": "mewtwo",
+    "species": "Genetic Pokemon",
+    "height": 20,
+    "weight": 1220,
+    "entry": "Its DNA is almost the same as MEW's. However, its size and disposition are vastly dif­ ferent."
+  },
+  {
+    "id": 151,
+    "slug": "mew",
+    "species": "New Species Pokemon",
+    "height": 4,
+    "weight": 40,
+    "entry": "When viewed through a micro­ scope, this POKeMON's short, fine, delicate hair can be seen."
+  }
+]
