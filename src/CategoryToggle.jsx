@@ -6,6 +6,7 @@ const CATEGORIES = [
   { key: "abilities", label: "Abilities", hash: "#/abilities" },
   { key: "ev", label: "EV Training", hash: "#/ev-training" },
   { key: "whosthat", label: "Who's That?", hash: "#/whosthat" },
+  { key: "sav", label: "Save Reader", hash: "#/sav" },
 ];
 
 function getActiveCategory() {
@@ -15,6 +16,7 @@ function getActiveCategory() {
   if (hash.startsWith("#/abilities")) return "abilities";
   if (hash.startsWith("#/ev-training") || hash.startsWith("#/ev")) return "ev";
   if (hash.startsWith("#/whosthat")) return "whosthat";
+  if (hash.startsWith("#/sav")) return "sav";
   return "pokemon";
 }
 
@@ -57,5 +59,4 @@ export default function CategoryToggle() {
     </div>
   );
 }
-
 

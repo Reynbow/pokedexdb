@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import "./App.css";
 import SpriteImage from "./components/SpriteImage.jsx";
+import CategoryToggle from "./CategoryToggle.jsx";
 
 // Generation 1 Pokemon names (Pokemon Yellow has 151 Pokemon)
 const GEN1_POKEMON_NAMES = [
@@ -982,46 +983,75 @@ export default function SavPage() {
       </a>
       <header className="app-header">
         <div className="container">
-          <h1 className="title">Pokemon Yellow Legacy Save Reader</h1>
-          <p className="subtitle">
-            Import a Pokemon Yellow Legacy .sav or .srm file to view your save file information.
-          </p>
+          <h1 className="title logo">
+            <span className="logo-accent">Pokedex</span>
+            <div className="logo-dot" />
+            <span className="logo-db">DB</span>
+          </h1>
+          <div className="sav-page__subtitle-wrapper">
+            <p className="subtitle sav-page__subtitle">
+              Import a <strong>Pokemon Yellow Legacy</strong> <span className="sav-page__subtitle-emphasis">.srm</span> file to view your save file information.
+            </p>
+            <CategoryToggle />
+          </div>
         </div>
       </header>
       <main className="container sav-page__content">
         <section className="sav-page__grid">
           {!hasFileSelected && (
-            <article className="sav-card sav-card--primary">
-              <div className="sav-card__header">
-                <h2 className="sav-card__title">Upload your save</h2>
-                <p className="sav-card__description">
-                  Works with emulator exports or flash-cart backups (32KB Pokemon Yellow saves in .sav or .srm format).
-                </p>
-              </div>
-              <div className="sav-card__body">
-                <label className="sav-field-label" htmlFor="sav-upload-input">
-                  Pokemon Yellow save file
-                </label>
-                <input
-                  id="sav-upload-input"
-                  className="sav-file-input"
-                  type="file"
-                  accept=".sav,.srm"
-                  onChange={handleFileChange}
-                  disabled={loading}
-                />
-                <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
-                {fileName && (
-                  <p className="sav-meta">
-                    <strong>Selected:</strong> {fileName}
+            <>
+              <article className="sav-card sav-card--primary">
+                <div className="sav-card__header">
+                  <h2 className="sav-card__title">Choose your save</h2>
+                  <p className="sav-card__description">
+                    Works with emulator exports or flash-cart backups (32KB Pokemon Yellow Legacy saves in .srm format).
                   </p>
-                )}
-                {loading && <p className="sav-status">Processing save file...</p>}
-                {error && <div className="sav-alert sav-alert--error">{error}</div>}
-              </div>
-            </article>
+                </div>
+                <div className="sav-card__body">
+                  <label className="sav-field-label" htmlFor="sav-upload-input">
+                    Pokemon Yellow Legacy save file
+                  </label>
+                  <input
+                    id="sav-upload-input"
+                    className="sav-file-input"
+                    type="file"
+                    accept=".sav,.srm"
+                    onChange={handleFileChange}
+                    disabled={loading}
+                  />
+                  <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
+                  {fileName && (
+                    <p className="sav-meta">
+                      <strong>Selected:</strong> {fileName}
+                    </p>
+                  )}
+                  {loading && <p className="sav-status">Processing save file...</p>}
+                  {error && <div className="sav-alert sav-alert--error">{error}</div>}
+                </div>
+              </article>
+              <article className="sav-card sav-card--info-panel-card">
+                <div className="sav-card__body sav-card__info-panel-body">
+                  <h3 className="sav-card__info-heading">Save Reader Notes</h3>
+                  <p>
+                    This reader currently supports only <strong>Pokemon Yellow Legacy</strong> saves.
+                    If you are using a different ROM, the data may not parse correctly.
+                  </p>
+                  <p>
+                    Learn more about the Legacy ROMs at{" "}
+                    <a
+                      className="sav-card__info-link"
+                      href="https://www.reddit.com/r/PokemonLegacy/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      r/PokemonLegacy
+                    </a>
+                    .
+                  </p>
+                </div>
+              </article>
+            </>
           )}
-
         </section>
 
         {hasSaveData && (
