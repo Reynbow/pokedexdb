@@ -131,6 +131,20 @@ function normalizeLegacyPokemonName(rawName) {
     .replace(/^-|-$/g, "");
 }
 
+function toTitleCase(str) {
+  if (typeof str !== "string" || str.length === 0) {
+    return "";
+  }
+  return str
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+const SLUG_TO_TITLE_NAME = new Map(
+  GEN1_POKEMON_NAMES.map((name) => [normalizeLegacyPokemonName(name), toTitleCase(name)])
+);
+
 const RAW_EVOLUTION_DATA = [
   "Abra~-/-~Level 16~-/-~Kadabra~-/-~Level 42~-/-~Alakazam",
   "Ekans~-/-~Level 22~-/-~Arbok",
@@ -883,13 +897,6 @@ export default function SavPage() {
     reader.readAsArrayBuffer(file);
   }, []);
 
-  const toTitleCase = (str) => {
-    return str
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-  
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
   const hasSaveData = fileData instanceof Uint8Array;
   const legacyMapReady = legacyEncountersReady && legacyEncounters instanceof Map;
@@ -914,6 +921,41 @@ export default function SavPage() {
       };
     });
   }, [caughtSet, hasSaveData, legacyMapReady, legacyEncounters]);
+
+  const locationPokemonLookup = useMemo(() => {
+    if (!legacyMapReady || !(legacyEncounters instanceof Map)) {
+      return new Map();
+    }
+    const aggregator = new Map();
+    for (const [slug, entries] of legacyEncounters.entries()) {
+      const displayName = SLUG_TO_TITLE_NAME.get(slug) || toTitleCase(slug);
+      if (!displayName) continue;
+      const pokemonId = GEN1_SLUG_TO_POKEDEX_ID.get(slug);
+      const isCaught = pokemonId ? caughtSet.has(pokemonId) : false;
+      for (const entryData of entries || []) {
+        const locationName = entryData?.location;
+        if (!locationName) continue;
+        let slugMap = aggregator.get(locationName);
+        if (!slugMap) {
+          slugMap = new Map();
+          aggregator.set(locationName, slugMap);
+        }
+        if (!slugMap.has(slug)) {
+          slugMap.set(slug, {
+            name: displayName,
+            slug,
+            caught: isCaught,
+          });
+        }
+      }
+    }
+    const result = new Map();
+    for (const [locationName, slugMap] of aggregator.entries()) {
+      const shared = Array.from(slugMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+      result.set(locationName, shared);
+    }
+    return result;
+  }, [caughtSet, legacyEncounters, legacyMapReady]);
 
   const hasFileSelected = Boolean(fileName);
 
@@ -1209,6 +1251,14 @@ export default function SavPage() {
                                     locationEntry.methodLabel &&
                                     locationEntry.methodLabel !== DEFAULT_METHOD_LABEL;
 
+                                  const sharedPokemon =
+                                    locationPokemonLookup.get(locationEntry.location) || [];
+                                  const sharedOthers = sharedPokemon.filter(
+                                    (item) => item.name !== pokemonName
+                                  );
+                                  const caughtEntries = sharedOthers.filter((item) => item.caught);
+                                  const missingEntries = sharedOthers.filter((item) => !item.caught);
+
                                   return (
                                     <li key={`${locationEntry.location}-${index}`} className={rowClassNames}>
                                       <div className="sav-location-row__name">{locationEntry.location}</div>
@@ -1220,6 +1270,53 @@ export default function SavPage() {
                                       {detailParts.length > 0 && (
                                         <div className="sav-location-row__meta">{detailParts.join(" · ")}</div>
                                       )}
+                                      <div className="sav-location-row__hover-panel">
+                                        <div className="sav-location-row__hover-title">Also found here</div>
+                                        {sharedOthers.length > 0 ? (
+                                          <div className="sav-location-row__hover-grid">
+                                            <div className="sav-location-row__hover-column">
+                                              <div className="sav-location-row__hover-subtitle">Caught</div>
+                                              {caughtEntries.length > 0 ? (
+                                                <ul className="sav-location-row__hover-list">
+                                                  {caughtEntries.map(({ name, slug }) => (
+                                                    <li
+                                                      key={`${slug || name}-caught`}
+                                                      className="sav-location-row__hover-item sav-location-row__hover-item--caught"
+                                                    >
+                                                      <span className="sav-location-row__hover-item-dot" aria-hidden="true" />
+                                                      <span>{name}</span>
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              ) : (
+                                                <div className="sav-location-row__hover-empty">None</div>
+                                              )}
+                                            </div>
+                                            <div className="sav-location-row__hover-column">
+                                              <div className="sav-location-row__hover-subtitle">Missing</div>
+                                              {missingEntries.length > 0 ? (
+                                                <ul className="sav-location-row__hover-list">
+                                                  {missingEntries.map(({ name, slug }) => (
+                                                    <li
+                                                      key={`${slug || name}-missing`}
+                                                      className="sav-location-row__hover-item sav-location-row__hover-item--missing"
+                                                    >
+                                                      <span className="sav-location-row__hover-item-dot" aria-hidden="true" />
+                                                      <span>{name}</span>
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              ) : (
+                                                <div className="sav-location-row__hover-empty">None</div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="sav-location-row__hover-empty">
+                                            No other Pokémon share this location.
+                                          </div>
+                                        )}
+                                      </div>
                                     </li>
                                   );
                                 })}
