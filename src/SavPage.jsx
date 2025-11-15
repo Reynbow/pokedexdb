@@ -76,7 +76,7 @@ function resolveLegacyCsvUrl() {
 
 function readUint16(data, offset) {
   if (offset + 1 >= data.length) return 0;
-  return (data[offset + 1] << 8) | data[offset];
+  return (data[offset] << 8) | data[offset + 1];
 }
 
 function decodeGen1String(bytes) {
@@ -789,12 +789,8 @@ export default function SavPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fileName, setFileName] = useState(null);
-  const [debugInfo, setDebugInfo] = useState(null);
   const [fileData, setFileData] = useState(null);
   const [partyMembers, setPartyMembers] = useState([]);
-  const [manualOffset, setManualOffset] = useState('0x25A3');
-  const [manualBitOrder, setManualBitOrder] = useState('lsb');
-  const [showDebugTools, setShowDebugTools] = useState(false);
   const [legacyEncounters, setLegacyEncounters] = useState(null);
   const [legacyEncountersReady, setLegacyEncountersReady] = useState(false);
   const [legacyEncounterError, setLegacyEncounterError] = useState(null);
@@ -860,31 +856,9 @@ export default function SavPage() {
       try {
         const arrayBuffer = e.target.result;
         const data = new Uint8Array(arrayBuffer);
-        const {
-          caughtPokemon: caught,
-          sourceOffset,
-          sourceLabel,
-          offsetResults,
-        } = parseSavFile(arrayBuffer);
+        const { caughtPokemon: caught } = parseSavFile(arrayBuffer);
         
-        // Store file data for debugging
         setFileData(data);
-        
-        // Store some debug info about the file
-        // Show both the main and backup Pokédex locations
-        setDebugInfo({
-          fileSize: data.length,
-          offsetResults: offsetResults.map((entry) => ({
-            offset: entry.label,
-            absoluteOffset: `0x${entry.offset.toString(16).toUpperCase()}`,
-            bytes: entry.bytes.map((b) => `0x${b.toString(16).padStart(2, "0").toUpperCase()}`).join(" "),
-            caughtCount: entry.caughtPokemon.length,
-            sample: entry.caughtPokemon.slice(0, 5),
-            isActive: entry.offset === sourceOffset,
-          })),
-          usedOffset: `0x${sourceOffset.toString(16).toUpperCase()}`,
-          usedLabel: sourceLabel,
-        });
         
         const party = parsePartyPokemon(data);
 
@@ -895,7 +869,6 @@ export default function SavPage() {
         setError(`Error parsing save file: ${err.message}`);
         setCaughtPokemon([]);
         setPartyMembers([]);
-        setDebugInfo(null);
         setFileData(null);
       } finally {
         setLoading(false);
@@ -917,59 +890,6 @@ export default function SavPage() {
       .join(' ');
   };
   
-  const testManualOffset = useCallback((overrideOffset, overrideBitOrder) => {
-    if (!fileData) return;
-    
-    try {
-      const offsetText = (overrideOffset ?? manualOffset ?? '').trim();
-      const bitOrder = overrideBitOrder ?? manualBitOrder;
-      const offset = parseInt(offsetText, 16);
-      if (isNaN(offset) || offset < 0 || offset + 20 >= fileData.length) {
-        setError(`Invalid offset: ${offsetText}`);
-        return;
-      }
-      
-      const caught = [];
-      
-      // Try the selected bit order
-      for (let i = 0; i < GEN1_POKEMON_COUNT; i++) {
-        const byteIndex = offset + Math.floor(i / 8);
-        const bitPosition = i % 8;
-        if (byteIndex >= fileData.length) break;
-        
-        let isCaught = false;
-        if (bitOrder === 'lsb') {
-          isCaught = ((fileData[byteIndex] >> bitPosition) & 1) !== 0;
-        } else if (bitOrder === 'msb') {
-          isCaught = ((fileData[byteIndex] >> (7 - bitPosition)) & 1) !== 0;
-        } else if (bitOrder === 'reverse-lsb') {
-          const reverseBitPos = 7 - bitPosition;
-          isCaught = ((fileData[byteIndex] >> reverseBitPos) & 1) !== 0;
-        }
-        
-        if (isCaught) {
-          caught.push(i + 1);
-        }
-      }
-      
-      setCaughtPokemon(caught);
-      setError(null);
-    } catch (err) {
-      setError(`Error testing offset: ${err.message}`);
-    }
-  }, [fileData, manualOffset, manualBitOrder]);
-
-  const handleManualPreset = useCallback((offsetValue, bitOrderValue) => {
-    setManualOffset(offsetValue);
-    setManualBitOrder(bitOrderValue);
-    testManualOffset(offsetValue, bitOrderValue);
-  }, [testManualOffset]);
-
-  const manualPresets = [
-    { label: 'Main 0x25A3 (LSB)', offset: '0x25A3', bitOrder: 'lsb' },
-    { label: 'Backup 0x05A3 (LSB)', offset: '0x05A3', bitOrder: 'lsb' },
-  ];
-
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
   const hasSaveData = fileData instanceof Uint8Array;
   const legacyMapReady = legacyEncountersReady && legacyEncounters instanceof Map;
@@ -995,6 +915,18 @@ export default function SavPage() {
     });
   }, [caughtSet, hasSaveData, legacyMapReady, legacyEncounters]);
 
+  const hasFileSelected = Boolean(fileName);
+
+  const handleClearSave = useCallback(() => {
+    setFileData(null);
+    setFileName(null);
+    setCaughtPokemon([]);
+    setPartyMembers([]);
+    setError(null);
+    setLegacyEncounterError(null);
+    setLoading(false);
+  }, []);
+
   return (
     <div className="app-shell sav-page">
       <a
@@ -1008,178 +940,60 @@ export default function SavPage() {
       </a>
       <header className="app-header">
         <div className="container">
-          <h1 className="title">Save File Reader</h1>
+          <h1 className="title">Pokemon Yellow Legacy Save Reader</h1>
           <p className="subtitle">
-            Import a Pokemon Yellow .sav or .srm file to preview which Pokedex entries are marked as caught.
+            Import a Pokemon Yellow Legacy .sav or .srm file to view your save file information.
           </p>
         </div>
       </header>
       <main className="container sav-page__content">
         <section className="sav-page__grid">
-          <article className="sav-card sav-card--primary">
-            <div className="sav-card__header">
-              <h2 className="sav-card__title">Upload your save</h2>
-              <p className="sav-card__description">
-                Works with emulator exports or flash-cart backups (32KB Pokemon Yellow saves in .sav or .srm format).
-              </p>
-            </div>
-            <div className="sav-card__body">
-              <label className="sav-field-label" htmlFor="sav-upload-input">
-                Pokemon Yellow save file
-              </label>
-              <input
-                id="sav-upload-input"
-                className="sav-file-input"
-                type="file"
-                accept=".sav,.srm"
-                onChange={handleFileChange}
-                disabled={loading}
-              />
-              <p className="sav-meta">Processing happens locally in the browser—no files are uploaded.</p>
-              {fileName && (
-                <p className="sav-meta">
-                  <strong>Selected:</strong> {fileName}
-                </p>
-              )}
-              {loading && <p className="sav-status">Processing save file...</p>}
-              {error && <div className="sav-alert sav-alert--error">{error}</div>}
-            </div>
-          </article>
-
-          {debugInfo && (
-            <article className="sav-card sav-card--debug">
+          {!hasFileSelected && (
+            <article className="sav-card sav-card--primary">
               <div className="sav-card__header">
-                <h2 className="sav-card__title">Debug details</h2>
+                <h2 className="sav-card__title">Upload your save</h2>
                 <p className="sav-card__description">
-                  Review the offsets we attempted or manually try a different bit order.
+                  Works with emulator exports or flash-cart backups (32KB Pokemon Yellow saves in .sav or .srm format).
                 </p>
               </div>
               <div className="sav-card__body">
-                <p className="sav-meta">
-                  <strong>File size:</strong> {debugInfo.fileSize} bytes ({debugInfo.fileSize.toString(16).toUpperCase()} hex)
-                </p>
-                {debugInfo.usedLabel && (
+                <label className="sav-field-label" htmlFor="sav-upload-input">
+                  Pokemon Yellow save file
+                </label>
+                <input
+                  id="sav-upload-input"
+                  className="sav-file-input"
+                  type="file"
+                  accept=".sav,.srm"
+                  onChange={handleFileChange}
+                  disabled={loading}
+                />
+                <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
+                {fileName && (
                   <p className="sav-meta">
-                    <strong>Active offset:</strong> {debugInfo.usedLabel} (<code>{debugInfo.usedOffset}</code>)
+                    <strong>Selected:</strong> {fileName}
                   </p>
                 )}
-                <button
-                  type="button"
-                  className="sav-debug-toggle"
-                  onClick={() => setShowDebugTools((value) => !value)}
-                >
-                  {showDebugTools ? "Hide debug tools" : "Show debug tools"}
-                </button>
-
-                {showDebugTools && (
-                  <div className="sav-debug-panel">
-                    <div className="sav-debug-section">
-                      <div className="sav-debug-section__title">Test results at common offsets</div>
-                      <div className="sav-debug-table-wrapper">
-                        <table className="sav-debug-table">
-                          <thead>
-                            <tr>
-                              <th>Offset</th>
-                              <th>Absolute</th>
-                              <th>Count</th>
-                              <th>Sample</th>
-                              <th>Used</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {debugInfo.offsetResults.map((result, idx) => {
-                              const rowClassNames = [
-                                result.caughtCount === GEN1_POKEMON_COUNT ? "is-complete" : "",
-                                result.isActive ? "is-active" : "",
-                                result.caughtCount === 0 ? "is-empty" : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ");
-                              return (
-                                <tr key={`${result.offset}-${idx}`} className={rowClassNames}>
-                                  <td>{result.offset}</td>
-                                  <td>
-                                    <code>{result.absoluteOffset}</code>
-                                  </td>
-                                  <td>{result.caughtCount}</td>
-                                  <td>{result.sample.map((id) => `#${id}`).join(", ")}</td>
-                                  <td>{result.isActive ? "Yes" : "No"}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="sav-debug-section">
-                      <div className="sav-debug-section__title">Manual offset tester</div>
-                      <div className="sav-manual-controls">
-                        <label className="visually-hidden" htmlFor="manual-offset-input">
-                          Manual offset
-                        </label>
-                        <input
-                          id="manual-offset-input"
-                          className="sav-manual-input"
-                          type="text"
-                          value={manualOffset}
-                          onChange={(e) => setManualOffset(e.target.value)}
-                          placeholder="0x25A3"
-                        />
-                        <label className="visually-hidden" htmlFor="manual-bit-order">
-                          Manual bit order
-                        </label>
-                        <select
-                          id="manual-bit-order"
-                          className="sav-manual-select"
-                          value={manualBitOrder}
-                          onChange={(e) => setManualBitOrder(e.target.value)}
-                        >
-                          <option value="lsb">LSB (bit 0 = #1)</option>
-                          <option value="msb">MSB (bit 7 = #1)</option>
-                          <option value="reverse-lsb">Reverse LSB</option>
-                        </select>
-                        <button
-                          type="button"
-                          className="sav-manual-button"
-                          onClick={() => testManualOffset()}
-                          disabled={!fileData}
-                        >
-                          Test
-                        </button>
-                      </div>
-                      <p className="sav-meta">
-                        Compare the count below with your in-game Pokedex to confirm the correct combination.
-                      </p>
-                      <div className="sav-quick-buttons">
-                        <span className="sav-quick-label">Quick tests:</span>
-                        {manualPresets.map((preset) => (
-                          <button
-                            key={`${preset.offset}-${preset.bitOrder}`}
-                            type="button"
-                            className="sav-quick-button"
-                            onClick={() => handleManualPreset(preset.offset, preset.bitOrder)}
-                            disabled={!fileData}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {loading && <p className="sav-status">Processing save file...</p>}
+                {error && <div className="sav-alert sav-alert--error">{error}</div>}
               </div>
             </article>
           )}
+
         </section>
 
         {hasSaveData && (
           <section className="sav-card sav-party-card">
-            <div className="sav-card__header">
-              <h2 className="sav-card__title">Current Party ({partyMembers.length} / {PARTY_MAX_SIZE})</h2>
-              <p className="sav-card__description">
-                These are the Pokémon currently stored in your party slots.
-              </p>
+            <div className="sav-card__header sav-card__header--with-actions">
+              <div className="sav-card__header-body">
+                <h2 className="sav-card__title">Current Party ({partyMembers.length} / {PARTY_MAX_SIZE})</h2>
+                <p className="sav-card__description">
+                  These are the Pokémon currently stored in your party slots.
+                </p>
+              </div>
+              <button type="button" className="sav-card__reset-button" onClick={handleClearSave}>
+                Clear information
+              </button>
             </div>
             <div className="sav-card__body">
               {partySlots.some(Boolean) ? (

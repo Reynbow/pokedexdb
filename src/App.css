@@ -7339,6 +7339,43 @@
   margin-bottom: 16px;
 }
 
+.sav-card__header--with-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sav-card__header-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sav-card__reset-button {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: rgba(148, 163, 184, 0.08);
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.sav-card__reset-button:hover:not(:disabled) {
+  border-color: rgba(147, 197, 253, 0.7);
+  background: rgba(147, 197, 253, 0.1);
+}
+
+.sav-card__reset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .sav-card__eyebrow {
   display: inline-flex;
   align-items: center;
@@ -7612,8 +7649,6 @@
   border-radius: 18px;
   border: 2px solid rgba(148, 163, 184, 0.25);
   background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(10, 12, 24, 0.9));
-  height: 100%;
-  min-height: 0;
 }
 
 .sav-party-slot.has-pokemon {
@@ -7680,7 +7715,8 @@
 .sav-party-slot__sprite-panel .sav-party-slot__sprite-wrapper {
   position: absolute;
   top: -38px;
-  left: -38px;
+  left: 45%;
+  transform: translateX(-50%);
   width: 192px;
   height: 192px;
   overflow: visible;
