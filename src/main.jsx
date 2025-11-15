@@ -12,6 +12,7 @@ const AbilitiesPage = lazy(() => import('./AbilitiesPage.jsx'))
 const MinigamePage = lazy(() => import('./MinigamePage.jsx'))
 const HomePage = lazy(() => import('./HomePage.jsx'))
 const EvTrainingPage = lazy(() => import('./EvTrainingPage'))
+const SavPage = lazy(() => import('./SavPage.jsx'))
 
 const pathSegments = window.location.pathname.toLowerCase().split('/').filter(Boolean)
 const lastSegment = pathSegments[pathSegments.length - 1] || ''
@@ -155,6 +156,13 @@ function RootRouter() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <MinigamePage />
+      </Suspense>
+    )
+  }
+  if (hash.startsWith('#/sav')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <SavPage />
       </Suspense>
     )
   }
