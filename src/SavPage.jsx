@@ -74,6 +74,52 @@ function resolveLegacyCsvUrl() {
   return `${String(baseUrl || "/").replace(/\/+$/, "/")}${LEGACY_CSV_FILENAME}`;
 }
 
+function readUint16(data, offset) {
+  if (offset + 1 >= data.length) return 0;
+  return (data[offset + 1] << 8) | data[offset];
+}
+
+function decodeGen1String(bytes) {
+  if (!bytes || bytes.length === 0) return null;
+  const chars = [];
+  for (const value of bytes) {
+    if (value === 0x50 || value === 0xff) {
+      break;
+    }
+    const mapped = GEN1_CHAR_MAP.get(value);
+    if (typeof mapped === "string") {
+      chars.push(mapped);
+    }
+  }
+  const result = chars.join("").trim();
+  return result || null;
+}
+
+function interpretStatus(value) {
+  if (!value) return "OK";
+  const sleepCounter = value & STATUS_FLAG_LABELS[0].mask;
+  if (sleepCounter) {
+    return "SLP";
+  }
+  for (let i = 1; i < STATUS_FLAG_LABELS.length; i++) {
+    const { mask, label } = STATUS_FLAG_LABELS[i];
+    if (value & mask) {
+      return label;
+    }
+  }
+  return "OK";
+}
+
+function resolveTypeName(code) {
+  if (GEN1_TYPE_NAMES.has(code)) {
+    return GEN1_TYPE_NAMES.get(code);
+  }
+  if (code >= 0x09 && code <= 0x13) {
+    return "Normal";
+  }
+  return "Unknown";
+}
+
 function normalizeLegacyPokemonName(rawName) {
   if (!rawName) return "";
   return rawName
@@ -141,6 +187,7 @@ const RAW_EVOLUTION_DATA = [
   "Tentacool~-/-~Level 30~-/-~Tentacruel",
   "Venonat~-/-~Level 31~-/-~Venomoth",
 ];
+
 const SPECIES_INDEX_TO_SLUG = new Map([
   [1, "rhydon"],
   [2, "kangaskhan"],
@@ -298,6 +345,72 @@ const SPECIES_INDEX_TO_SLUG = new Map([
   [190, "victreebel"],
 ]);
 
+const GEN1_CHAR_MAP = new Map([
+  [0x7f, " "],
+  [0x50, ""],
+  [0x9a, "("],
+  [0x9b, ")"],
+  [0x9c, ":"],
+  [0x9d, ";"],
+  [0x9e, "["],
+  [0x9f, "]"],
+  [0xba, "é"],
+  [0xbb, "'d"],
+  [0xbc, "'l"],
+  [0xbd, "'s"],
+  [0xbe, "'t"],
+  [0xbf, "'v"],
+  [0xe0, "'"],
+  [0xe1, "PK"],
+  [0xe2, "MN"],
+  [0xe3, "-"],
+  [0xe4, "'r"],
+  [0xe5, "'m"],
+  [0xe6, "?"],
+  [0xe7, "!"],
+  [0xe8, "."],
+  [0xf2, "."],
+  [0xf3, "/"],
+  [0xf4, ","],
+]);
+
+const STATUS_FLAG_LABELS = [
+  { mask: 0x07, label: "SLP" },
+  { mask: 0x08, label: "PSN" },
+  { mask: 0x10, label: "BRN" },
+  { mask: 0x20, label: "FRZ" },
+  { mask: 0x40, label: "PAR" },
+];
+
+for (let i = 0; i < 26; i++) {
+  GEN1_CHAR_MAP.set(0x80 + i, String.fromCharCode(65 + i));
+  GEN1_CHAR_MAP.set(0xa0 + i, String.fromCharCode(97 + i));
+}
+const GEN1_DIGITS = "0123456789";
+for (let i = 0; i < GEN1_DIGITS.length; i++) {
+  GEN1_CHAR_MAP.set(0xf6 + i, GEN1_DIGITS[i]);
+}
+
+const GEN1_TYPE_NAMES = new Map([
+  [0x00, "Normal"],
+  [0x01, "Fighting"],
+  [0x02, "Flying"],
+  [0x03, "Poison"],
+  [0x04, "Ground"],
+  [0x05, "Rock"],
+  [0x06, "Bird"],
+  [0x07, "Bug"],
+  [0x08, "Ghost"],
+  [0x14, "Fire"],
+  [0x15, "Water"],
+  [0x16, "Grass"],
+  [0x17, "Electric"],
+  [0x18, "Psychic"],
+  [0x19, "Ice"],
+  [0x1A, "Dragon"],
+]);
+
+
 const buildEvolutionRequirements = (rawEntries) => {
   const map = new Map();
   rawEntries.forEach((entry) => {
@@ -345,22 +458,71 @@ function parsePartyPokemon(data) {
     if (offset + 1 + PARTY_MAX_SIZE > data.length) {
       continue;
     }
-    const speciesBuffer = Array.from(data.slice(offset + 1, offset + 1 + PARTY_MAX_SIZE));
+
     const entries = [];
+    const speciesBuffer = Array.from(data.slice(offset + 1, offset + 1 + PARTY_MAX_SIZE));
+    const partyDataOffset = offset + 0x08;
+    const otNamesOffset = offset + 0x110;
+    const nicknameOffset = offset + 0x152;
+
     for (let i = 0; i < Math.min(count, speciesBuffer.length); i++) {
-      const speciesId = speciesBuffer[i];
-      if (!Number.isFinite(speciesId) || speciesId <= 0 || speciesId === 0xff) {
+      const speciesInternalId = speciesBuffer[i];
+      if (!Number.isFinite(speciesInternalId) || speciesInternalId <= 0 || speciesInternalId === 0xff) {
         continue;
       }
-      const slug = SPECIES_INDEX_TO_SLUG.get(speciesId) || null;
+
+      const pokemonDataOffset = partyDataOffset + i * 0x2C;
+      if (pokemonDataOffset + 0x2C > data.length) {
+        continue;
+      }
+
+      const slug = SPECIES_INDEX_TO_SLUG.get(speciesInternalId) || null;
       const dexId = slug ? GEN1_SLUG_TO_POKEDEX_ID.get(slug) || null : null;
+      const currentHp = readUint16(data, pokemonDataOffset + 0x01);
+      const maxHp = readUint16(data, pokemonDataOffset + 0x22);
+      const level = data[pokemonDataOffset + 0x21] || data[pokemonDataOffset + 0x03] || null;
+      const status = data[pokemonDataOffset + 0x04] || 0;
+      const type1 = resolveTypeName(data[pokemonDataOffset + 0x05]);
+      const type2 = resolveTypeName(data[pokemonDataOffset + 0x06]);
+      const trainerId = readUint16(data, pokemonDataOffset + 0x0C);
+      const attack = readUint16(data, pokemonDataOffset + 0x24);
+      const defense = readUint16(data, pokemonDataOffset + 0x26);
+      const speed = readUint16(data, pokemonDataOffset + 0x28);
+      const special = readUint16(data, pokemonDataOffset + 0x2A);
+
+      const otBytes =
+        otNamesOffset + (i * 11) + 11 <= data.length
+          ? data.slice(otNamesOffset + i * 11, otNamesOffset + i * 11 + 11)
+          : null;
+      const nicknameBytes =
+        nicknameOffset + (i * 11) + 11 <= data.length
+          ? data.slice(nicknameOffset + i * 11, nicknameOffset + i * 11 + 11)
+          : null;
+
       entries.push({
         slot: i + 1,
-        speciesId,
+        speciesInternalId,
         slug,
         dexId,
+        currentHp,
+        maxHp,
+        level,
+        status,
+        statusText: interpretStatus(status),
+        types: type1 === type2 ? [type1] : [type1, type2],
+        stats: {
+          attack,
+          defense,
+          speed,
+          special,
+        },
+        originalTrainerId: trainerId,
+        originalTrainerIdFormatted: String(trainerId).padStart(5, "0"),
+        originalTrainerName: otBytes ? decodeGen1String(otBytes) : null,
+        nickname: nicknameBytes ? decodeGen1String(nicknameBytes) : null,
       });
     }
+
     if (entries.length > 0 || count === 0) {
       return entries;
     }
@@ -1020,38 +1182,133 @@ export default function SavPage() {
               </p>
             </div>
             <div className="sav-card__body">
-                      {partySlots.some(Boolean) ? (
-                        <div className="sav-party-grid">
-                          {partySlots.map((slot, index) => (
-                            <div
-                              key={`party-slot-${index}`}
-                              className={`sav-party-slot ${slot ? "has-pokemon" : "is-empty"}`}
-                            >
-                              {slot ? (
-                                <>
-                                  <div className="sav-party-slot__sprite">
-                                    <SpriteImage
-                                      id={slot.dexId ?? slot.speciesId ?? 0}
-                                      alt={slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesId}`}
-                                      gameSpritePath="generation-i/yellow/transparent/"
-                                      style={{ width: "96px", height: "96px", imageRendering: "pixelated" }}
-                                    />
-                                  </div>
-                                  <div className="sav-party-slot__meta">
-                                    <div className="sav-party-slot__label">Slot {slot.slot}</div>
-                                    <div className="sav-party-slot__name">
-                                      {slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesId}`}
-                                    </div>
-                                  </div>
-                                </>
-                              ) : (
-                        <div className="sav-party-slot__empty">
-                          <span className="sav-party-slot__label">Slot {index + 1}</span>
-                          <span className="sav-party-slot__name">Empty</span>
+              {partySlots.some(Boolean) ? (
+                <div className="sav-party-grid">
+                  {partySlots.map((slot, index) => {
+                    if (!slot) {
+                      return (
+                        <div key={`party-slot-${index}`} className="sav-party-slot is-empty">
+                          <div className="sav-party-slot__empty">
+                            <span className="sav-party-slot__name">Slot {index + 1}</span>
+                            <span className="sav-party-slot__empty-label">Empty</span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    }
+
+                    const displayName =
+                      slot.nickname ||
+                      (slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesInternalId}`);
+                    const hpPercent =
+                      slot.maxHp && slot.maxHp > 0
+                        ? Math.max(0, Math.min(100, (slot.currentHp / slot.maxHp) * 100))
+                        : 0;
+                    const primaryType = slot.types[0] || "Unknown";
+                    const secondaryType = slot.types[1] || "";
+                    const hasSecondaryType = Boolean(secondaryType);
+                    const pokedexNumber =
+                      slot.dexId != null ? `No. ${String(slot.dexId).padStart(3, "0")}` : "No. ---";
+
+                    return (
+                      <div key={`party-slot-${index}`} className="sav-party-slot has-pokemon">
+                        <div className="sav-party-slot__content">
+                          <div className="sav-party-slot__sprite-area">
+                            <div className="sav-party-slot__sprite-panel">
+                              <div className="sav-party-slot__sprite-wrapper">
+                                <SpriteImage
+                                  id={slot.dexId ?? slot.speciesInternalId ?? 0}
+                                  alt={displayName}
+                                  gameSpritePath="generation-i/yellow/transparent/"
+                                  style={{
+                                    width: "192px",
+                                    height: "192px",
+                                    imageRendering: "pixelated",
+                                    transform: "scaleX(-1)",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="sav-party-slot__info-area">
+                            <div className="sav-party-slot__header-row">
+                              <div className="sav-party-slot__display-name">{displayName}</div>
+                              <div className="sav-party-slot__level">
+                                {slot.level != null ? `Lv${slot.level}` : "Lv??"}
+                              </div>
+                            </div>
+                            <div className="sav-party-slot__hp">
+                              <div className="sav-party-slot__hp-row">
+                                <span className="sav-party-slot__hp-label">HP:</span>
+                                <div className="sav-party-slot__hp-bar">
+                                  <div
+                                    className="sav-party-slot__hp-fill"
+                                    style={{ width: `${hpPercent}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="sav-party-slot__hp-value">
+                                {(slot.currentHp ?? 0).toString()} / {(slot.maxHp ?? 0).toString()}
+                              </div>
+                            </div>
+                            <div className="sav-party-slot__status">
+                              STATUS / {slot.statusText || "OK"}
+                            </div>
+                          </div>
+                          <div className="sav-party-slot__stats-area">
+                            <div className="sav-party-slot__number">{pokedexNumber}</div>
+                            <div className="sav-party-slot__stat-grid">
+                              {[
+                                ["ATTACK", slot.stats?.attack],
+                                ["DEFENSE", slot.stats?.defense],
+                                ["SPEED", slot.stats?.speed],
+                                ["SPECIAL", slot.stats?.special],
+                              ].map(([label, value]) => (
+                                <div key={label} className="sav-party-slot__stat-row">
+                                  <span>{label}</span>
+                                  <span>{value != null ? value : "--"}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="sav-party-slot__meta-area">
+                            <div className="sav-party-slot__meta-number">{pokedexNumber}</div>
+                            <div className="sav-party-slot__meta-block">
+                              <div className="sav-party-slot__meta-line">
+                                <span className="sav-party-slot__meta-label">
+                                  {hasSecondaryType ? "TYPE 1" : "TYPE"}
+                                </span>
+                                <span className="sav-party-slot__meta-value">{primaryType}</span>
+                              </div>
+                              <div className="sav-party-slot__meta-line">
+                                <span
+                                  className={`sav-party-slot__meta-label ${
+                                    !secondaryType ? "sav-party-slot__meta-label--hidden" : ""
+                                  }`}
+                                >
+                                  TYPE 2
+                                </span>
+                                <span className="sav-party-slot__meta-value">
+                                  {secondaryType || "\u00A0"}
+                                </span>
+                              </div>
+                              <div className="sav-party-slot__meta-line">
+                                <span className="sav-party-slot__meta-label">IDNo</span>
+                                <span className="sav-party-slot__meta-value">
+                                  {slot.originalTrainerIdFormatted}
+                                </span>
+                              </div>
+                              <div className="sav-party-slot__meta-line">
+                                <span className="sav-party-slot__meta-label">OT</span>
+                                <span className="sav-party-slot__meta-value">
+                                  {slot.originalTrainerName || "Unknown"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="sav-party-empty">Party data unavailable (or party is empty).</div>

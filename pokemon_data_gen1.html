@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html class="client-nojs" lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<title>Pokémon data structure (Generation I) - Bulbapedia, the community-driven Pokémon encyclopedia</title>
+<script>document.documentElement.className="client-js";RLCONF={"wgBreakFrames":false,"wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgDefaultDateFormat":"dmy","wgMonthNames":["","January","February","March","April","May","June","July","August","September","October","November","December"],"wgRequestId":"dffda7aaca6541fad6424257","wgCanonicalNamespace":"","wgCanonicalSpecialPageName":false,"wgNamespaceNumber":0,"wgPageName":"Pokémon_data_structure_(Generation_I)","wgTitle":"Pokémon data structure (Generation I)","wgCurRevisionId":4320889,"wgRevisionId":4320889,"wgArticleId":2838,"wgIsArticle":true,"wgIsRedirect":false,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":["Structures","Game mechanics"],"wgPageViewLanguage":"en","wgPageContentLanguage":"en","wgPageContentModel":"wikitext","wgRelevantPageName":"Pokémon_data_structure_(Generation_I)","wgRelevantArticleId":2838,"wgIsProbablyEditable":false,"wgRelevantPageIsProbablyEditable":false,
+"wgRestrictionEdit":[],"wgRestrictionMove":[],"wgCiteReferencePreviewsActive":true,"wgMFDisplayWikibaseDescriptions":{"search":false,"watchlist":false,"tagline":false},"wgVisualEditor":{"pageLanguageCode":"en","pageLanguageDir":"ltr","pageVariantFallbacks":"en"},"wgMediaViewerOnClick":true,"wgMediaViewerEnabledByDefault":true,"wgPopupsFlags":0,"wgCheckUserClientHintsHeadersJsApi":["architecture","bitness","brands","fullVersionList","mobile","model","platform","platformVersion"],"wgEditSubmitButtonLabelPublish":false};RLSTATE={"site.styles":"ready","user.styles":"ready","user":"ready","user.options":"loading","skins.bulbapediamonobook.styles":"ready","ext.embedVideo.styles":"ready","ext.visualEditor.desktopArticleTarget.noscript":"ready"};RLPAGEMODULES=["site","mediawiki.page.ready","mediawiki.toc","skins.bulbapediamonobook.scripts","ext.embedVideo.overlay","ext.checkUser.clientHints","ext.visualEditor.desktopArticleTarget.init","ext.visualEditor.targetLoader","mmv.bootstrap",
+"ext.echo.centralauth","ext.popups"];</script>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.loader.impl(function(){return["user.options@12s5i",function($,jQuery,require,module){mw.user.tokens.set({"patrolToken":"+\\","watchToken":"+\\","csrfToken":"+\\"});
+}];});});</script>
+<link rel="stylesheet" href="/w/load.php?lang=en&amp;modules=ext.embedVideo.styles%7Cext.visualEditor.desktopArticleTarget.noscript%7Cskins.bulbapediamonobook.styles&amp;only=styles&amp;skin=bulbapediamonobook">
+<script async="" src="/w/load.php?lang=en&amp;modules=startup&amp;only=scripts&amp;raw=1&amp;skin=bulbapediamonobook"></script>
+<meta name="ResourceLoaderDynamicStyles" content="">
+<link rel="stylesheet" href="/w/load.php?lang=en&amp;modules=site.styles&amp;only=styles&amp;skin=bulbapediamonobook">
+<meta name="generator" content="MediaWiki 1.43.0">
+<meta name="robots" content="max-image-preview:standard">
+<meta name="format-detection" content="telephone=no">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0">
+<link rel="search" type="application/opensearchdescription+xml" href="/w/rest.php/v1/search" title="Bulbapedia (en)">
+<link rel="EditURI" type="application/rsd+xml" href="https://bulbapedia.bulbagarden.net/w/api.php?action=rsd">
+<link rel="canonical" href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_I)">
+<link rel="license" href="https://creativecommons.org/licenses/by-nc-sa/2.5/">
+<link rel="alternate" type="application/atom+xml" title="Bulbapedia Atom feed" href="/w/index.php?title=Special:RecentChanges&amp;feed=atom">
+<!---------------------------------->
+<!-- Google dual analytics : HEAD -->
+<!---------------------------------->
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XCGG53D4E3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-XCGG53D4E3');
+  gtag('config', 'UA-326511-18');
+</script>
+
+<!---------------->
+<!-- Script End -->
+<!---------------->
+<!-------------------------->
+<!-- Adthrive Main : HEAD -->
+<!-------------------------->
+
+<script>
+(function(w, d) {
+w.adthrive = w.adthrive || {};
+w.adthrive.cmd = w.adthrive.cmd || [];
+w.adthrive.plugin = 'adthrive-ads-manual';
+w.adthrive.host = 'ads.adthrive.com';
+var s = d.createElement('script');
+s.async = true;
+s.referrerpolicy='no-referrer-when-downgrade';
+s.src = 'https://' + w.adthrive.host + '/sites/630428a76245162875c78210/ads.min.js?referrer=' + w.encodeURIComponent(w.location.href) + '&cb=' + (Math.floor(Math.random() * 100) + 1);
+var n = d.getElementsByTagName('script')[0];
+n.parentNode.insertBefore(s, n);
+})(window, document);
+</script>
+
+<!---------------->
+<!-- Script End -->
+<!---------------->
+<script type="text/javascript" src="//ahost.bulbagarden.net/Content/bulbapediascript.js"></script>
+<meta name="robots" content="max-image-preview:large">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet">
+<meta property="og:title" content="Pokémon data structure (Generation I)">
+<meta property="og:site_name" content="Bulbapedia">
+<meta property="og:url" content="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_I)">
+<meta property="og:image" content="https://archives.bulbagarden.net/media/upload/e/e6/Bulbapedia_1x_logo.png">
+<meta property="article:modified_time" content="2025-06-17T22:21:19Z">
+<meta property="article:published_time" content="2025-06-17T22:21:19Z">
+<script type="application/ld+json">{"@context":"http:\/\/schema.org","@type":"Article","name":"Pok\u00e9mon data structure (Generation I) - Bulbapedia, the community-driven Pok\u00e9mon encyclopedia","headline":"Pok\u00e9mon data structure (Generation I) - Bulbapedia, the community-driven Pok\u00e9mon encyclopedia","mainEntityOfPage":"Pok\u00e9mon data structure (Generation I)","identifier":"https:\/\/bulbapedia.bulbagarden.net\/wiki\/Pok%C3%A9mon_data_structure_(Generation_I)","url":"https:\/\/bulbapedia.bulbagarden.net\/wiki\/Pok%C3%A9mon_data_structure_(Generation_I)","dateModified":"2025-06-17T22:21:19Z","datePublished":"2025-06-17T22:21:19Z","image":{"@type":"ImageObject","url":"https:\/\/archives.bulbagarden.net\/media\/upload\/e\/e6\/Bulbapedia_1x_logo.png"},"author":{"@type":"Organization","name":"Bulbapedia","url":"https:\/\/bulbapedia.bulbagarden.net","logo":{"@type":"ImageObject","url":"https:\/\/archives.bulbagarden.net\/media\/upload\/e\/e6\/Bulbapedia_1x_logo.png","caption":"Bulbapedia"}},"publisher":{"@type":"Organization","name":"Bulbapedia","url":"https:\/\/bulbapedia.bulbagarden.net","logo":{"@type":"ImageObject","url":"https:\/\/archives.bulbagarden.net\/media\/upload\/e\/e6\/Bulbapedia_1x_logo.png","caption":"Bulbapedia"}},"potentialAction":{"@type":"SearchAction","target":"https:\/\/bulbapedia.bulbagarden.net\/w\/index.php?title=Special:Search&search={search_term}","query-input":"required name=search_term"}}</script>
+</head>
+<body class="mediawiki ltr sitedir-ltr mw-hide-empty-elt ns-0 ns-subject page-Pokémon_data_structure_Generation_I rootpage-Pokémon_data_structure_Generation_I skin-bulbapediamonobook action-view skin--responsive"><a href="https://bulbapedia.bulbagarden.net/cdn-cgi/content?id=5hc43KlsTt2hHmrIlrFh9iZyY97Nk9YJLL40NCw6Xx0-1763190513.787002-1.0.1.1-zYY.H7TSFoh4Y1UZmjXyADnBadfP.5MfdPG79YcfQKA" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a><div id="globalWrapper">
+        <div class="bg-global-menu bg-bulbapedia-menu">
+        <a href="https://bulbagarden.net" class="bg-global-nav-logo"></a>
+        <nav class="bg-global-nav">
+            <ul class="bg-global-nav-primary">
+                <li class="bg-global-nav-primary-item">
+                    <a href="https://bulbagarden.net" class="bg-global-nav-primary-link ">News</a>
+                </li>
+                <li class="bg-global-nav-primary-item bg-global-nav-primary-haschildren">
+                    <a href="https://bulbapedia.bulbagarden.net/"
+                       class="bg-global-nav-primary-link bg-global-nav-primary-toggle selected">Bulbapedia</a>
+                    <ul class="bg-global-nav-primary-children">
+                        <li class="bg-global-nav-secondary row">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item bulbapedia">
+                                    <a href="https://bulbapedia.bulbagarden.net/"
+                                       class="bg-global-nav-secondary-link">Bulbapedia main page</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Pokémon</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/List_of_Pokémon_by_National_Pokédex_number"
+                                       class="bg-global-nav-secondary-link">National Pokédex</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_name"
+                                       class="bg-global-nav-secondary-link">By Name</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Legendary_Pok%C3%A9mon"
+                                       class="bg-global-nav-secondary-link">Legendary Pokémon</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Mythical_Pok%C3%A9mon"
+                                       class="bg-global-nav-secondary-link">Mythical Pokémon</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Event_Pok%C3%A9mon"
+                                       class="bg-global-nav-secondary-link">Event Pokémon</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Terastal_phenomenon"
+                                       class="bg-global-nav-secondary-link">Terastal</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Noble_Pokémon"
+                                       class="bg-global-nav-secondary-link">Noble Pokémon</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Alpha_Pokémon"
+                                       class="bg-global-nav-secondary-link">Alpha Pokémon</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Gigantamax"
+                                       class="bg-global-nav-secondary-link">Gigantamax</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Dynamax"
+                                       class="bg-global-nav-secondary-link">Dynamax</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon"
+                                       class="bg-global-nav-secondary-link">more...</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Mechanics</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Type"
+                                       class="bg-global-nav-secondary-link">Types</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Type#Type_chart"
+                                       class="bg-global-nav-secondary-link">Type chart</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Abilities"
+                                       class="bg-global-nav-secondary-link">Abilities</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Nature#List_of_Natures"
+                                       class="bg-global-nav-secondary-link">Nature</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Status_condition"
+                                       class="bg-global-nav-secondary-link">Status conditions</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Moves"
+                                       class="bg-global-nav-secondary-link">Moves</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Items"
+                                       class="bg-global-nav-secondary-link">Items</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Game_mechanics"
+                                       class="bg-global-nav-secondary-link">more...</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Games</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Browse:Video_Games"
+                                       class="bg-global-nav-secondary-link">Video Games Portal</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Walkthroughs"
+                                       class="bg-global-nav-secondary-link">Walkthroughs</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Scarlet_and_Violet"
+                                       class="bg-global-nav-secondary-link">Pokémon Scarlet and Violet</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pokémon_Legends:_Arceus"
+                                       class="bg-global-nav-secondary-link">Pokémon Legends: Arceus</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pokémon_Brilliant_Diamond_and_Shining_Pearl"
+                                       class="bg-global-nav-secondary-link">Pokémon Brilliant Diamond and Shining Pearl</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Pok%C3%A9mon_Sword_and_Shield"
+                                       class="bg-global-nav-secondary-link">Pokémon Sword and Shield</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Spin-off_Pok%C3%A9mon_games"
+                                       class="bg-global-nav-secondary-link">Spin-offs</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Pok%C3%A9mon_GO"
+                                       class="bg-global-nav-secondary-link">Pokémon GO</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Games"
+                                       class="bg-global-nav-secondary-link">all games...</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">TCG</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Browse:Trading_Card_Game"
+                                       class="bg-global-nav-secondary-link">TCG Portal</a>
+                                </li>
+
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Trading_Card_Game"
+                                       class="bg-global-nav-secondary-link">About</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Trading_Card_Game#How_to_play"
+                                       class="bg-global-nav-secondary-link">How to play</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Rotation_(TCG)"
+                                       class="bg-global-nav-secondary-link">Rotation</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Promotional_cards_(TCG)"
+                                       class="bg-global-nav-secondary-link">Promotional cards</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Surging_Sparks_(TCG)"
+                                       class="bg-global-nav-secondary-link">Surging Sparks</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Stellar_Crown_(TCG)"
+                                       class="bg-global-nav-secondary-link">Stellar Crown</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Shrouded_Fable_(TCG)"
+                                       class="bg-global-nav-secondary-link">Shrouded Fable</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Twilight_Masquerade_(TCG)"
+                                       class="bg-global-nav-secondary-link">Twilight Masquerade</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_Trading_Card_Game_expansions"
+                                       class="bg-global-nav-secondary-link">all expansions...</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Animation & Manga</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Browse:Animation"
+                                       class="bg-global-nav-secondary-link">Animation Portal</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Browse:Manga"
+                                       class="bg-global-nav-secondary-link">Manga Portal</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Horizons:_The_Series"
+                                       class="bg-global-nav-secondary-link">Pokémon Horizons</a>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Liko"
+                                       class="bg-global-nav-secondary-link">Liko</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_the_Series"
+                                       class="bg-global-nav-secondary-link">Pokémon the Series</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Ash_Ketchum"
+                                       class="bg-global-nav-secondary-link">Ash Ketchum</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/List_of_animated_series_characters"
+                                       class="bg-global-nav-secondary-link">Animated series characters</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_movie"
+                                       class="bg-global-nav-secondary-link">Movies</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Category:Manga"
+                                       class="bg-global-nav-secondary-link">Manga</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Adventures"
+                                       class="bg-global-nav-secondary-link">Pokémon Adventures</a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="bg-global-nav-primary-item">
+                    <a href="https://bulbagarden.net/forums/" class="bg-global-nav-primary-link">Forums</a>
+                </li>
+                <li class="bg-global-nav-primary-item">
+                    <a href="https://discord.gg/bulbagarden" class="bg-global-nav-primary-link">Discord</a>
+                </li>
+                <li class="bg-global-nav-primary-item bg-global-nav-primary-haschildren">
+                    <a href="#bulbapedia"
+                       class="bg-global-nav-primary-link bg-global-nav-primary-toggle">More</a>
+                    <ul class="bg-global-nav-primary-children">
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Social</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://www.youtube.com/user/Bulbagarden" target="_blank"
+                                       rel="noopener" class="bg-global-nav-secondary-link">Youtube</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://twitch.tv/Bulbagarden" target="_blank"
+                                       rel="noopener" class="bg-global-nav-secondary-link">Twitch</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://x.com/Bulbagarden" target="_blank" rel="noopener"
+                                       class="bg-global-nav-secondary-link">X (Twitter)</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://www.facebook.com/Bulbagarden/" target="_blank"
+                                       rel="noopener" class="bg-global-nav-secondary-link">Facebook</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://www.instagram.com/bulbagarden.official/" target="_blank"
+                                       rel="noopener" class="bg-global-nav-secondary-link">Instagram</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbagarden.tumblr.com/" target="_blank"
+                                       rel="noopener" class="bg-global-nav-secondary-link">Tumblr</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://mastodon.social/@bulbagarden" target="_blank"
+                                       rel="noopener" class="bg-global-nav-secondary-link">Mastodon</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Apps</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://play.google.com/store/apps/details?id=org.bulbagarden.alpha&hl=en&gl=US"
+                                       target="_blank" rel="noopener" class="bg-global-nav-secondary-link">Android</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://apps.apple.com/us/app/bulbapedia-wiki-for-pok%C3%A9mon/id1242159382"
+                                       target="_blank" rel="noopener"
+                                       class="bg-global-nav-secondary-link">iOS</a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+            <ul class="bg-global-nav-primary utilities">
+                <li class="bg-global-nav-primary-item bg-global-nav-primary-haschildren">
+                    <a href="#bulbapedia" class="bg-global-nav-primary-link bg-global-nav-primary-toggle">Editors</a>
+                    <ul class="bg-global-nav-primary-children">
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Bulbapedia</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Bulbapedia:Getting_started"
+                                       class="bg-global-nav-secondary-link">Getting Started</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Bulbapedia:Bulletin_Board"
+                                       class="bg-global-nav-secondary-link">Bulletin Board</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://www.mediawiki.org/wiki/Help:Contents"
+                                       class="bg-global-nav-secondary-link">Help</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Bulbapedia:FAQ"
+                                       class="bg-global-nav-secondary-link">FAQ</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbagarden.net/forums/bulbawiki-forum.195/"
+                                       class="bg-global-nav-secondary-link">Bulbawiki forum</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Special:RecentChanges"
+                                       class="bg-global-nav-secondary-link">Recent changes</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Special:Random"
+                                       class="bg-global-nav-secondary-link">Random Page</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Special:SpecialPages"
+                                       class="bg-global-nav-secondary-link">Special pages</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">Archives</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Main_Page"
+                                       class="bg-global-nav-secondary-link">Main Page</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Archives:FAQ"
+                                       class="bg-global-nav-secondary-link">FAQ</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Archives:To-do_list"
+                                       class="bg-global-nav-secondary-link">To-do list</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Special:Upload"
+                                       class="bg-global-nav-secondary-link">Upload file</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Special:RecentChanges"
+                                       class="bg-global-nav-secondary-link">Recent Changes</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Special:Log/upload"
+                                       class="bg-global-nav-secondary-link">Recent Uploads</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://archives.bulbagarden.net/wiki/Special:Random/File"
+                                       class="bg-global-nav-secondary-link">Random File</a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="bg-global-nav-primary-item bg-global-nav-primary-haschildren">
+                    <a href="#account"
+                       class="bg-global-nav-primary-link bg-global-nav-primary-toggle">Account</a>
+                    <ul class="bg-global-nav-primary-children">
+                        <li class="bg-global-nav-secondary row">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item bulbapedia">
+                                    <a href="https://bulbapedia.bulbagarden.net/w/index.php?title=Special:UserLogin&returnto=Main+Page"
+                                       class="bg-global-nav-secondary-link">Bulbapedia login</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item forums">
+                                    <a href="https://bulbagarden.net/forums/index.php?login/"
+                                       class="bg-global-nav-secondary-link">Forum login</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="bg-global-nav-secondary">
+                            <ul>
+                                <li class="bg-global-nav-secondary-item header">New Accounts</li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbapedia.bulbagarden.net/wiki/Special:CreateAccount"
+                                       class="bg-global-nav-secondary-link">Create Bulbapedia Account</a>
+                                </li>
+                                <li class="bg-global-nav-secondary-item">
+                                    <a href="https://bulbagarden.net/forums/index.php?register/"
+                                       class="bg-global-nav-secondary-link">Create Forum Account</a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+        <div id="bgMenuToggle" class="bg-global-nav-primary-link menu">Menu</div>
+        <div class="bg-global-nav-search-wrapper">
+            <form action="/w/index.php" id="searchform">
+                <input type="hidden" name="title" value="Special:Search">
+                <input type="search" name="search" placeholder="Search Bulbapedia"
+                       title="Search Bulbapedia [alt-shift-f]" accesskey="f" id="searchInput"
+                       class="bg-global-nav-search-input" autocomplete="off">
+                <input type="submit" name="go" value="Go" title="Go to a page with this exact name if it exists"
+                       id="searchGoButton" class="searchButton" style="display: none;">
+                <input type="submit" name="fulltext" value="Search" title="Search the pages for this text"
+                       id="mw-searchButton" class="searchButton" style="display: none;">
+            </form>
+        </div>
+    </div>
+
+	<div id="column-content">
+		<div id="content" class="mw-body" role="main">
+			<a id="top"></a>
+			<div id="siteNotice"><div id="mw-dismissablenotice-anonplace"></div><script>(function(){var node=document.getElementById("mw-dismissablenotice-anonplace");if(node){node.outerHTML="\u003Cdiv id=\"localNotice\" data-nosnippet=\"\"\u003E\u003Cdiv class=\"sitenotice\" lang=\"en\" dir=\"ltr\"\u003E\u003Cdiv class=\"plainlinks\" style=\"padding:0px;\"\u003E\n\u003Cp\u003E\u003Ca href=\"/wiki/Pok%C3%A9mon_Legends:_Z-A\" title=\"Pokémon Legends: Z-A\"\u003EPokémon Legends: Z-A\u003C/a\u003E has been officially released worldwide! Bulbapedia is currently being updated with the new information.\u003Cbr /\u003E\n\u003C/p\u003E\nPlease remember to follow the \u003Ca href=\"/wiki/Bulbapedia:Unreleased_materials_policy\" title=\"Bulbapedia:Unreleased materials policy\"\u003Eunreleased materials policy\u003C/a\u003E, \u003Ca href=\"/wiki/Bulbapedia:Manual_of_style\" title=\"Bulbapedia:Manual of style\"\u003Emanual of style\u003C/a\u003E, and \u003Ca href=\"/wiki/Bulbapedia:Code_of_conduct\" title=\"Bulbapedia:Code of conduct\"\u003Ecode of conduct\u003C/a\u003E at all times.\u003Cbr /\u003ECheck the \u003Ca rel=\"nofollow\" class=\"external text\" href=\"https://bulbagarden.net/\"\u003EBulbagarden home page\u003C/a\u003E for up-to-date Pokémon news, and discuss it on the \u003Ca rel=\"nofollow\" class=\"external text\" href=\"https://bulbagarden.net/forums/\"\u003Eforums\u003C/a\u003E or in the \u003Ca rel=\"nofollow\" class=\"external text\" href=\"https://discord.gg/bulbagarden\"\u003EBulbagarden Discord server\u003C/a\u003E.\u003C/div\u003E\u003C/div\u003E\u003C/div\u003E";}}());</script></div>
+			<div class="mw-indicators">
+			</div>
+			<h1 id="firstHeading" class="firstHeading mw-first-heading"><span class="mw-page-title-main">Pokémon data structure (Generation I)</span></h1>
+			<div id="bodyContent" class="bulbapediamonobook-body">
+				<div id="siteSub">From Bulbapedia, the community-driven Pokémon encyclopedia.</div>
+				<div id="contentSub" ><div id="mw-content-subtitle"></div></div>
+				
+				<div id="jump-to-nav"></div><a href="#column-one" class="mw-jump-link">Jump to navigation</a><a href="#searchInput" class="mw-jump-link">Jump to search</a>
+				<!-- start content -->
+				<div id="mw-content-text" class="mw-body-content"><div class="mw-content-ltr mw-parser-output" lang="en" dir="ltr"><p>The <b>Pokémon data structure</b> in the <a href="/wiki/Generation_I" title="Generation I">Generation I</a> games stores most information about the current state of a <a href="/wiki/Player_character" title="Player character">player</a>'s <a href="/wiki/Caught_Pok%C3%A9mon" title="Caught Pokémon">caught Pokémon</a>. It has a length of 64 bytes for Pokémon in the player's <a href="/wiki/Party" title="Party">party</a> (44 bytes for the Pokémon itself and 20 bytes for the OT's name and the Nickname) and 53 bytes for Pokémon in boxes (33 for the Pokémon itself and 20 for the OT's name and Nickname) on <a href="/wiki/Pok%C3%A9mon_Storage_System" title="Pokémon Storage System">Bill's PC</a>. The information lost when depositing a Pokémon in Bill's PC is its <a href="/wiki/Level" title="Level">level</a>, <a href="/wiki/HP" title="HP">HP</a>, <a href="/wiki/Stat#Attack" title="Stat">Attack</a>, <a href="/wiki/Stat#Defense" title="Stat">Defense</a>, <a href="/wiki/Stat#Speed" title="Stat">Speed</a> and <a href="/wiki/Stat#Special" title="Stat">Special</a>; this allows the <a href="/wiki/Box_trick" title="Box trick">box trick</a> to work by recalculating the lost information upon withdrawing the Pokémon again.
+</p>
+<div id="toc" class="toc" role="navigation" aria-labelledby="mw-toc-heading"><input type="checkbox" role="button" id="toctogglecheckbox" class="toctogglecheckbox" style="display:none" /><div class="toctitle" lang="en" dir="ltr"><h2 id="mw-toc-heading">Contents</h2><span class="toctogglespan"><label class="toctogglelabel" for="toctogglecheckbox"></label></span></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="#The_structure"><span class="tocnumber">1</span> <span class="toctext">The structure</span></a></li>
+<li class="toclevel-1 tocsection-2"><a href="#Explanation_of_fields"><span class="tocnumber">2</span> <span class="toctext">Explanation of fields</span></a>
+<ul>
+<li class="toclevel-2 tocsection-3"><a href="#Species"><span class="tocnumber">2.1</span> <span class="toctext">Species</span></a></li>
+<li class="toclevel-2 tocsection-4"><a href="#Remaining_HP"><span class="tocnumber">2.2</span> <span class="toctext">Remaining HP</span></a></li>
+<li class="toclevel-2 tocsection-5"><a href="#Level"><span class="tocnumber">2.3</span> <span class="toctext">Level</span></a></li>
+<li class="toclevel-2 tocsection-6"><a href="#Status_conditions"><span class="tocnumber">2.4</span> <span class="toctext">Status conditions</span></a></li>
+<li class="toclevel-2 tocsection-7"><a href="#Type"><span class="tocnumber">2.5</span> <span class="toctext">Type</span></a></li>
+<li class="toclevel-2 tocsection-8"><a href="#Catch_rate/Held_item"><span class="tocnumber">2.6</span> <span class="toctext">Catch rate/Held item</span></a></li>
+<li class="toclevel-2 tocsection-9"><a href="#Original_Trainer_ID_number"><span class="tocnumber">2.7</span> <span class="toctext">Original Trainer ID number</span></a></li>
+<li class="toclevel-2 tocsection-10"><a href="#Experience"><span class="tocnumber">2.8</span> <span class="toctext">Experience</span></a></li>
+<li class="toclevel-2 tocsection-11"><a href="#Stat_experience"><span class="tocnumber">2.9</span> <span class="toctext">Stat experience</span></a></li>
+<li class="toclevel-2 tocsection-12"><a href="#PP"><span class="tocnumber">2.10</span> <span class="toctext">PP</span></a></li>
+<li class="toclevel-2 tocsection-13"><a href="#Maximum_HP"><span class="tocnumber">2.11</span> <span class="toctext">Maximum HP</span></a></li>
+<li class="toclevel-2 tocsection-14"><a href="#Attack,_Defense,_Speed,_and_Special"><span class="tocnumber">2.12</span> <span class="toctext">Attack, Defense, Speed, and Special</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-15"><a href="#Storage"><span class="tocnumber">3</span> <span class="toctext">Storage</span></a>
+<ul>
+<li class="toclevel-2 tocsection-16"><a href="#6-Pokémon_Party_Structure"><span class="tocnumber">3.1</span> <span class="toctext">6-Pokémon Party Structure</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-17"><a href="#Related_articles"><span class="tocnumber">4</span> <span class="toctext">Related articles</span></a></li>
+</ul>
+</div>
+
+<h2><span class="mw-headline" id="The_structure">The structure</span></h2>
+<table style="border: 1px solid #88a; background: #f8f8ff; padding: 0.5em; border-collapse: collapse; margin: 0 0 0.5em 0.5em;" cellspacing="1" cellpadding="2">
+
+<tbody><tr>
+<th style="text-align: center; background: #ccf;"><b>Offset</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Contents</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Size</b>
+</th></tr>
+<tr>
+<td><a href="#Species">0x00</a></td>
+<td><a href="/wiki/List_of_Pok%C3%A9mon_by_index_number_in_Generation_I" title="List of Pokémon by index number in Generation I">Index number of the Species</a></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td><a href="#Remaining_HP">0x01</a></td>
+<td>Current <a href="/wiki/HP" title="HP">HP</a></td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Box_Level">0x03</a></td>
+<td><span class="explain" title="as represented while viewed from inside the PC">Level</span></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td><a href="#Status_conditions">0x04</a></td>
+<td><a href="/wiki/Status_condition" title="Status condition">Status condition</a></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td><a href="#Type">0x05</a></td>
+<td><a href="/wiki/Type" title="Type">Type 1</a></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td><a href="#Type">0x06</a></td>
+<td>Type 2</td>
+<td>1 byte
+</td></tr>
+<tr>
+<td><a href="#Catch_rate/Held_item">0x07</a></td>
+<td><a href="/wiki/Catch_rate" title="Catch rate">Catch rate</a>/<a href="/wiki/Held_item" title="Held item">Held item</a></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td>0x08</td>
+<td><a href="/wiki/List_of_moves#Generation_I" title="List of moves">Index number of move 1</a></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td>0x09</td>
+<td>Index number of move 2</td>
+<td>1 byte
+</td></tr>
+<tr>
+<td>0x0A</td>
+<td>Index number of move 3</td>
+<td>1 byte
+</td></tr>
+<tr>
+<td>0x0B</td>
+<td>Index number of move 4</td>
+<td>1 byte
+</td></tr>
+<tr>
+<td>0x0C</td>
+<td><a href="/wiki/Trainer_ID_number" title="Trainer ID number">Original Trainer ID number</a></td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Experience">0x0E</a></td>
+<td><a href="/wiki/Experience" title="Experience">Experience points</a></td>
+<td>3 bytes
+</td></tr>
+<tr>
+<td><a href="#Stat_experience">0x11</a></td>
+<td><a href="/wiki/HP" title="HP">HP</a> <a href="/wiki/Effort_values" title="Effort values">stat experience data</a></td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Stat_experience">0x13</a></td>
+<td><a href="/wiki/Stat#Attack" title="Stat">Attack</a> stat experience data</td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Stat_experience">0x15</a></td>
+<td><a href="/wiki/Stat#Defense" title="Stat">Defense</a> stat experience data</td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Stat_experience">0x17</a></td>
+<td><a href="/wiki/Stat#Speed" title="Stat">Speed</a> stat experience data</td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Stat_experience">0x19</a></td>
+<td><a href="/wiki/Stat#Special" title="Stat">Special</a> stat experience data</td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td>0x1B</td>
+<td><a href="/wiki/Individual_values" title="Individual values">IV data</a></td>
+<td><span class="explain" title="One nibble (4 bits) for each stat&#39;s IV excluding HP">2 bytes</span>
+</td></tr>
+<tr>
+<td><a href="#PP">0x1D</a></td>
+<td>Move 1's <a href="/wiki/PP" title="PP">PP</a> values</td>
+<td><span class="explain" title="2 bits for applied PP Ups, 6 bits for current PP">1 byte</span>
+</td></tr>
+<tr>
+<td><a href="#PP">0x1E</a></td>
+<td>Move 2's PP values</td>
+<td><span class="explain" title="2 bits for applied PP Ups, 6 bits for current PP">1 byte</span>
+</td></tr>
+<tr>
+<td><a href="#PP">0x1F</a></td>
+<td>Move 3's PP values</td>
+<td><span class="explain" title="2 bits for applied PP Ups, 6 bits for current PP">1 byte</span>
+</td></tr>
+<tr>
+<td><a href="#PP">0x20</a></td>
+<td>Move 4's PP values</td>
+<td><span class="explain" title="2 bits for applied PP Ups, 6 bits for current PP">1 byte</span>
+</td></tr>
+<tr>
+<td>0x21</td>
+<td><a href="/wiki/Level" title="Level">Level</a></td>
+<td>1 byte
+</td></tr>
+<tr>
+<td><a href="#Maximum_HP">0x22</a></td>
+<td>Maximum HP</td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Attack,_Defense,_Speed,_and_Special">0x24</a></td>
+<td><a href="/wiki/Stat#Attack" title="Stat">Attack</a></td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Attack,_Defense,_Speed,_and_Special">0x26</a></td>
+<td><a href="/wiki/Stat#Defense" title="Stat">Defense</a></td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Attack,_Defense,_Speed,_and_Special">0x28</a></td>
+<td><a href="/wiki/Stat#Speed" title="Stat">Speed</a></td>
+<td>2 bytes
+</td></tr>
+<tr>
+<td><a href="#Attack,_Defense,_Speed,_and_Special">0x2A</a></td>
+<td><a href="/wiki/Stat#Special" title="Stat">Special</a></td>
+<td>2 bytes
+</td></tr></tbody></table>
+<p>Notably missing from this structure are the Pokémon's nickname and the original Trainer's name, which are stored elsewhere.
+</p><p>Pokémon stored in Bill's PC use a form of this structure that stops after the PP data for the fourth move, at 0x20.
+</p><p>The Pokémon box data consists only of the currently open Pokémon box, which explains the need for the player to save the game before switching the open box.
+</p><p>In <a href="/wiki/Pok%C3%A9mon_Red_Version" class="mw-redirect" title="Pokémon Red Version">Pokémon Red</a> and <a href="/wiki/Pok%C3%A9mon_Blue_Version" class="mw-redirect" title="Pokémon Blue Version">Pokémon Blue</a> for the US, the current Pokémon box data is stored at 0xDA81 and is 460 bytes long (including OT Names and Nicknames).
+</p><p>In <a href="/wiki/Pok%C3%A9mon_Yellow_Version" title="Pokémon Yellow Version">Pokémon Yellow</a> for the US, this data starts at 0xDA95 and is 660 bytes long (33 bytes each for 20 Pokémon).
+</p>
+<h2><span class="mw-headline" id="Explanation_of_fields">Explanation of fields</span></h2>
+<h3><span class="mw-headline" id="Species">Species</span></h3>
+<p>The <a href="/wiki/List_of_Pok%C3%A9mon_by_index_number_in_Generation_I" title="List of Pokémon by index number in Generation I">index number</a> for the Pokémon's species.
+</p>
+<h3><span class="mw-headline" id="Remaining_HP">Remaining HP</span></h3>
+<p>The number of HP left on the Pokémon. This value should not be greater than the Maximum HP field's value.
+</p>
+<h3><span class="mw-headline" id="Level">Level</span></h3>
+<p>Though it appears to be the level of the Pokémon, it seems effectively redundant: it exists as a Pokémon's level when said Pokémon is stored in a PC box, yet is overwritten as part of the recalculation that takes place when the Pokémon is withdrawn. If the Pokémon is deposited back into a box, this value is set to the Pokémon's level again. This value's purpose is currently unknown.
+</p>
+<h3><span class="mw-headline" id="Status_conditions">Status conditions</span></h3>
+<p>The <a href="/wiki/Status_condition" title="Status condition">status conditions</a> of the Pokémon, as a bit field.
+</p>
+<table style="border: 1px solid #88a; background: #f8f8ff; padding: 0.5em; border-collapse: collapse; margin: 0 0 0.5em 0.5em;" cellspacing="1" cellpadding="2">
+
+<tbody><tr>
+<th style="text-align: center; background: #ccf;"><b>Bit</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Value</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Status condition</b>
+</th></tr>
+<tr>
+<td>3</td>
+<td>0x04</td>
+<td>Asleep
+</td></tr>
+<tr>
+<td>4</td>
+<td>0x08</td>
+<td>Poisoned
+</td></tr>
+<tr>
+<td>5</td>
+<td>0x10</td>
+<td>Burned
+</td></tr>
+<tr>
+<td>6</td>
+<td>0x20</td>
+<td>Frozen
+</td></tr>
+<tr>
+<td>7</td>
+<td>0x40</td>
+<td>Paralyzed
+</td></tr></tbody></table>
+<p>Since being <a href="/wiki/Poison_(status_condition)" title="Poison (status condition)">badly poisoned</a> is a temporary condition in <a href="/wiki/Pok%C3%A9mon_battle" title="Pokémon battle">battles</a>, it is not stored here. Confusion is also not stored here. 0x00 means that the Pokémon is not affected by any major status condition.
+</p>
+<h3><span class="mw-headline" id="Type">Type</span></h3>
+<p>The <a href="/wiki/Type" title="Type">type</a> of the Pokémon. If the Pokémon has only one type, both values are the same. It seems redundant, as there is no way a Pokémon can change type in Generation I besides <a href="/wiki/Evolution" title="Evolution">evolving</a>, and through the use of Conversion. Values between 0x09 and 0x13 inclusive are dummy types named "Normal".
+</p>
+<table style="border: 1px solid #88a; background: #f8f8ff; padding: 0.5em; border-collapse: collapse; margin: 0 0 0.5em 0.5em;" cellspacing="1" cellpadding="2">
+
+<tbody><tr>
+<th style="text-align: center; background: #ccf;"><b>#</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Hex</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Type</b>
+</th></tr>
+<tr>
+<td>00</td>
+<td>0x00</td>
+<td>Normal
+</td></tr>
+<tr>
+<td>01</td>
+<td>0x01</td>
+<td>Fighting
+</td></tr>
+<tr>
+<td>02</td>
+<td>0x02</td>
+<td>Flying
+</td></tr>
+<tr>
+<td>03</td>
+<td>0x03</td>
+<td>Poison
+</td></tr>
+<tr>
+<td>04</td>
+<td>0x04</td>
+<td>Ground
+</td></tr>
+<tr>
+<td>05</td>
+<td>0x05</td>
+<td>Rock
+</td></tr>
+<tr>
+<td>06</td>
+<td>0x06</td>
+<td><a href="/wiki/Bird_(type)" title="Bird (type)">Bird</a> <i>(unused)</i>
+</td></tr>
+<tr>
+<td>07</td>
+<td>0x07</td>
+<td>Bug
+</td></tr>
+<tr>
+<td>08</td>
+<td>0x08</td>
+<td>Ghost
+</td></tr>
+<tr>
+<td>20</td>
+<td>0x14</td>
+<td>Fire
+</td></tr>
+<tr>
+<td>21</td>
+<td>0x15</td>
+<td>Water
+</td></tr>
+<tr>
+<td>22</td>
+<td>0x16</td>
+<td>Grass
+</td></tr>
+<tr>
+<td>23</td>
+<td>0x17</td>
+<td>Electric
+</td></tr>
+<tr>
+<td>24</td>
+<td>0x18</td>
+<td>Psychic
+</td></tr>
+<tr>
+<td>25</td>
+<td>0x19</td>
+<td>Ice
+</td></tr>
+<tr>
+<td>26</td>
+<td>0x1A</td>
+<td>Dragon
+</td></tr></tbody></table>
+<h3><span id="Catch_rate.2FHeld_item"></span><span class="mw-headline" id="Catch_rate/Held_item">Catch rate/Held item</span></h3>
+<p>The <a href="/wiki/Catch_rate" title="Catch rate">catch rate</a> for the species. This is set when the Pokémon is obtained in a Generation I game and does not change when the Pokémon evolves, even if its Evolution has a different catch rate.
+</p><p>When trading with <a href="/wiki/Pok%C3%A9mon_Gold_and_Silver_Versions" title="Pokémon Gold and Silver Versions">Gold, Silver</a>, and <a href="/wiki/Pok%C3%A9mon_Crystal_Version" title="Pokémon Crystal Version">Crystal</a>, this field is co-opted for storing the Pokémon's <a href="/wiki/Held_item" title="Held item">held item</a>. Items are preserved when traded from Generation II to Generation I and back, but some catch rates from Generation I do not have corresponding items in Generation II. In these cases, the value in this field is translated to a different value the first time it is traded to Generation II.
+</p><p>In <a href="/wiki/Pok%C3%A9mon_Yellow_Version" title="Pokémon Yellow Version">Pokémon Yellow</a>, two Pokémon have their held item set to a value other than their catch rate. <a href="/wiki/Pikachu_(Yellow)" title="Pikachu (Yellow)">The partner Pikachu</a>'s held item value is specially set to 163 (as opposed to regular Pikachu's catch rate of 190) when it is obtained, which causes it to hold a <a href="/wiki/Light_Ball" title="Light Ball">Light Ball</a> when traded over. A wild <a href="/wiki/Kadabra_(Pok%C3%A9mon)" title="Kadabra (Pokémon)">Kadabra</a>'s held item value is set to 96 upon capture (as opposed to 100), which gives it a <a href="/wiki/TwistedSpoon" class="mw-redirect" title="TwistedSpoon">TwistedSpoon</a> when traded over.
+</p><p><a href="/wiki/Gift_Pok%C3%A9mon" title="Gift Pokémon">Gift Pokémon</a> from <a href="/wiki/Pok%C3%A9mon_Stadium" title="Pokémon Stadium">Pokémon Stadium</a> also have their held item set to a value other than their catch rate. The Pokémon obtained for clearing the <a href="/wiki/Gym_Leader_Castle" title="Gym Leader Castle">Gym Leader Castle</a> have their held item set to the <a href="/wiki/Normal_Box" title="Normal Box">Normal Box</a> or <a href="/wiki/Gorgeous_Box" title="Gorgeous Box">Gorgeous Box</a>, depending on whether it was cleared as Round 1 or Round 2. The <a href="/wiki/Pok%C3%A9mon_Stadium#Amnesia_Psyduck" title="Pokémon Stadium">Amnesia Psyduck</a> has its held item set to the <a href="/wiki/Gorgeous_Box" title="Gorgeous Box">Gorgeous Box</a>.
+</p><p>The following catch rates correspond with bad items in Generation II (usually <a href="/wiki/Teru-sama" title="Teru-sama">Teru-sama</a>), and are converted into other items upon trading, as follows:
+</p>
+<table style="margin:auto; background: #338DA6; border-radius: 10px; -moz-border-radius: 10px; -webkit-border-radius: 10px; -khtml-border-radius: 10px; -icab-border-radius: 10px; -o-border-radius: 10px;; border: 5px solid #C0C0C0;">
+
+<tbody><tr>
+<td>
+<table border="1" style="background: #fff; border: 1px solid #338DA6; border-collapse:collapse;">
+
+<tbody><tr style="background:#338DA6;">
+<th style="background:#DAA520; border-top-left-radius: 5px; -moz-border-radius-topleft: 5px; -webkit-border-top-left-radius: 5px; -khtml-border-top-left-radius: 5px; -icab-border-top-left-radius: 5px; -o-border-top-left-radius: 5px;;"><span style="color:#8E6B15;">Old #</span>
+</th>
+<th style="background:#DAA520;"><span style="color:#8E6B15;">Old Hex</span>
+</th>
+<th style="background:#DAA520;"><span style="color:#8E6B15;">Old Item</span>
+</th>
+<th style="background:#DAA520;"><span style="color:#8E6B15;">New #</span>
+</th>
+<th style="background:#DAA520;"><span style="color:#8E6B15;">New Hex</span>
+</th>
+<th style="background:#DAA520;"><span style="color:#8E6B15;">New Item</span>
+</th></tr>
+<tr style="text-align: center;">
+<td>025</td>
+<td>0x19</td>
+<td><a href="/wiki/Teru-sama" title="Teru-sama">Teru-sama</a></td>
+<td>146</td>
+<td>0x92</td>
+<td><a href="/wiki/Leftovers" title="Leftovers">Leftovers</a>
+</td></tr>
+<tr style="text-align: center;">
+<td>045</td>
+<td>0x2D</td>
+<td>Teru-sama</td>
+<td>083</td>
+<td>0x53</td>
+<td><a href="/wiki/Bitter_Berry" title="Bitter Berry">Bitter Berry</a>
+</td></tr>
+<tr style="text-align: center;">
+<td>050</td>
+<td>0x32</td>
+<td>Teru-sama</td>
+<td>174</td>
+<td>0xAE</td>
+<td><a href="/wiki/Gold_Berry" title="Gold Berry">Gold Berry</a>
+</td></tr>
+<tr style="text-align: center;">
+<td>090</td>
+<td>0x5A</td>
+<td>Teru-sama</td>
+<td>173</td>
+<td>0xAD</td>
+<td><a href="/wiki/Berry_(item)" title="Berry (item)">Berry</a>
+</td></tr>
+<tr style="text-align: center;">
+<td>100</td>
+<td>0x64</td>
+<td>Teru-sama</td>
+<td>173</td>
+<td>0xAD</td>
+<td>Berry
+</td></tr>
+<tr style="text-align: center;">
+<td>120</td>
+<td>0x78</td>
+<td>Teru-sama</td>
+<td>173</td>
+<td>0xAD</td>
+<td>Berry
+</td></tr>
+<tr style="text-align: center;">
+<td>127</td>
+<td>0x7F</td>
+<td><a href="/wiki/Card_Key_(Kanto)" title="Card Key (Kanto)">Card Key</a></td>
+<td>173</td>
+<td>0xAD</td>
+<td>Berry
+</td></tr>
+<tr style="text-align: center;">
+<td>190</td>
+<td>0xBE</td>
+<td>Teru-sama</td>
+<td>173</td>
+<td>0xAD</td>
+<td>Berry
+</td></tr>
+<tr style="text-align: center;">
+<td>255</td>
+<td>0xFF</td>
+<td><a href="/wiki/Cancel" class="mw-redirect" title="Cancel">Cancel</a></td>
+<td>173</td>
+<td>0xAD</td>
+<td>Berry
+</td></tr></tbody></table>
+</td></tr></tbody></table>
+<p>For example, a wild <a href="/wiki/Snorlax_(Pok%C3%A9mon)" title="Snorlax (Pokémon)">Snorlax</a> caught in Generation I has a catch rate of 25. However, this is a <a href="/wiki/Teru-sama" title="Teru-sama">Teru-sama</a> in Generation II, so the value is automatically converted into 146, <a href="/wiki/Leftovers" title="Leftovers">Leftovers</a>.
+</p><p>A value of <code>0x00</code> in this field represents no held item.
+</p>
+<h3><span class="mw-headline" id="Original_Trainer_ID_number">Original Trainer ID number</span></h3>
+<p>The <a href="/wiki/Trainer_ID_number" title="Trainer ID number">ID number</a> of the <a href="/wiki/Pok%C3%A9mon_Trainer" title="Pokémon Trainer">Trainer</a> who <a href="/wiki/Caught_Pok%C3%A9mon" title="Caught Pokémon">caught</a> the Pokémon.
+</p>
+<h3><span class="mw-headline" id="Experience">Experience</span></h3>
+<p>The number of <a href="/wiki/Experience" title="Experience">Experience</a> points accumulated by the Pokémon. The <a href="/wiki/Level" title="Level">level</a> of the Pokémon should correspond with the value according to the growth formula for the Pokémon species.
+</p>
+<h3><span class="mw-headline" id="Stat_experience">Stat experience</span></h3>
+<dl><dd><i>Main article: <a href="/wiki/Effort_values" title="Effort values">Effort values</a></i></dd></dl>
+<p>The stat experience accumulated by the Pokémon in each of the 5 permanent stats after battling or receiving <a href="/wiki/Vitamin" title="Vitamin">vitamins</a>.
+</p>
+<h3><span class="mw-headline" id="PP">PP</span></h3>
+<dl><dd><i>Main article: <a href="/wiki/PP" title="PP">PP</a></i></dd></dl>
+<p>The PP for each move the Pokémon knows. The lowest 6 bits of each of these values is the current amount of PP for the move, and the highest 2 bits are the number of <a href="/wiki/PP_Up" title="PP Up">PP Ups</a> applied to the move.
+</p><p>This explains the behavior of <a href="/wiki/Hyper_Beam_(move)" title="Hyper Beam (move)">Hyper Beam</a> and other such multi-turn moves when they <a href="/wiki/Glitch" title="Glitch">glitch</a>: the game subtracts 1 from the entire byte, and 0x00 rolls over to 0xFF, which applies 3 PP Ups to the move and makes its current PP 63. However, if one or more PP Ups are already applied to the move, the byte does not roll over in this way, so one PP Up is removed from the move. For example, if the move has 2 PP Ups applied, the byte is 0x80, which becomes 0x7F, which specifies 63 PP and one PP Up.
+</p>
+<h3><span class="mw-headline" id="Maximum_HP">Maximum HP</span></h3>
+<p>The HP that the Pokémon has when at full health.
+</p>
+<h3><span id="Attack.2C_Defense.2C_Speed.2C_and_Special"></span><span class="mw-headline" id="Attack,_Defense,_Speed,_and_Special">Attack, Defense, Speed, and Special</span></h3>
+<p>The values of the Pokémon's Attack, Defense, Speed and Special stats, as they were last calculated from the <a href="/wiki/Base_stats" title="Base stats">base stats</a> of the species, the Pokémon's individual values and its stat experience. This occurs at level-up and when the Pokémon is withdrawn from Bill's PC.
+</p>
+<h2><span class="mw-headline" id="Storage">Storage</span></h2>
+<p>The following are RAM offsets for the beginning of the party structure while walking around:
+</p>
+<ul><li>Red/Blue (en): 0xD163</li>
+<li>Yellow (en): 0xD162</li></ul>
+<h4><span id="6-Pok.C3.A9mon_Party_Structure"></span><span class="mw-headline" id="6-Pokémon_Party_Structure">6-Pokémon Party Structure</span></h4>
+<table style="border: 1px solid #88a; background: #f8f8ff; padding: 1.0em; border-collapse: collapse; margin: 0 0 0.5em 0.5em;" cellspacing="1" cellpadding="3">
+
+<tbody><tr>
+<th style="text-align: center; background: #ccf;"><b>Offset</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Contents</b>
+</th>
+<th style="text-align: center; background: #ccf;"><b>Size</b>
+</th></tr>
+<tr>
+<td>0x00</td>
+<td>Number of Pokémon in party</td>
+<td>1 Byte
+</td></tr>
+<tr>
+<td>0x01</td>
+<td>List of Party Pokémon Species Index values</td>
+<td>7 Bytes
+</td></tr>
+<tr>
+<td>0x08</td>
+<td>1st Pokémon's structure</td>
+<td>44 Bytes
+</td></tr>
+<tr>
+<td>0x34</td>
+<td>2nd Pokémon's structure</td>
+<td>44 Bytes
+</td></tr>
+<tr>
+<td>0x60</td>
+<td>3rd Pokémon's structure</td>
+<td>44 Bytes
+</td></tr>
+<tr>
+<td>0x8C</td>
+<td>4th Pokémon's structure</td>
+<td>44 Bytes
+</td></tr>
+<tr>
+<td>0xB8</td>
+<td>5th Pokémon's structure</td>
+<td>44 Bytes
+</td></tr>
+<tr>
+<td>0xE4</td>
+<td>6th Pokémon's structure</td>
+<td>44 Bytes
+</td></tr>
+<tr>
+<td>0x110</td>
+<td>1st Pokémon's OT name</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x11B</td>
+<td>2nd Pokémon's OT name</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x126</td>
+<td>3rd Pokémon's OT name</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x131</td>
+<td>4th Pokémon's OT name</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x13C</td>
+<td>5th Pokémon's OT name</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x147</td>
+<td>6th Pokémon's OT name</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x152</td>
+<td>1st Pokémon's Nickname</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x15D</td>
+<td>2nd Pokémon's Nickname</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x168</td>
+<td>3rd Pokémon's Nickname</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x173</td>
+<td>4th Pokémon's Nickname</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x17E</td>
+<td>5th Pokémon's Nickname</td>
+<td>10 Bytes
+</td></tr>
+<tr>
+<td>0x189</td>
+<td>6th Pokémon's Nickname</td>
+<td>10 Bytes
+</td></tr></tbody></table>
+<p>Also of note is that the storage of the current Pokémon's information during battle. The internal index of the current Pokémon is stored at 0xCF91, and the current Pokémon's data structure begins at 0xCF98.
+</p>
+<h2><span class="mw-headline" id="Related_articles">Related articles</span></h2>
+<table border="0" cellspacing="0" cellpadding="0" style="margin:auto; background: #dcdce7; border: 1px solid #dcdce7; border-radius: 20px; -moz-border-radius: 20px; -webkit-border-radius: 20px; -khtml-border-radius: 20px; -icab-border-radius: 20px; -o-border-radius: 20px;; margin-top:1em">
+
+<tbody><tr>
+<td style="background: #bebed1; border-radius: 20px; -moz-border-radius: 20px; -webkit-border-radius: 20px; -khtml-border-radius: 20px; -icab-border-radius: 20px; -o-border-radius: 20px; padding: 2px;">
+<table class="toccolours" cellspacing="0" cellpadding="5" style="margin:auto; text-align: center; line-height: 19px; border: 3px solid #88a; border-radius: 20px; -moz-border-radius: 20px; -webkit-border-radius: 20px; -khtml-border-radius: 20px; -icab-border-radius: 20px; -o-border-radius: 20px; padding: 0px;">
+
+<tbody><tr>
+<td>
+<table border="0" cellspacing="0" cellpadding="0" style="background:#f9f9f9;">
+
+<tbody><tr>
+<th colspan="2" style="padding-bottom: 1px; padding-left: 20px; padding-right: 20px;"><div style="background: #ccf; border-top-left-radius: 15px; -moz-border-radius-topleft: 15px; -webkit-border-top-left-radius: 15px; -khtml-border-top-left-radius: 15px; -icab-border-top-left-radius: 15px; -o-border-top-left-radius: 15px; border-top-right-radius: 15px; -moz-border-radius-topright: 15px; -webkit-border-top-right-radius: 15px; -khtml-border-top-right-radius: 15px; -icab-border-top-right-radius: 15px; -o-border-top-right-radius: 15px; padding: 2px 15px;">Data structure in the <a href="/wiki/Pok%C3%A9mon_games" title="Pokémon games"><span style="color:#000;">Pokémon games</span></a></div>
+</th></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px; border-top-left-radius: 10px; -moz-border-radius-topleft: 10px; -webkit-border-top-left-radius: 10px; -khtml-border-top-left-radius: 10px; -icab-border-top-left-radius: 10px; -o-border-top-left-radius: 10px;">General
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px; border-top-right-radius: 10px; -moz-border-radius-topright: 10px; -webkit-border-top-right-radius: 10px; -khtml-border-top-right-radius: 10px; -icab-border-top-right-radius: 10px; -o-border-top-right-radius: 10px;"><a href="/wiki/Character_encoding" title="Character encoding">Character encoding</a>
+</td></tr>
+<tr style="font-size: 90%;">
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px"><a href="/wiki/Generation_I" title="Generation I">Generation I</a>
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px"><a href="/wiki/Pok%C3%A9mon_species_data_structure_(Generation_I)" title="Pokémon species data structure (Generation I)">Pokémon species</a> • <a class="mw-selflink selflink">Pokémon</a> • <a href="/wiki/Pok%C3%A9_Mart_data_structure_(Generation_I)" title="Poké Mart data structure (Generation I)">Poké Mart</a> • <a href="/wiki/Character_encoding_(Generation_I)" title="Character encoding (Generation I)">Character encoding</a> (<a href="/wiki/Character_encoding_(Stadium)" title="Character encoding (Stadium)">Stadium</a>) • <a href="/wiki/Save_data_structure_(Generation_I)" title="Save data structure (Generation I)">Save</a>
+</td></tr>
+<tr style="font-size: 90%;">
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px;"><a href="/wiki/Generation_II" title="Generation II">Generation II</a>
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px;"><a href="/wiki/Pok%C3%A9mon_species_data_structure_(Generation_II)" title="Pokémon species data structure (Generation II)">Pokémon species</a> • <a href="/wiki/Pok%C3%A9mon_data_structure_(Generation_II)" title="Pokémon data structure (Generation II)">Pokémon</a> • <a href="/wiki/Trainer_data_structure_(Generation_II)" title="Trainer data structure (Generation II)">Trainer</a> • <a href="/wiki/Character_encoding_(Generation_II)" title="Character encoding (Generation II)">Character encoding</a> (<a href="/wiki/Character_encoding_(Stadium)" title="Character encoding (Stadium)">Stadium</a> • <a href="/wiki/Korean_character_encoding_(Generation_II)" title="Korean character encoding (Generation II)">Korean</a>) • <a href="/wiki/Save_data_structure_(Generation_II)" title="Save data structure (Generation II)">Save</a>
+</td></tr>
+<tr>
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px;"><a href="/wiki/Generation_III" title="Generation III">Generation III</a>
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px;"><a href="/wiki/Pok%C3%A9mon_species_data_structure_(Generation_III)" title="Pokémon species data structure (Generation III)">Pokémon species</a> (<a href="/wiki/Pok%C3%A9mon_Evolution_data_structure_(Generation_III)" title="Pokémon Evolution data structure (Generation III)">Evolution</a> • <a href="/wiki/Pok%C3%A9dex_data_structure_(Generation_III)" title="Pokédex data structure (Generation III)">Pokédex</a> • <a href="/wiki/Type_chart_data_structure_(Generation_III)" title="Type chart data structure (Generation III)">Type chart</a>)<br /><a href="/wiki/Pok%C3%A9mon_data_structure_(Generation_III)" title="Pokémon data structure (Generation III)">Pokémon</a> (<a href="/wiki/Pok%C3%A9mon_data_substructures_(Generation_III)" title="Pokémon data substructures (Generation III)">substructures</a>) • <a href="/wiki/Move_data_structure_(Generation_III)" title="Move data structure (Generation III)">Move</a> • <a href="/wiki/Contest_data_structure_(Generation_III)" title="Contest data structure (Generation III)">Contest</a> • <a href="/wiki/Contest_move_data_structure_(Generation_III)" title="Contest move data structure (Generation III)">Contest move</a> • <a href="/wiki/Item_data_structure_(Generation_III)" title="Item data structure (Generation III)">Item</a><br /><a href="/wiki/Trainer_Tower_data_structures_(Generation_III)" title="Trainer Tower data structures (Generation III)">Trainer Tower</a> • <a href="/wiki/Battle_Frontier_data_structures_(Generation_III)" title="Battle Frontier data structures (Generation III)">Battle Frontier</a> • <a href="/wiki/Character_encoding_(Generation_III)" title="Character encoding (Generation III)">Character encoding</a> (<a href="/wiki/GameCube_character_encoding_(Generation_III)" title="GameCube character encoding (Generation III)">GameCube</a>) • <a href="/wiki/Save_data_structure_(Generation_III)" title="Save data structure (Generation III)">Save</a>
+</td></tr>
+<tr>
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px;"><a href="/wiki/Generation_IV" title="Generation IV">Generation IV</a>
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px;"><a href="/wiki/Pok%C3%A9mon_species_data_structure_(Generation_IV)" title="Pokémon species data structure (Generation IV)">Pokémon species</a> (<a href="/wiki/Pok%C3%A9mon_Evolution_data_structure_(Generation_IV)" title="Pokémon Evolution data structure (Generation IV)">Evolution</a> • <a href="/wiki/Pok%C3%A9mon_level_up_learnset_data_structure_(Generation_IV)" title="Pokémon level up learnset data structure (Generation IV)">Learnsets</a>)<br /><a href="/wiki/Pok%C3%A9mon_data_structure_(Generation_IV)" title="Pokémon data structure (Generation IV)">Pokémon</a> • <a href="/wiki/Save_data_structure_(Generation_IV)" title="Save data structure (Generation IV)">Save</a> • <a href="/wiki/Character_encoding_(Generation_IV)" title="Character encoding (Generation IV)">Character encoding</a> (<a href="/wiki/Wii_character_encoding_(Generation_IV)" title="Wii character encoding (Generation IV)">Wii</a>)
+</td></tr>
+<tr>
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px;"><a href="/wiki/Generation_V" title="Generation V">Generation V</a>–present
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px;"><a href="/wiki/Character_encoding_(Generation_V%E2%80%93present)" title="Character encoding (Generation V–present)">Character encoding</a>
+</td></tr>
+<tr>
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; padding: 2px 15px;"><a href="/wiki/Generation_VIII" title="Generation VIII">Generation VIII</a>
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px;"><a href="/wiki/Save_data_structure_(Generation_VIII)" title="Save data structure (Generation VIII)">Save</a>
+</td></tr>
+<tr>
+<td colspan="2" height="1">
+</td></tr>
+<tr style="font-size: 90%;">
+<th style="background: #ddf; border-bottom-left-radius: 10px; -moz-border-radius-bottomleft: 10px; -webkit-border-bottom-left-radius: 10px; -khtml-border-bottom-left-radius: 10px; -icab-border-bottom-left-radius: 10px; -o-border-bottom-left-radius: 10px; padding: 2px 15px;"><a href="/wiki/Pok%C3%A9mon_Trading_Card_Game_(video_game)" title="Pokémon Trading Card Game (video game)">TCG GB</a> and <a href="/wiki/Pok%C3%A9mon_Trading_Card_Game_2:_The_Invasion_of_Team_GR!" title="Pokémon Trading Card Game 2: The Invasion of Team GR!">GB2</a>
+</th>
+<td style="text-align: left; background: #e6e6ff; padding: 2px 10px; border-bottom-right-radius: 10px; -moz-border-radius-bottomright: 10px; -webkit-border-bottom-right-radius: 10px; -khtml-border-bottom-right-radius: 10px; -icab-border-bottom-right-radius: 10px; -o-border-bottom-right-radius: 10px;"><a href="/wiki/Character_encoding_(TCG_GB)" title="Character encoding (TCG GB)">Character encoding</a>
+</td></tr></tbody></table>
+</td></tr></tbody></table>
+</td></tr></tbody></table>
+<table align="center" style="background: #FAFFF4; border: 2px solid #8888AA; width: 100%; margin-top:1em; border-radius: 80px; -moz-border-radius: 80px; -webkit-border-radius: 80px; -khtml-border-radius: 80px; -icab-border-radius: 80px; -o-border-radius: 80px;">
+
+<tbody><tr>
+<td width="60px" style="border-radius: 80px; -moz-border-radius: 80px; -webkit-border-radius: 80px; -khtml-border-radius: 80px; -icab-border-radius: 80px; -o-border-radius: 80px; background: #FFFFFF;"><span typeof="mw:File"><a href="/wiki/File:Project_Games_logo.png" class="mw-file-description"><img src="https://archives.bulbagarden.net/media/upload/thumb/5/56/Project_Games_logo.png/80px-Project_Games_logo.png" decoding="async" loading="lazy" width="80" height="80" class="mw-file-element" srcset="https://archives.bulbagarden.net/media/upload/thumb/5/56/Project_Games_logo.png/120px-Project_Games_logo.png 1.5x, https://archives.bulbagarden.net/media/upload/thumb/5/56/Project_Games_logo.png/160px-Project_Games_logo.png 2x" data-file-width="400" data-file-height="400" /></a></span>
+</td>
+<td>This data structure article is part of <b><a href="/wiki/Bulbapedia:Project_Games" title="Bulbapedia:Project Games">Project Games</a></b>, a <a href="/wiki/Bulbapedia:Projects" title="Bulbapedia:Projects">Bulbapedia project</a> that aims to write comprehensive articles on the <a href="/wiki/Pok%C3%A9mon_games" title="Pokémon games">Pokémon games</a>.
+</td></tr></tbody></table>
+<!-- 
+NewPP limit report
+Cached time: 20251114175606
+Cache expiry: 86400
+Reduced expiry: false
+Complications: [show‐toc]
+CPU time usage: 0.076 seconds
+Real time usage: 0.112 seconds
+Preprocessor visited node count: 1012/1000000
+Post‐expand include size: 13721/2097152 bytes
+Template argument size: 2570/2097152 bytes
+Highest expansion depth: 5/100
+Expensive parser function count: 0/250
+Unstrip recursion depth: 0/20
+Unstrip post‐expand size: 0/5000000 bytes
+-->
+<!--
+Transclusion expansion time report (%,ms,calls,template)
+100.00%   59.811      1 -total
+ 31.40%   18.778      1 Template:Data_structure
+  5.82%    3.479      6 Template:Color
+  5.62%    3.361      1 Template:Project_Games_notice
+  4.86%    2.907     35 Template:Gdis
+  3.78%    2.259     12 Template:Stat
+  3.53%    2.112      1 Template:Status
+  3.20%    1.914      4 Template:Game
+  3.08%    1.844      1 Template:TCG_GB
+  3.03%    1.814      6 Template:Roundy
+-->
+
+<!-- Saved in parser cache with key themozz_mediawiki:pcache:idhash:2838-0!canonical and timestamp 20251114175606 and revision id 4320889. Rendering was triggered because: page-view
+ -->
+</div><!---------------------------------------------------------------->
+<!-------- Custom Adthrive Code : BEFORE Adthrive Main ----------->
+<!---------------------------------------------------------------->
+<script>
+// Initialize elements
+appendElementIf({id: "adthrive-left-s", wAbove: 1520, wBelow: 1699, hAbove: 700});
+appendElementIf({id: "adthrive-left-m", wAbove: 1700, wBelow: 1890, hAbove: 700});
+appendElementIf({id: "adthrive-left-l", wAbove: 1891, hAbove: 700});
+
+appendElementIf({id: "adthrive-right-s", wAbove: 945, wBelow: 1099, hAbove: 964});
+appendElementIf({id: "adthrive-right-m", wAbove: 1100, wBelow: 1399, hAbove: 964});
+appendElementIf({id: "adthrive-right-l", wAbove: 1400, hAbove: 964});
+appendElementIf({id: "adthrive-right-rect", hBelow: 964});
+
+
+// Appends element if condition is met
+function appendElementIf({id, wAbove, wBelow, hAbove, hBelow}) {
+
+	// find browser height
+	var w = window.innerWidth;
+	var h = window.innerHeight;
+
+	// If true after browser size check then unit is added
+	var condition = true;
+
+	// Check size conditions
+	if (wBelow && (w > wBelow)) condition = false;
+	if (wAbove && (w < wAbove)) condition = false;
+
+	if (hBelow && (h > hBelow)) condition = false;
+	if (hAbove && (h < hAbove)) condition = false;
+
+	// Append element if condition is met
+	if (condition) {
+		createAndAppendElement(id);
+	}
+}
+
+
+// creates and appends a div element to the body
+function createAndAppendElement(id)
+{
+	var atEl = document.createElement('div');
+	atEl.id = id;
+	document.body.appendChild(atEl);
+}
+</script>
+<!---------------->
+<!-- Script End -->
+<!---------------->        <style>
+        /*This styles are to place the close button right above the video without this the close button will be placed below the video.*/
+        #pw-close-btn {
+            display: none !important;
+        }
+        #span_btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            cursor: pointer;
+        }
+        @media only screen and (max-width: 767px) {
+            #span_btn {
+                top: 9px;
+                right: 11px;
+            }
+        }
+        .is-docked {
+           margin-bottom:90px !important;
+        }
+        </style><!--------------------------------------------->
+<!-- Adthrive Ad Block Recovery : END OF BODY -->
+<!--------------------------------------------->
+
+<script>!function(){"use strict";!function(e){if(-1===e.cookie.indexOf("__adblocker")){e.cookie="__adblocker=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";var t=new XMLHttpRequest;t.open("GET","https://ads.adthrive.com/abd/abd.js",!0),t.onreadystatechange=function(){if(XMLHttpRequest.DONE===t.readyState)if(200===t.status){var a=e.createElement("script");a.innerHTML=t.responseText,e.getElementsByTagName("head")[0].appendChild(a)}else{var n=new Date;n.setTime(n.getTime()+3e5),e.cookie="__adblocker=true; expires="+n.toUTCString()+"; path=/"}},t.send()}}(document)}();</script>
+
+<script>!function(){"use strict";var e;e=document,function(){var t,n;function r(){var t=e.createElement("script");t.src="https://cafemedia-com.videoplayerhub.com/galleryplayer.js",e.head.appendChild(t)}function a(){var t=e.cookie.match("(^|[^;]+)\s*__adblocker\s*=\s*([^;]+)");return t&&t.pop()}function c(){clearInterval(n)}return{init:function(){var e;"true"===(t=a())?r():(e=0,n=setInterval((function(){100!==e&&"false"!==t||c(),"true"===t&&(r(),c()),t=a(),e++}),50))}}}().init()}();
+</script>
+
+<!---------------->
+<!-- Script End -->
+<!---------------->
+<div class="printfooter" data-nosnippet="">Retrieved from "<a dir="ltr" href="https://bulbapedia.bulbagarden.net/w/index.php?title=Pokémon_data_structure_(Generation_I)&amp;oldid=4320889">https://bulbapedia.bulbagarden.net/w/index.php?title=Pokémon_data_structure_(Generation_I)&amp;oldid=4320889</a>"</div></div>
+				<div id="catlinks" class="catlinks" data-mw="interface"><div id="mw-normal-catlinks" class="mw-normal-catlinks"><a href="/wiki/Special:Categories" title="Special:Categories">Categories</a>: <ul><li><a href="/wiki/Category:Structures" title="Category:Structures">Structures</a></li><li><a href="/wiki/Category:Game_mechanics" title="Category:Game mechanics">Game mechanics</a></li></ul></div></div>
+				<!-- end content -->
+				<div class="visualClear"></div>
+			</div>
+		</div>
+		<div class="visualClear"></div>
+	</div>
+	<div id="column-one" >
+		<h2>Navigation menu</h2>
+		<div role="navigation" class="portlet" id="p-cactions" aria-labelledby="p-cactions-label">
+			<h3 id="p-cactions-label" >Page actions</h3>
+			<div class="pBody">
+				<ul >
+				<li id="ca-nstab-main" class="selected mw-list-item"><a href="/wiki/Pok%C3%A9mon_data_structure_(Generation_I)" title="View the content page [c]" accesskey="c">Article</a></li><li id="ca-talk" class="mw-list-item"><a href="/wiki/Talk:Pok%C3%A9mon_data_structure_(Generation_I)" rel="discussion" title="Discussion about the content page [t]" accesskey="t">Discussion</a></li><li id="ca-view" class="selected mw-list-item"><a href="/wiki/Pok%C3%A9mon_data_structure_(Generation_I)">Read</a></li><li id="ca-viewsource" class="mw-list-item"><a href="/w/index.php?title=Pok%C3%A9mon_data_structure_(Generation_I)&amp;action=edit" title="This page is protected.&#10;You can view its source [e]" accesskey="e">View source</a></li><li id="ca-history" class="mw-list-item"><a href="/w/index.php?title=Pok%C3%A9mon_data_structure_(Generation_I)&amp;action=history" title="Past revisions of this page [h]" accesskey="h">History</a></li>
+				
+				</ul>
+			</div>
+		</div>
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-cactions-mobile"
+	id="p-cactions-mobile" aria-labelledby="p-cactions-mobile-label">
+	<h3 id="p-cactions-mobile-label" >Page actions</h3>
+	<div class="pBody">
+		<ul ><li id="main-mobile" class="selected mw-list-item"><a href="/wiki/Pok%C3%A9mon_data_structure_(Generation_I)" title="Article">Article</a></li><li id="talk-mobile" class="mw-list-item"><a href="/wiki/Talk:Pok%C3%A9mon_data_structure_(Generation_I)" title="Discussion">Discussion</a></li><li id="ca-more" class="mw-list-item"><a href="#p-cactions">More</a></li><li id="ca-tools" class="mw-list-item"><a href="#p-tb" title="Tools">Tools</a></li></ul>
+		
+	</div>
+</div>
+
+		<div role="navigation" class="portlet" id="p-personal" aria-labelledby="p-personal-label">
+			<h3 id="p-personal-label" >Personal tools</h3>
+			<div class="pBody">
+				<ul >
+				<li id="pt-createaccount" class="mw-list-item"><a href="/w/index.php?title=Special:CreateAccount&amp;returnto=Pok%C3%A9mon+data+structure+%28Generation+I%29" title="You are encouraged to create an account and log in; however, it is not mandatory">Create account</a></li><li id="pt-login" class="mw-list-item"><a href="/w/index.php?title=Special:UserLogin&amp;returnto=Pok%C3%A9mon+data+structure+%28Generation+I%29" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in</a></li>
+				</ul>
+			</div>
+		</div>
+		<div class="portlet" id="p-logo" role="banner">
+			<a href="/wiki/Main_Page" class="mw-wiki-logo"></a>
+		</div>
+		<div id="sidebar">
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-navigation"
+	id="p-navigation" aria-labelledby="p-navigation-label">
+	<h3 id="p-navigation-label" >Navigation</h3>
+	<div class="pBody">
+		<ul ><li id="n-mainpage" class="mw-list-item"><a href="/wiki/Main_Page" title="Visit Bulbapedia&#039;s Main Page [z]" accesskey="z">Main Page</a></li><li id="n-Editor&#039;s-Hub" class="mw-list-item"><a href="/wiki/Bulbapedia:Editor%27s_Hub">Editor&#039;s Hub</a></li><li id="n-help" class="mw-list-item"><a href="https://bulbapedia.bulbagarden.net/wiki/Help:Contents" rel="nofollow" title="General editing help">Help</a></li><li id="n-faq" class="mw-list-item"><a href="/wiki/Bulbapedia:FAQ">Frequently asked questions</a></li><li id="n-portal" class="mw-list-item"><a href="https://bulbagarden.net/forums/bulbawiki-forum.195/" rel="nofollow" title="Discussion forum for the Bulbawiki network">Bulbawiki forum</a></li><li id="n-recentchanges" class="mw-list-item"><a href="/wiki/Special:RecentChanges" title="View recent changes to Bulbapedia. [r]" accesskey="r">Recent changes</a></li><li id="n-randompage" class="mw-list-item"><a href="/wiki/Special:Random" title="Load a random page [x]" accesskey="x">Random page</a></li></ul>
+		
+	</div>
+</div>
+
+		<div role="search" class="portlet" id="p-search">
+			<h3 id="p-search-label" ><label for="searchInput">Search</label></h3>
+			<div class="pBody" id="searchBody">
+				<form action="/w/index.php" id="searchform"><input type="hidden" value="Special:Search" name="title"><input type="search" name="search" placeholder="Search Bulbapedia" aria-label="Search Bulbapedia" autocapitalize="sentences" title="Search Bulbapedia [f]" accesskey="f" id="searchInput"><input type="submit" name="go" value="Go" title="Go to a page with this exact name if it exists" class="searchButton" id="searchButton"> <input type="submit" name="fulltext" value="Search" title="Search the pages for this text" class="searchButton mw-fallbackSearchButton" id="mw-searchButton"></form>
+			</div>
+		</div>
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-Bulbagarden"
+	id="p-Bulbagarden" aria-labelledby="p-Bulbagarden-label">
+	<h3 id="p-Bulbagarden-label" >Bulbagarden</h3>
+	<div class="pBody">
+		<ul ><li id="n-gateway" class="mw-list-item"><a href="https://www.bulbagarden.net" rel="nofollow">Bulbagarden home page</a></li><li id="n-archive" class="mw-list-item"><a href="https://archives.bulbagarden.net/wiki/Main_Page" title="Depository for media used by Bulbagarden&#039;s wikis">Bulbagarden Archives</a></li><li id="n-Bulbagarden-Forums" class="mw-list-item"><a href="https://bulbagarden.net/forums/" rel="nofollow">Bulbagarden Forums</a></li><li id="n-Bulbagarden-Discord" class="mw-list-item"><a href="https://discord.gg/bulbagarden" rel="nofollow">Bulbagarden Discord</a></li><li id="n-Bulbagarden-Twitch" class="mw-list-item"><a href="https://www.twitch.tv/bulbagarden" rel="nofollow">Bulbagarden Twitch</a></li><li id="n-Bulbagarden-YouTube" class="mw-list-item"><a href="https://www.youtube.com/user/Bulbagarden" rel="nofollow">Bulbagarden YouTube</a></li></ul>
+		
+	</div>
+</div>
+
+<div role="navigation" class="portlet mw-portlet mw-portlet-Social_media"
+	id="p-Social_media" aria-labelledby="p-Social_media-label">
+	<h3 id="p-Social_media-label" >Social media</h3>
+	<div class="pBody">
+		<ul ><li id="n-Bluesky" class="mw-list-item"><a href="https://bsky.app/profile/bulbagarden.net" rel="nofollow">Bluesky</a></li><li id="n-Facebook" class="mw-list-item"><a href="https://www.facebook.com/Bulbagarden" rel="nofollow">Facebook</a></li><li id="n-Mastodon" class="mw-list-item"><a href="https://mastodon.social/@bulbagarden" rel="nofollow">Mastodon</a></li><li id="n-Twitter" class="mw-list-item"><a href="https://twitter.com/Bulbagarden" rel="nofollow">Twitter</a></li><li id="n-Tumblr" class="mw-list-item"><a href="https://bulbagarden.tumblr.com/" rel="nofollow">Tumblr</a></li></ul>
+		
+	</div>
+</div>
+
+<div role="navigation" class="portlet mw-portlet mw-portlet-tb"
+	id="p-tb" aria-labelledby="p-tb-label">
+	<h3 id="p-tb-label" >Tools</h3>
+	<div class="pBody">
+		<ul ><li id="t-whatlinkshere" class="mw-list-item"><a href="/wiki/Special:WhatLinksHere/Pok%C3%A9mon_data_structure_(Generation_I)" title="A list of all wiki pages that link here [j]" accesskey="j">What links here</a></li><li id="t-recentchangeslinked" class="mw-list-item"><a href="/wiki/Special:RecentChangesLinked/Pok%C3%A9mon_data_structure_(Generation_I)" rel="nofollow" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li><li id="t-upload" class="mw-list-item"><a href="https://archives.bulbagarden.net/wiki/Special:Upload" title="Upload files [u]" accesskey="u">Upload file</a></li><li id="t-specialpages" class="mw-list-item"><a href="/wiki/Special:SpecialPages" title="A list of all special pages [q]" accesskey="q">Special pages</a></li><li id="t-print" class="mw-list-item"><a href="javascript:print();" rel="alternate" title="Printable version of this page [p]" accesskey="p">Printable version</a></li><li id="t-permalink" class="mw-list-item"><a href="/w/index.php?title=Pok%C3%A9mon_data_structure_(Generation_I)&amp;oldid=4320889" title="Permanent link to this revision of this page">Permanent link</a></li><li id="t-info" class="mw-list-item"><a href="/w/index.php?title=Pok%C3%A9mon_data_structure_(Generation_I)&amp;action=info" title="More information about this page">Page information</a></li><li id="t-cite" class="mw-list-item"><a href="/w/index.php?title=Special:CiteThisPage&amp;page=Pok%C3%A9mon_data_structure_%28Generation_I%29&amp;id=4320889&amp;wpFormIdentifier=titleform" title="Information on how to cite this page">Cite this page</a></li></ul>
+		
+	</div>
+</div>
+
+		
+		</div>
+		<a href="#sidebar" title="Jump to navigation"
+			class="menu-toggle" id="sidebar-toggle"></a>
+		<a href="#p-personal" title="user tools"
+			class="menu-toggle" id="p-personal-toggle"></a>
+		<a href="#globalWrapper" title="back to top"
+			class="menu-toggle" id="globalWrapper-toggle"></a>
+	</div>
+	<!-- end of the left (by default at least) column -->
+	<div class="visualClear"></div>
+	<div id="footer" class="mw-footer" role="contentinfo"
+		>
+		<div id="f-copyrightico" class="footer-icons">
+			<a href="https://creativecommons.org/licenses/by-nc-sa/2.5/" class="cdx-button cdx-button--fake-button cdx-button--size-large cdx-button--fake-button--enabled"><img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/png/by-nc-sa.png" alt="https://creativecommons.org/licenses/by-nc-sa/2.5/" width="88" height="31" loading="lazy"></a>
+		</div>
+		<div id="f-poweredbyico" class="footer-icons">
+			<a href="https://www.mediawiki.org/" class="cdx-button cdx-button--fake-button cdx-button--size-large cdx-button--fake-button--enabled"><img src="/w/resources/assets/poweredby_mediawiki.svg" alt="Powered by MediaWiki" width="88" height="31" loading="lazy"></a>
+		</div>
+		<ul id="f-list">
+			<li id="lastmod"> This page was last edited on 17 June 2025, at 22:21.</li><li id="copyright">Content is available under <a class="external" rel="nofollow" href="http://creativecommons.org/licenses/by-nc-sa/2.5/">Attribution-NonCommercial-ShareAlike 2.5</a>. (see <a class='internal' href="/wiki/Bulbapedia:Copyrights">Copyrights</a> for details)</li>
+			<li id="privacy"><a href="/wiki/Bulbapedia:Privacy_policy">Privacy policy</a></li><li id="about"><a href="/wiki/Bulbapedia:About">About Bulbapedia</a></li><li id="disclaimers"><a href="/wiki/Bulbapedia:General_disclaimer">Disclaimers</a></li><li id="mobileview"><a href="https://bulbapedia.bulbagarden.net/w/index.php?title=Pok%C3%A9mon_data_structure_(Generation_I)&amp;mobileaction=toggle_view_mobile" class="noprint stopMobileRedirectToggle">Mobile view</a></li>
+		</ul>
+	</div>
+</div>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.config.set({"wgBackendResponseTime":218,"wgPageParseReport":{"limitreport":{"cputime":"0.076","walltime":"0.112","ppvisitednodes":{"value":1012,"limit":1000000},"postexpandincludesize":{"value":13721,"limit":2097152},"templateargumentsize":{"value":2570,"limit":2097152},"expansiondepth":{"value":5,"limit":100},"expensivefunctioncount":{"value":0,"limit":250},"unstrip-depth":{"value":0,"limit":20},"unstrip-size":{"value":0,"limit":5000000},"timingprofile":["100.00%   59.811      1 -total"," 31.40%   18.778      1 Template:Data_structure","  5.82%    3.479      6 Template:Color","  5.62%    3.361      1 Template:Project_Games_notice","  4.86%    2.907     35 Template:Gdis","  3.78%    2.259     12 Template:Stat","  3.53%    2.112      1 Template:Status","  3.20%    1.914      4 Template:Game","  3.08%    1.844      1 Template:TCG_GB","  3.03%    1.814      6 Template:Roundy"]},"cachereport":{"timestamp":"20251114175606","ttl":86400,"transientcontent":false}}});});</script>
+</body>
+</html>
