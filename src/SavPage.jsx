@@ -59,6 +59,7 @@ const LEGACY_CSV_FILENAME = "data/pokemon_yellow_legacy_list.csv";
 const DEFAULT_METHOD_LABEL = "Grass";
 const PARTY_DATA_OFFSETS = [0x2F2C, BANK1_START + 0x2F2C];
 const PARTY_MAX_SIZE = 6;
+const LOCATION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 let legacyEncounterCache = null;
 let legacyEncounterPromise = null;
@@ -809,6 +810,9 @@ export default function SavPage() {
   const [legacyEncounters, setLegacyEncounters] = useState(null);
   const [legacyEncountersReady, setLegacyEncountersReady] = useState(false);
   const [legacyEncounterError, setLegacyEncounterError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [showCaught, setShowCaught] = useState(true);
 
   useEffect(() => {
     try {
@@ -904,10 +908,8 @@ export default function SavPage() {
   const partySlots = useMemo(() => {
     return Array.from({ length: PARTY_MAX_SIZE }, (_, index) => partyMembers[index] || null);
   }, [partyMembers]);
+  const caughtCount = caughtSet.size;
   const combinedResults = useMemo(() => {
-    if (!hasSaveData) {
-      return [];
-    }
     return GEN1_POKEMON_NAMES.map((name, index) => {
       const pokemonId = index + 1;
       const slug = normalizeLegacyPokemonName(name);
@@ -921,7 +923,35 @@ export default function SavPage() {
         evolutionRequirement: EVOLUTION_REQUIREMENTS.get(slug) || null,
       };
     });
-  }, [caughtSet, hasSaveData, legacyMapReady, legacyEncounters]);
+  }, [caughtSet, legacyMapReady, legacyEncounters]);
+
+  const locationOptions = useMemo(() => {
+    const names = new Set();
+    if (legacyEncounters instanceof Map) {
+      for (const entries of legacyEncounters.values()) {
+        for (const entry of entries) {
+          if (entry?.location) {
+            names.add(entry.location);
+          }
+        }
+      }
+    }
+    return Array.from(names).sort((a, b) => LOCATION_COLLATOR.compare(a, b));
+  }, [legacyEncounters]);
+
+  const filteredResults = useMemo(() => {
+    const search = String(searchTerm || "").trim().toLowerCase();
+    const locationValue = String(locationFilter || "").trim();
+    return combinedResults.filter((entry) => {
+      if (locationValue) {
+        const matchesLocation = entry.visibleEntries.some((loc) => loc.location === locationValue);
+        if (!matchesLocation) return false;
+      }
+      if (!showCaught && entry.caught) return false;
+      if (!search) return true;
+      return entry.name.toLowerCase().includes(search);
+    });
+  }, [combinedResults, locationFilter, searchTerm, showCaught]);
 
   const locationPokemonLookup = useMemo(() => {
     if (!legacyMapReady || !(legacyEncounters instanceof Map)) {
@@ -1203,23 +1233,62 @@ export default function SavPage() {
           </section>
         )}
 
-        {hasSaveData && (
-          <section className="sav-card sav-results-card">
-            <div className="sav-card__header">
-              <h2 className="sav-card__title">
-                Caught Pokemon ({caughtPokemon.length} / {GEN1_POKEMON_COUNT})
-              </h2>
-              <p className="sav-card__description">
-                Review every Pokédex entry and compare your caught status with their encounter locations.
-              </p>
+        <section className="sav-card sav-results-card">
+          <div className="sav-card__header">
+            <h2 className="sav-card__title">
+              Caught Pokemon ({caughtCount} / {GEN1_POKEMON_COUNT})
+            </h2>
+            <p className="sav-card__description">
+              Review every Pokédex entry and compare your caught status with their encounter locations.
+            </p>
+            {!hasSaveData && (
+              <div className="sav-card__hint">
+                All entries default to “Missing” until you upload a save file, but locations remain available.
+              </div>
+            )}
+            <div className="sav-results-controls">
+              <label className="sav-results-controls__item">
+                <span className="sav-results-controls__label">Search Pokémon</span>
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Filter by name"
+                />
+              </label>
+              <label className="sav-results-controls__item">
+                <span className="sav-results-controls__label">Location</span>
+                <select
+                  value={locationFilter}
+                  onChange={(event) => setLocationFilter(event.target.value)}
+                >
+                  <option value="">All locations</option>
+                  {locationOptions.map((location) => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="sav-results-controls__item sav-results-controls__item--button">
+                <button
+                  type="button"
+                  className={`sav-results-controls__toggle ${showCaught ? "is-active" : ""}`}
+                  onClick={() => setShowCaught((prev) => !prev)}
+                >
+                  {showCaught ? "Hide caught" : "Show caught"}
+                </button>
+              </div>
             </div>
+          </div>
             <div className="sav-card__body">
               {legacyEncounterError && (
                 <div className="sav-alert sav-alert--error">{legacyEncounterError}</div>
               )}
               <div className="sav-results-list">
-                {combinedResults.map((entry) => {
-                  const pokemonName = toTitleCase(entry.name);
+                {filteredResults.length > 0 ? (
+                  filteredResults.map((entry) => {
+                    const pokemonName = toTitleCase(entry.name);
                   const cardClassNames = [
                     "sav-result-row",
                     entry.caught ? "is-caught" : "is-uncaught",
@@ -1383,11 +1452,14 @@ export default function SavPage() {
                       </div>
                     </div>
                   );
-                })}
+                }) ) : (
+                  <div className="sav-location-empty">
+                    No Pokémon match the current search or location filter.
+                  </div>
+                )}
               </div>
             </div>
           </section>
-        )}
       </main>
     </div>
   );
