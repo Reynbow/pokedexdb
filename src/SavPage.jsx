@@ -2,6 +2,9 @@ import React, { useState, useCallback, useEffect, useMemo } from "react";
 import "./App.css";
 import SpriteImage from "./components/SpriteImage.jsx";
 import CategoryToggle from "./CategoryToggle.jsx";
+import { getTypeIconUrl } from "./utils/typeIcons.js";
+import gen1TypeMapData from "./data/gen1-types.json";
+import gen1TypeChartData from "./data/gen1-type-chart.json";
 
 // Generation 1 Pokemon names (Pokemon Yellow has 151 Pokemon)
 const GEN1_POKEMON_NAMES = [
@@ -172,6 +175,85 @@ function toTitleCase(str) {
 const SLUG_TO_TITLE_NAME = new Map(
   GEN1_POKEMON_NAMES.map((name) => [normalizeLegacyPokemonName(name), toTitleCase(name)])
 );
+
+const GEN1_POKEMON_TYPE_MAP = new Map(
+  Object.entries(gen1TypeMapData || {}).map(([slug, types]) => [
+    slug,
+    Array.isArray(types) ? types.map((type) => String(type || "").toLowerCase()) : [],
+  ])
+);
+
+const GEN1_TYPE_CHART = new Map(
+  Object.entries(gen1TypeChartData || {}).map(([defensiveType, attackMap]) => [
+    defensiveType,
+    Object.fromEntries(
+      Object.entries(attackMap || {}).map(([attackType, value]) => [
+        attackType,
+        Number.isFinite(value) ? Number(value) : 1,
+      ])
+    ),
+  ])
+);
+
+const GEN1_ATTACK_TYPES = Object.keys(gen1TypeChartData || {}).sort();
+const TYPE_SUMMARY_CACHE = new Map();
+
+function getGen1TypeSummary(slug) {
+  if (!slug) return null;
+  if (TYPE_SUMMARY_CACHE.has(slug)) {
+    return TYPE_SUMMARY_CACHE.get(slug);
+  }
+  const pokemonTypes = GEN1_POKEMON_TYPE_MAP.get(slug) || [];
+  if (pokemonTypes.length === 0) {
+    TYPE_SUMMARY_CACHE.set(slug, null);
+    return null;
+  }
+  const summary = {
+    types: pokemonTypes,
+    weaknesses: [],
+    resistances: [],
+    immunities: [],
+  };
+  GEN1_ATTACK_TYPES.forEach((attackType) => {
+    let multiplier = 1;
+    pokemonTypes.forEach((defensiveType) => {
+      const relations = GEN1_TYPE_CHART.get(defensiveType);
+      const relationValue =
+        relations && Object.prototype.hasOwnProperty.call(relations, attackType)
+          ? relations[attackType]
+          : 1;
+      const parsedValue = Number.isFinite(relationValue) ? relationValue : 1;
+      multiplier *= parsedValue;
+    });
+    if (multiplier === 0) {
+      summary.immunities.push({ type: attackType, multiplier: 0 });
+    } else if (multiplier > 1) {
+      summary.weaknesses.push({ type: attackType, multiplier });
+    } else if (multiplier < 1) {
+      summary.resistances.push({ type: attackType, multiplier });
+    }
+  });
+  summary.weaknesses.sort(
+    (a, b) => b.multiplier - a.multiplier || a.type.localeCompare(b.type)
+  );
+  summary.resistances.sort(
+    (a, b) => a.multiplier - b.multiplier || a.type.localeCompare(b.type)
+  );
+  summary.immunities.sort((a, b) => a.type.localeCompare(b.type));
+  TYPE_SUMMARY_CACHE.set(slug, summary);
+  return summary;
+}
+
+function formatTypeMultiplier(multiplier) {
+  if (multiplier === 0) {
+    return "x0";
+  }
+  const rounded =
+    Math.abs(multiplier - Math.round(multiplier)) < 0.001
+      ? Math.round(multiplier)
+      : Number(multiplier.toFixed(2));
+  return `x${rounded}`;
+}
 
 const RAW_EVOLUTION_DATA = [
   "Abra~-/-~Level 16~-/-~Kadabra~-/-~Level 42~-/-~Alakazam",
@@ -1351,7 +1433,8 @@ export default function SavPage() {
                   <>
                     {filteredResults.map((entry) => {
                     const pokemonName = toTitleCase(entry.name);
-                    const yellowSlug = normalizeLegacyPokemonName(entry.name);
+                    const pokemonSlug = entry.slug || normalizeLegacyPokemonName(entry.name);
+                    const yellowSlug = pokemonSlug;
                     const yellowRecord = yellowReferenceReady ? yellowReference.get(yellowSlug) : null;
                     const speciesLabel = yellowRecord?.species || "Species unknown";
                     const heightLabel = formatHeight(yellowRecord?.height);
@@ -1365,6 +1448,8 @@ export default function SavPage() {
                     ]
                       .filter(Boolean)
                       .join(" ");
+                    const typeSummary = getGen1TypeSummary(pokemonSlug);
+                    const pokedexUrl = `/?p=${encodeURIComponent(pokemonSlug || entry.id)}`;
 
                   return (
                     <div key={entry.id} className={cardClassNames}>
@@ -1382,10 +1467,17 @@ export default function SavPage() {
                           />
                         </div>
                         <div className="sav-result-row__meta">
-                          <div className="sav-result-row__nameblock">
-                            <div className="sav-result-row__number">#{String(entry.id).padStart(3, "0")}</div>
-                            <div className="sav-result-row__name">{pokemonName}</div>
-                          </div>
+                            <div className="sav-result-row__nameblock">
+                              <div className="sav-result-row__number">#{String(entry.id).padStart(3, "0")}</div>
+                              <a
+                                className="sav-result-row__name"
+                                href={pokedexUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {pokemonName}
+                              </a>
+                            </div>
                           <span
                             className={`sav-result-row__status ${
                               entry.caught ? "sav-result-row__status--caught" : "sav-result-row__status--missing"
