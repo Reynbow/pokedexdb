@@ -1304,7 +1304,7 @@ export default function SavPage() {
             </p>
             {!hasSaveData && (
               <div className="sav-card__hint">
-                All entries default to “Missing” until you upload a save file, but locations remain available.
+                All entries default to “Missing” until you select a save file.
               </div>
             )}
             <div className="sav-results-controls">
