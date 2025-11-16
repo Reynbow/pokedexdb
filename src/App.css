@@ -8107,8 +8107,8 @@
 }
 
 .sav-result-row.is-uncaught {
-  border-color: rgba(24, 24, 32, 0.85);
-  background: linear-gradient(135deg, rgba(30, 30, 40, 0.85), rgba(15, 15, 20, 0.9));
+  border-color: rgba(28, 34, 50, 0.85);
+  background: linear-gradient(135deg, rgba(24, 28, 44, 0.9), rgba(12, 16, 28, 0.95));
 }
 
 .sav-result-row__pokemon {
@@ -8162,6 +8162,10 @@
   color: #f8fafc;
 }
 
+.sav-result-row.is-uncaught .sav-result-row__name {
+  opacity: 0.6;
+}
+
 .sav-result-row__status {
   align-self: flex-start;
   padding: 4px 10px;
@@ -8179,9 +8183,9 @@
 }
 
 .sav-result-row__status--missing {
-  background: rgba(248, 113, 113, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  color: #fecaca;
+  background: rgba(148, 163, 184, 0.25);
+  border: 1px solid rgba(100, 116, 139, 0.5);
+  color: #cbd5f5;
 }
 
 .sav-result-row__locations {
@@ -8201,6 +8205,11 @@
   gap: 8px;
   position: relative;
   overflow: visible;
+}
+
+.sav-location-list-wrapper {
+  position: relative;
+  padding-bottom: 32px;
 }
 
 @media (min-width: 900px) {
@@ -8310,6 +8319,29 @@
 .sav-location-row__hover-empty {
   font-size: 0.76rem;
   color: #94a3b8;
+}
+
+.sav-location-toggle {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.85);
+  color: #93c5fd;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+}
+
+.sav-location-toggle:hover {
+  border-color: rgba(148, 163, 184, 0.8);
+  color: #bae6fd;
 }
 
 .sav-result-row__yellow-hover-panel {

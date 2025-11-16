@@ -1347,8 +1347,9 @@ export default function SavPage() {
                 <div className="sav-alert sav-alert--error">{legacyEncounterError}</div>
               )}
               <div className="sav-results-list">
-                  {filteredResults.length > 0 ? (
-                    filteredResults.map((entry) => {
+                {filteredResults.length > 0 ? (
+                  <>
+                    {filteredResults.map((entry) => {
                     const pokemonName = toTitleCase(entry.name);
                     const yellowSlug = normalizeLegacyPokemonName(entry.name);
                     const yellowRecord = yellowReferenceReady ? yellowReference.get(yellowSlug) : null;
@@ -1577,7 +1578,9 @@ export default function SavPage() {
                       </div>
                     </div>
                   );
-                }) ) : (
+                })}
+                  </>
+                ) : (
                   <div className="sav-location-empty">
                     No Pokémon match the current search or location filter.
                   </div>
