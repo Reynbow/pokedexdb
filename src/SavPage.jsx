@@ -3,6 +3,7 @@ import "./App.css";
 import SpriteImage from "./components/SpriteImage.jsx";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
+import { buildPokemonPath } from "./utils/url.js";
 import gen1TypeMapData from "./data/gen1-types.json";
 import gen1TypeChartData from "./data/gen1-type-chart.json";
 
@@ -1267,6 +1268,7 @@ export default function SavPage() {
                     const hasSecondaryType = Boolean(secondaryType);
                     const pokedexNumber =
                       slot.dexId != null ? `No. ${String(slot.dexId).padStart(3, "0")}` : "No. ---";
+                    const pokedexUrl = slot.slug ? buildPokemonPath(slot.slug) : null;
 
                     return (
                       <div key={`party-slot-${index}`} className="sav-party-slot has-pokemon">
@@ -1290,7 +1292,18 @@ export default function SavPage() {
                           </div>
                           <div className="sav-party-slot__info-area">
                             <div className="sav-party-slot__header-row">
-                              <div className="sav-party-slot__display-name">{displayName}</div>
+                              {pokedexUrl ? (
+                                <a
+                                  className="sav-party-slot__display-name sav-party-slot__display-name-link"
+                                  href={pokedexUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {displayName}
+                                </a>
+                              ) : (
+                                <div className="sav-party-slot__display-name">{displayName}</div>
+                              )}
                               <div className="sav-party-slot__level">
                                 {slot.level != null ? `Lv${slot.level}` : "Lv??"}
                               </div>
