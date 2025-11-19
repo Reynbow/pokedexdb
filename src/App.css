@@ -8392,6 +8392,132 @@
   box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
 }
 
+.sav-result-row__yellow-hover-panel .sav-lazarus-hover-card {
+  width: 100%;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sav-lazarus-hover-card__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sav-lazarus-hover-card__sprite {
+  flex: 0 0 140px;
+  width: 140px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.sav-lazarus-hover-card__summary {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+}
+
+.sav-lazarus-hover-card__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.sav-lazarus-hover-card__bst {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #cbd5f5;
+}
+
+.sav-lazarus-hover-card__bst-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.sav-lazarus-hover-card__bst-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fef3c7;
+}
+
+.sav-lazarus-hover-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sav-lazarus-hover-card__meta-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sav-lazarus-hover-card__meta-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+.sav-lazarus-hover-card__meta-label {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.sav-lazarus-hover-card__meta-value {
+  font-weight: 600;
+  color: #f8fafc;
+  text-align: right;
+}
+
+.sav-lazarus-hover-card__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.sav-lazarus-hover-card__stat {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.75);
+  text-align: center;
+}
+
+.sav-lazarus-hover-card__stat-label {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.sav-lazarus-hover-card__stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
 .sav-result-row__yellow-hover-placeholder {
   min-width: 220px;
   padding: 14px 16px;

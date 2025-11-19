@@ -1941,8 +1941,8 @@ export default function SavPage() {
                         }
                       : {
                           style: {
-                            width: "192px",
-                            height: "192px",
+                            width: "140px",
+                            height: "140px",
                           },
                           // Use entry.id for form-specific sprites, fallback to nationalId for base forms
                           speciesId: spriteNationalId ?? undefined,
@@ -1961,7 +1961,6 @@ export default function SavPage() {
                       : [];
                     const lazarusTypes = referenceRecord?.types || [];
                     const lazarusAbilities = referenceRecord?.abilities || [];
-                    const lazarusLocation = referenceRecord?.location || entry.visibleEntries[0]?.location || "";
 
                   return (
                     <div key={entry.id} className={cardClassNames}>
@@ -2140,64 +2139,54 @@ export default function SavPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="sav-party-slot sav-party-slot--dex-preview">
-                                  <div className="sav-party-slot__content">
-                                    <div className="sav-party-slot__sprite-area">
-                                      <div className="sav-party-slot__sprite-panel">
-                                        <div className="sav-party-slot__sprite-wrapper">
-                                          <SpriteImage
-                                            id={previewSpriteIdentifier}
-                                            alt={pokemonName}
-                                            {...previewSpriteProps}
-                                          />
-                                        </div>
-                                      </div>
+                                <div className="sav-lazarus-hover-card">
+                                  <div className="sav-lazarus-hover-card__header">
+                                    <div className="sav-lazarus-hover-card__sprite">
+                                      <SpriteImage
+                                        id={previewSpriteIdentifier}
+                                        alt={pokemonName}
+                                        {...previewSpriteProps}
+                                      />
                                     </div>
-                                    <div className="sav-party-slot__info-area">
-                                      <div className="sav-party-slot__header-row">
-                                        <div className="sav-party-slot__display-name">{pokemonName}</div>
-                                      </div>
-                                      <div className="sav-party-slot__hp">
-                                        <div className="sav-party-slot__hp-row">
-                                          <span className="sav-party-slot__hp-label">Base Stat Total</span>
-                                        </div>
-                                        <div className="sav-party-slot__hp-value">
+                                    <div className="sav-lazarus-hover-card__summary">
+                                      <div className="sav-lazarus-hover-card__name">{pokemonName}</div>
+                                      <div className="sav-lazarus-hover-card__bst">
+                                        <span className="sav-lazarus-hover-card__bst-label">Base stat total</span>
+                                        <span className="sav-lazarus-hover-card__bst-value">
                                           {referenceRecord?.bst != null ? referenceRecord.bst : "--"}
-                                        </div>
+                                        </span>
                                       </div>
-                                      {lazarusStatRows.length > 0 && (
-                                        <div className="sav-party-slot__stat-grid">
-                                          {lazarusStatRows.map(([label, value]) => (
-                                            <div key={label} className="sav-party-slot__stat-row">
-                                              <span>{label}</span>
-                                              <span>{value != null ? value : "--"}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
                                     </div>
-                                    <div className="sav-party-slot__meta-area">
-                                      <div className="sav-party-slot__meta-line">
-                                        <span className="sav-party-slot__meta-label">Types</span>
-                                        <span className="sav-party-slot__meta-value">
+                                  </div>
+                                  <div className="sav-lazarus-hover-card__body">
+                                    <div className="sav-lazarus-hover-card__meta-grid">
+                                      <div className="sav-lazarus-hover-card__meta-line">
+                                        <span className="sav-lazarus-hover-card__meta-label">Types</span>
+                                        <span className="sav-lazarus-hover-card__meta-value">
                                           {lazarusTypes.length > 0 ? lazarusTypes.join(" / ") : "Unknown"}
                                         </span>
                                       </div>
                                       {lazarusAbilities.length > 0 && (
-                                        <div className="sav-party-slot__meta-line">
-                                          <span className="sav-party-slot__meta-label">Abilities</span>
-                                          <span className="sav-party-slot__meta-value">
+                                        <div className="sav-lazarus-hover-card__meta-line">
+                                          <span className="sav-lazarus-hover-card__meta-label">Abilities</span>
+                                          <span className="sav-lazarus-hover-card__meta-value">
                                             {lazarusAbilities.join(" / ")}
                                           </span>
                                         </div>
                                       )}
-                                      {lazarusLocation && (
-                                        <div className="sav-party-slot__meta-line">
-                                          <span className="sav-party-slot__meta-label">Location</span>
-                                          <span className="sav-party-slot__meta-value">{lazarusLocation}</span>
-                                        </div>
-                                      )}
                                     </div>
+                                    {lazarusStatRows.length > 0 && (
+                                      <div className="sav-lazarus-hover-card__stats">
+                                        {lazarusStatRows.map(([label, value]) => (
+                                          <div key={label} className="sav-lazarus-hover-card__stat">
+                                            <span className="sav-lazarus-hover-card__stat-label">{label}</span>
+                                            <span className="sav-lazarus-hover-card__stat-value">
+                                              {value != null ? value : "--"}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )
