@@ -6,6 +6,8 @@ import { getTypeIconUrl } from "./utils/typeIcons.js";
 import { buildPokemonPath } from "./utils/url.js";
 import gen1TypeMapData from "./data/gen1-types.json";
 import gen1TypeChartData from "./data/gen1-type-chart.json";
+import parseLazarusSavFile, { normalizeSpeciesSlug } from "./utils/lazarusSave.js";
+import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
 
 // Generation 1 Pokemon names (Pokemon Yellow has 151 Pokemon)
 const GEN1_POKEMON_NAMES = [
@@ -39,6 +41,90 @@ const GEN1_POKEMON_NAMES = [
 const GEN1_SLUG_TO_POKEDEX_ID = new Map(
   GEN1_POKEMON_NAMES.map((slug, index) => [slug, index + 1])
 );
+
+const LAZARUS_SPRITE_OVERRIDES = new Map([
+  ["hisuian-decidueye", "10244"],
+  ["mega-chesnaught", "10292"],
+  ["mega-delphox", "10293"],
+  ["mega-greninja", "10294"],
+  ["alolan-marowak", "10115"],
+  ["mega-ampharos", "10045"],
+  ["alolan-grimer", "10112"],
+  ["alolan-muk", "10113"],
+  ["mega-gardevoir", "10051"],
+  ["mega-gallade", "10068"],
+  ["oricorio-baile", "741"],
+  ["oricorio-pa-u", "10124"],
+  ["oricorio-pom-pom", "10123"],
+  ["oricorio-sensu", "10125"],
+  ["alolan-sandshrew", "10101"],
+  ["alolan-sandslash", "10102"],
+  ["mega-mawile", "10052"],
+  ["own-tempo-rockruff", "10151"],
+  ["dusk-lycanroc", "10152"],
+  ["midnight-lycanroc", "10126"],
+  ["mega-aggron", "10053"],
+  ["mega-heracross", "10047"],
+  ["mega-banette", "10056"],
+  ["paldean-wooper", "10253"],
+  ["alolan-vulpix", "10103"],
+  ["alolan-ninetales", "10104"],
+  ["aegislash-blade", "10026"],
+  ["minior-core", "10140"],
+  ["mega-gengar", "10038"],
+  ["hero-palafin", "10256"],
+  ["mega-houndoom", "10048"],
+  ["mega-steelix", "10072"],
+  ["mega-glalie", "10074"],
+  ["hisuian-zorua", "10238"],
+  ["hisuian-zoroark", "10239"],
+  ["hisuian-sneasel", "10235"],
+  ["alolan-meowth", "10107"],
+  ["galarian-meowth", "10161"],
+  ["alolan-persian", "10108"],
+  ["hisuian-typhlosion", "10233"],
+  ["mega-hawlucha", "10300"],
+  ["paldean-tauros-a", "10252"],
+  ["paldean-tauros-b", "10251"],
+  ["paldean-tauros-c", "10250"],
+  ["pawmott", "923"],
+  ["alolan-raichu", "10100"],
+  ["galarian-ponyta", "10162"],
+  ["galarian-rapidash", "10163"],
+  ["galarian-corsola", "10173"],
+  ["mega-scizor", "10046"],
+  ["mega-medicham", "10054"],
+  ["basculin-blue", "10016"],
+  ["basculin-red", "550"],
+  ["basculin-white", "10247"],
+  ["flab-b", "669"],
+  ["eternal-flower-floette", "10061"],
+  ["mega-falinks", "10303"],
+  ["mega-scrafty", "10289"],
+  ["mega-camerupt", "10087"],
+  ["mega-gyarados", "10041"],
+  ["galarian-zigzagoon", "10174"],
+  ["galarian-linoone", "10175"],
+  ["hisuian-sliggoo", "10241"],
+  ["hisuian-goodra", "10242"],
+  ["mega-altaria", "10067"],
+  ["hisuian-voltorb", "10231"],
+  ["hisuian-electrode", "10232"],
+  ["mega-victreebel", "10279"],
+  ["hisuian-growlithe", "10229"],
+  ["hisuian-arcanine", "10230"],
+  ["mega-aerodactyl", "10042"],
+  ["hisuian-braviary", "10240"],
+  ["mega-abomasnow", "10060"],
+  ["mega-tyranitar", "10049"],
+  ["mega-dragonite", "10281"],
+  ["primal-kyogre", "10077"],
+  ["primal-groudon", "10078"],
+  ["mega-rayquaza", "10079"],
+  ["ogerpon-cornerstone", "10275"],
+  ["ogerpon-hearthflame", "10274"],
+  ["ogerpon-wellspring", "10273"],
+]);
 
 // Pokemon Yellow save file offsets
 // According to Bulbapedia: https://bulbapedia.bulbagarden.net/wiki/Save_data_structure_(Generation_I)
@@ -94,6 +180,10 @@ function resolveStaticDataUrl(filename) {
 
 function resolveYellowReferenceUrl() {
   return resolveStaticDataUrl("data/pokemon_yellow_reference.json");
+}
+
+function resolveLazarusReferenceUrl() {
+  return resolveStaticDataUrl("data/pokemon_lazarus_reference.json");
 }
 
 function readUint16(data, offset) {
@@ -828,6 +918,44 @@ function buildLegacyEncounterMap(csvText) {
   return encounterMap;
 }
 
+function buildLazarusLocationEntries(record) {
+  const locationText = String(record?.location || "").trim();
+  const evolutionText = String(record?.evolution || "").trim();
+  if (!locationText) {
+    return { entries: [], evolutionRequirement: null };
+  }
+  const locationSegments = locationText
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+  if (locationSegments.length === 0) {
+    return { entries: [], evolutionRequirement: null };
+  }
+
+  const entries = [];
+  let evolutionRequirement = null;
+  locationSegments.forEach((segment) => {
+    if (/\(evolve\)/i.test(segment)) {
+      if (!evolutionRequirement) {
+        evolutionRequirement = {
+          method: evolutionText || "Evolve",
+          target: record?.name || "Evolution",
+        };
+      }
+      return;
+    }
+    entries.push({
+      location: segment,
+      methodLabel: "Location",
+      methodType: "land",
+      levelSummary: "",
+      chanceSummary: "",
+    });
+  });
+
+  return { entries, evolutionRequirement };
+}
+
 async function loadLegacyEncounterData() {
   if (legacyEncounterCache) {
     return legacyEncounterCache;
@@ -910,6 +1038,7 @@ function parseSavFile(arrayBuffer) {
 }
 
 export default function SavPage() {
+  const [gameKey, setGameKey] = useState("yellow");
   const [caughtPokemon, setCaughtPokemon] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -924,6 +1053,60 @@ export default function SavPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [showCaught, setShowCaught] = useState(true);
+  const [lazarusDex, setLazarusDex] = useState([]);
+  const [lazarusDexError, setLazarusDexError] = useState(null);
+  const speciesSlugLookup = useMemo(() => {
+    const map = new Map();
+    Object.entries(NATIONAL_ID_TO_SLUG || {}).forEach(([id, slug]) => {
+      if (!slug) return;
+      const numericId = Number(id);
+      if (Number.isFinite(numericId)) {
+        map.set(numericId, normalizeSpeciesSlug(slug));
+      }
+    });
+    return map;
+  }, []);
+  const slugToNationalId = useMemo(() => {
+    const map = new Map();
+    speciesSlugLookup.forEach((slug, id) => {
+      if (slug) {
+        map.set(slug, Number(id));
+      }
+    });
+    return map;
+  }, [speciesSlugLookup]);
+  const lazarusReferenceReady = lazarusDex.length > 0;
+  const lazarusDexByCustomId = useMemo(() => {
+    const map = new Map();
+    lazarusDex.forEach((record) => {
+      if (record?.id != null) {
+        map.set(Number(record.id), record);
+      }
+    });
+    return map;
+  }, [lazarusDex]);
+  const lazarusDexBySlug = useMemo(() => {
+    const map = new Map();
+    lazarusDex.forEach((record) => {
+      const slug = normalizeSpeciesSlug(record?.slug || record?.name);
+      if (slug) {
+        map.set(slug, record);
+      }
+    });
+    return map;
+  }, [lazarusDex]);
+  const lazarusDexByNationalId = useMemo(() => {
+    const map = new Map();
+    lazarusDex.forEach((record) => {
+      const slug = normalizeSpeciesSlug(record?.slug || record?.name);
+      if (!slug) return;
+      const nationalId = slugToNationalId.get(slug);
+      if (nationalId != null) {
+        map.set(nationalId, record);
+      }
+    });
+    return map;
+  }, [lazarusDex, slugToNationalId]);
 
   useEffect(() => {
     try {
@@ -961,7 +1144,7 @@ export default function SavPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [slugToNationalId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -995,7 +1178,57 @@ export default function SavPage() {
     };
   }, []);
 
-  const handleFileChange = useCallback((event) => {
+  useEffect(() => {
+    let cancelled = false;
+    fetch(resolveLazarusReferenceUrl())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load Lazarus reference data (${response.status})`);
+        }
+        return response.json();
+      })
+      .then((records) => {
+        if (cancelled) return;
+        const list = (Array.isArray(records) ? records : []).map((record) => {
+          const normalizedSlug = normalizeSpeciesSlug(record?.slug || record?.name);
+          const nationalId = normalizedSlug ? slugToNationalId.get(normalizedSlug) ?? null : null;
+          return {
+            ...record,
+            slug: normalizedSlug || record?.slug || null,
+            nationalId,
+          };
+        });
+        list.sort((a, b) => {
+          const idA = Number.isFinite(a?.id) ? a.id : Number.MAX_SAFE_INTEGER;
+          const idB = Number.isFinite(b?.id) ? b.id : Number.MAX_SAFE_INTEGER;
+          return idA - idB || String(a?.name || "").localeCompare(String(b?.name || ""));
+        });
+        setLazarusDex(list);
+        setLazarusDexError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLazarusDex([]);
+        setLazarusDexError(
+          `Pokemon Lazarus reference data is unavailable right now (${err?.message || "unknown error"}).`
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const prepareForNewUpload = useCallback((targetGame) => {
+    setGameKey(targetGame);
+    setCaughtPokemon([]);
+    setPartyMembers([]);
+    setError(null);
+    setLocationFilter("");
+    setSearchTerm("");
+    setShowCaught(true);
+  }, []);
+
+  const handleYellowFileChange = useCallback((event) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -1007,11 +1240,9 @@ export default function SavPage() {
       return;
     }
 
+    prepareForNewUpload("yellow");
     setLoading(true);
-    setError(null);
     setFileName(file.name);
-    setCaughtPokemon([]);
-    setPartyMembers([]);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -1043,45 +1274,134 @@ export default function SavPage() {
     };
 
     reader.readAsArrayBuffer(file);
-  }, []);
+  }, [prepareForNewUpload]);
+
+  const handleLazarusFileChange = useCallback(
+    (event) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      const fileNameLower = file.name.toLowerCase();
+      if (!fileNameLower.endsWith(".sav") && !fileNameLower.endsWith(".srm")) {
+        setError("Please select a .sav or .srm file");
+        return;
+      }
+      if (!lazarusReferenceReady) {
+        setError("Pokemon Lazarus data is still loading. Please try again in a moment.");
+        return;
+      }
+
+      prepareForNewUpload("lazarus");
+      setLoading(true);
+      setFileName(file.name);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const arrayBuffer = e.target.result;
+          const data = new Uint8Array(arrayBuffer);
+          const { caughtPokemon: caught, partyMembers: party } = parseLazarusSavFile(arrayBuffer, {
+            recordsByNationalId: lazarusDexByNationalId,
+            recordsBySlug: lazarusDexBySlug,
+            slugByNationalId: speciesSlugLookup,
+          });
+          setFileData(data);
+          setCaughtPokemon(caught);
+          setPartyMembers(party);
+          setError(null);
+        } catch (err) {
+          setError(`Error parsing Pokemon Lazarus save file: ${err.message}`);
+          setCaughtPokemon([]);
+          setPartyMembers([]);
+          setFileData(null);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setError("Error reading file");
+        setLoading(false);
+      };
+
+      reader.readAsArrayBuffer(file);
+    },
+    [lazarusDexByNationalId, lazarusDexBySlug, lazarusReferenceReady, prepareForNewUpload, speciesSlugLookup]
+  );
 
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
   const hasSaveData = fileData instanceof Uint8Array;
-  const legacyMapReady = legacyEncountersReady && legacyEncounters instanceof Map;
+  const showingYellow = gameKey === "yellow";
+  const legacyMapReady = showingYellow ? legacyEncountersReady && legacyEncounters instanceof Map : true;
   const yellowReferenceReady = yellowReference instanceof Map;
-  const partySlots = useMemo(() => {
-    return Array.from({ length: PARTY_MAX_SIZE }, (_, index) => partyMembers[index] || null);
-  }, [partyMembers]);
-  const caughtCount = caughtSet.size;
+  const activeGameLabel = showingYellow ? "Pokémon Yellow Legacy" : "Pokémon Lazarus";
+  const referenceReady = showingYellow ? yellowReferenceReady : lazarusReferenceReady;
+  const referenceError = showingYellow ? yellowReferenceError : lazarusDexError;
   const combinedResults = useMemo(() => {
+    if (!showingYellow) {
+      return lazarusDex.map((record, index) => {
+        const { entries: visibleEntries, evolutionRequirement } = buildLazarusLocationEntries(record);
+        const entryId = Number.isFinite(record?.id) ? Number(record.id) : index + 1;
+        const recordSlug = normalizeSpeciesSlug(record?.slug || record?.name);
+        return {
+          id: entryId,
+          name: record?.name || `Pokemon ${entryId}`,
+          slug: recordSlug || null,
+          nationalId: record?.nationalId ?? null,
+          caught: record?.id != null && caughtSet.has(Number(record.id)),
+          visibleEntries,
+          evolutionRequirement,
+          record,
+        };
+      });
+    }
     return GEN1_POKEMON_NAMES.map((name, index) => {
       const pokemonId = index + 1;
       const slug = normalizeLegacyPokemonName(name);
       const encounterEntries = legacyMapReady ? legacyEncounters.get(slug) || [] : [];
-      const visibleEntries = encounterEntries;
       return {
         id: pokemonId,
         name,
+        slug,
         caught: caughtSet.has(pokemonId),
-        visibleEntries,
+        visibleEntries: encounterEntries,
         evolutionRequirement: EVOLUTION_REQUIREMENTS.get(slug) || null,
       };
     });
-  }, [caughtSet, legacyMapReady, legacyEncounters]);
+  }, [caughtSet, lazarusDex, legacyEncounters, legacyMapReady, showingYellow]);
+  const { totalDexCount, caughtCount } = useMemo(() => {
+    const total = combinedResults.length || (showingYellow ? GEN1_POKEMON_COUNT : 0);
+    const caught = combinedResults.reduce((sum, entry) => (entry.caught ? sum + 1 : sum), 0);
+    return { totalDexCount: total, caughtCount: caught };
+  }, [combinedResults, showingYellow]);
+  const partySlots = useMemo(() => {
+    return Array.from({ length: PARTY_MAX_SIZE }, (_, index) => partyMembers[index] || null);
+  }, [partyMembers]);
 
   const locationOptions = useMemo(() => {
     const names = new Set();
-    if (legacyEncounters instanceof Map) {
-      for (const entries of legacyEncounters.values()) {
-        for (const entry of entries) {
-          if (entry?.location) {
-            names.add(entry.location);
+    if (showingYellow) {
+      if (legacyEncounters instanceof Map) {
+        for (const entries of legacyEncounters.values()) {
+          for (const entry of entries) {
+            if (entry?.location) {
+              names.add(entry.location);
+            }
           }
         }
       }
+    } else {
+      lazarusDex.forEach((record) => {
+        const value = String(record?.location || "").trim();
+        if (value) {
+          names.add(value);
+        }
+      });
     }
     return Array.from(names).sort((a, b) => LOCATION_COLLATOR.compare(a, b));
-  }, [legacyEncounters]);
+  }, [lazarusDex, legacyEncounters, showingYellow]);
 
   const filteredResults = useMemo(() => {
     const search = String(searchTerm || "").trim().toLowerCase();
@@ -1098,6 +1418,36 @@ export default function SavPage() {
   }, [combinedResults, locationFilter, searchTerm, showCaught]);
 
   const locationPokemonLookup = useMemo(() => {
+    if (!showingYellow) {
+      const aggregator = new Map();
+      lazarusDex.forEach((record) => {
+        const locationName = String(record?.location || "").trim();
+        if (!locationName) {
+          return;
+        }
+        let slugMap = aggregator.get(locationName);
+        if (!slugMap) {
+          slugMap = new Map();
+          aggregator.set(locationName, slugMap);
+        }
+        const slug = record?.slug || record?.name || locationName;
+        if (!slugMap.has(slug)) {
+          slugMap.set(slug, {
+            name: record?.name || slug,
+            slug,
+            caught: record?.id != null && caughtSet.has(Number(record.id)),
+          });
+        }
+      });
+      const result = new Map();
+      for (const [locationName, slugMap] of aggregator.entries()) {
+        result.set(
+          locationName,
+          Array.from(slugMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+        );
+      }
+      return result;
+    }
     if (!legacyMapReady || !(legacyEncounters instanceof Map)) {
       return new Map();
     }
@@ -1130,17 +1480,21 @@ export default function SavPage() {
       result.set(locationName, shared);
     }
     return result;
-  }, [caughtSet, legacyEncounters, legacyMapReady]);
+  }, [caughtSet, lazarusDex, legacyEncounters, legacyMapReady, showingYellow]);
 
   const hasFileSelected = Boolean(fileName);
 
   const handleClearSave = useCallback(() => {
+    setGameKey("yellow");
     setFileData(null);
     setFileName(null);
     setCaughtPokemon([]);
     setPartyMembers([]);
     setError(null);
     setLegacyEncounterError(null);
+    setLocationFilter("");
+    setSearchTerm("");
+    setShowCaught(true);
     setLoading(false);
   }, []);
 
@@ -1164,7 +1518,8 @@ export default function SavPage() {
           </h1>
           <div className="sav-page__subtitle-wrapper">
             <p className="subtitle sav-page__subtitle">
-              Import a <strong>Pokemon Yellow Legacy</strong> <span className="sav-page__subtitle-emphasis">.srm</span> file to view your save file information.
+              Import a <strong>Pokemon Yellow Legacy</strong> or <strong>Pokemon Lazarus</strong>{" "}
+              <span className="sav-page__subtitle-emphasis">.sav / .srm</span> file to view your save data entirely in the browser.
             </p>
             <CategoryToggle />
           </div>
@@ -1190,25 +1545,53 @@ export default function SavPage() {
                     className="sav-file-input"
                     type="file"
                     accept=".sav,.srm"
-                    onChange={handleFileChange}
+                    onChange={handleYellowFileChange}
                     disabled={loading}
                   />
                   <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
                   {fileName && (
-                    <p className="sav-meta">
+                    <p className="sav-meta" aria-live="polite">
                       <strong>Selected:</strong> {fileName}
                     </p>
                   )}
-                  {loading && <p className="sav-status">Processing save file...</p>}
-                  {error && <div className="sav-alert sav-alert--error">{error}</div>}
+                  {loading && gameKey === "yellow" && <p className="sav-status">Processing save file...</p>}
+                  {error && gameKey === "yellow" && <div className="sav-alert sav-alert--error">{error}</div>}
+                </div>
+              </article>
+              <article className="sav-card sav-card--primary">
+                <div className="sav-card__header">
+                  <h2 className="sav-card__title">Choose your save</h2>
+                  <p className="sav-card__description">
+                    Works with 128KB Pokemon Lazarus saves exported from emulators or flash carts.
+                  </p>
+                </div>
+                <div className="sav-card__body">
+                  <label className="sav-field-label" htmlFor="lazarus-upload-input">
+                    Pokemon Lazarus save file
+                  </label>
+                  <input
+                    id="lazarus-upload-input"
+                    className="sav-file-input"
+                    type="file"
+                    accept=".sav,.srm"
+                    onChange={handleLazarusFileChange}
+                    disabled={loading || !lazarusReferenceReady}
+                  />
+                  <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
+                  {!lazarusReferenceReady && !lazarusDexError && (
+                    <p className="sav-status">Loading Pokemon Lazarus data...</p>
+                  )}
+                  {lazarusDexError && <div className="sav-alert sav-alert--error">{lazarusDexError}</div>}
+                  {loading && gameKey === "lazarus" && <p className="sav-status">Processing save file...</p>}
+                  {error && gameKey === "lazarus" && <div className="sav-alert sav-alert--error">{error}</div>}
                 </div>
               </article>
               <article className="sav-card sav-card--info-panel-card">
                 <div className="sav-card__body sav-card__info-panel-body">
                   <h3 className="sav-card__info-heading">Save Reader Notes</h3>
                   <p>
-                    This reader currently supports only <strong>Pokemon Yellow Legacy</strong> saves.
-                    If you are using a different ROM, the data may not parse correctly.
+                    This reader currently supports <strong>Pokemon Yellow Legacy</strong> and{" "}
+                    <strong>Pokemon Lazarus</strong> saves. If you are using a different ROM, parsing results may be inaccurate.
                   </p>
                   <p>
                     Learn more about the Legacy ROMs at{" "}
@@ -1232,7 +1615,9 @@ export default function SavPage() {
           <section className="sav-card sav-party-card">
             <div className="sav-card__header sav-card__header--with-actions">
               <div className="sav-card__header-body">
-                <h2 className="sav-card__title">Current Party ({partyMembers.length} / {PARTY_MAX_SIZE})</h2>
+                <h2 className="sav-card__title">
+                  Current Party · {activeGameLabel} ({partyMembers.length} / {PARTY_MAX_SIZE})
+                </h2>
                 <p className="sav-card__description">
                   These are the Pokémon currently stored in your party slots.
                 </p>
@@ -1258,6 +1643,7 @@ export default function SavPage() {
 
                     const displayName =
                       slot.nickname ||
+                      slot.displayName ||
                       (slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesInternalId}`);
                     const hpPercent =
                       slot.maxHp && slot.maxHp > 0
@@ -1269,24 +1655,47 @@ export default function SavPage() {
                     const pokedexNumber =
                       slot.dexId != null ? `No. ${String(slot.dexId).padStart(3, "0")}` : "No. ---";
                     const pokedexUrl = slot.slug ? buildPokemonPath(slot.slug) : null;
+                    const spriteNationalId = showingYellow
+                      ? slot.dexId ?? slot.speciesInternalId ?? null
+                      : slot.nationalId ?? null;
+                    const slotSlugForSprite = slot.slug || normalizeSpeciesSlug(displayName);
+                    const slotSpriteOverride =
+                      !showingYellow && slotSlugForSprite
+                        ? LAZARUS_SPRITE_OVERRIDES.get(slotSlugForSprite)
+                        : null;
+                    // For non-override sprites, use National Dex ID (numeric) for proper sprite lookup
+                    const defaultSlotIdentifier = showingYellow
+                      ? slot.dexId ?? slot.speciesInternalId ?? 0
+                      : spriteNationalId ?? slot.dexId ?? slot.speciesInternalId ?? 0;
+                    const spriteIdentifier = showingYellow
+                      ? slot.dexId ?? slot.speciesInternalId ?? 0
+                      : slotSpriteOverride ?? defaultSlotIdentifier;
 
+                    const partySpriteProps = showingYellow
+                      ? {
+                          gameSpritePath: "generation-i/yellow/transparent/",
+                          style: {
+                            width: "192px",
+                            height: "192px",
+                            imageRendering: "pixelated",
+                            transform: "scaleX(-1)",
+                          },
+                        }
+                      : {
+                          style: {
+                            width: "192px",
+                            height: "192px",
+                          },
+                          speciesId: spriteNationalId ?? undefined,
+                          formName: slot.slug || slot.displayName || undefined,
+                        };
                     return (
                       <div key={`party-slot-${index}`} className="sav-party-slot has-pokemon">
                         <div className="sav-party-slot__content">
                           <div className="sav-party-slot__sprite-area">
                             <div className="sav-party-slot__sprite-panel">
                               <div className="sav-party-slot__sprite-wrapper">
-                                <SpriteImage
-                                  id={slot.dexId ?? slot.speciesInternalId ?? 0}
-                                  alt={displayName}
-                                  gameSpritePath="generation-i/yellow/transparent/"
-                                  style={{
-                                    width: "192px",
-                                    height: "192px",
-                                    imageRendering: "pixelated",
-                                    transform: "scaleX(-1)",
-                                  }}
-                                />
+                                <SpriteImage id={spriteIdentifier} alt={displayName} {...partySpriteProps} />
                               </div>
                             </div>
                           </div>
@@ -1332,8 +1741,9 @@ export default function SavPage() {
                               {[
                                 ["ATTACK", slot.stats?.attack],
                                 ["DEFENSE", slot.stats?.defense],
+                                ["SP. ATK", slot.stats?.spAttack ?? slot.stats?.special],
+                                ["SP. DEF", slot.stats?.spDefense ?? slot.stats?.special],
                                 ["SPEED", slot.stats?.speed],
-                                ["SPECIAL", slot.stats?.special],
                               ].map(([label, value]) => (
                                 <div key={label} className="sav-party-slot__stat-row">
                                   <span>{label}</span>
@@ -1363,6 +1773,12 @@ export default function SavPage() {
                                   {secondaryType || "\u00A0"}
                                 </span>
                               </div>
+                              {slot.nature && (
+                                <div className="sav-party-slot__meta-line">
+                                  <span className="sav-party-slot__meta-label">NATURE</span>
+                                  <span className="sav-party-slot__meta-value">{slot.nature}</span>
+                                </div>
+                              )}
                               <div className="sav-party-slot__meta-line">
                                 <span className="sav-party-slot__meta-label">IDNo</span>
                                 <span className="sav-party-slot__meta-value">
@@ -1392,7 +1808,7 @@ export default function SavPage() {
         <section className="sav-card sav-results-card">
           <div className="sav-card__header">
             <h2 className="sav-card__title">
-              Caught Pokemon ({caughtCount} / {GEN1_POKEMON_COUNT})
+              Caught Pokemon · {activeGameLabel} ({caughtCount} / {totalDexCount})
             </h2>
             <p className="sav-card__description">
               Review every Pokédex entry and compare your caught status with their encounter locations.
@@ -1438,7 +1854,7 @@ export default function SavPage() {
             </div>
           </div>
             <div className="sav-card__body">
-              {legacyEncounterError && (
+              {showingYellow && legacyEncounterError && (
                 <div className="sav-alert sav-alert--error">{legacyEncounterError}</div>
               )}
               <div className="sav-results-list">
@@ -1447,13 +1863,20 @@ export default function SavPage() {
                     {filteredResults.map((entry) => {
                     const pokemonName = toTitleCase(entry.name);
                     const pokemonSlug = entry.slug || normalizeLegacyPokemonName(entry.name);
-                    const yellowSlug = pokemonSlug;
-                    const yellowRecord = yellowReferenceReady ? yellowReference.get(yellowSlug) : null;
-                    const speciesLabel = yellowRecord?.species || "Species unknown";
-                    const heightLabel = formatHeight(yellowRecord?.height);
-                    const weightLabel = formatWeight(yellowRecord?.weight);
-                    const entryText = yellowRecord?.entry || "Yellow Pokedex entry unavailable.";
-                    const hasLocationInfo = legacyMapReady && entry.visibleEntries.length > 0;
+                    const referenceRecord = showingYellow
+                      ? yellowReferenceReady
+                        ? yellowReference.get(pokemonSlug)
+                        : null
+                      : entry.record || lazarusDexByCustomId.get(entry.id);
+                    const speciesLabel = showingYellow
+                      ? referenceRecord?.species || "Species unknown"
+                      : null;
+                    const heightLabel = showingYellow ? formatHeight(referenceRecord?.height) : null;
+                    const weightLabel = showingYellow ? formatWeight(referenceRecord?.weight) : null;
+                    const entryText = showingYellow
+                      ? referenceRecord?.entry || "Yellow Pokedex entry unavailable."
+                      : null;
+                    const hasLocationInfo = entry.visibleEntries.length > 0;
                     const cardClassNames = [
                       "sav-result-row",
                       entry.caught ? "is-caught" : "is-uncaught",
@@ -1461,27 +1884,86 @@ export default function SavPage() {
                     ]
                       .filter(Boolean)
                       .join(" ");
-                    const typeSummary = getGen1TypeSummary(pokemonSlug);
-                    const pokedexUrl = `/?p=${encodeURIComponent(pokemonSlug || entry.id)}`;
+                    const pokedexUrl = showingYellow
+                      ? `/?p=${encodeURIComponent(pokemonSlug || entry.id)}`
+                      : entry.slug
+                      ? buildPokemonPath(entry.slug)
+                      : null;
+                    const spriteNationalId = showingYellow ? entry.id : entry.nationalId ?? null;
+                    const entrySlugForSprite = entry.slug || pokemonSlug;
+                    const spriteOverride =
+                      !showingYellow && entrySlugForSprite
+                        ? LAZARUS_SPRITE_OVERRIDES.get(entrySlugForSprite)
+                        : null;
+                    // For non-override sprites, use National Dex ID (numeric) for proper sprite lookup
+                    const defaultResultIdentifier = showingYellow
+                      ? entry.id
+                      : spriteNationalId ?? entry.id;
+                    const spriteIdentifier = showingYellow
+                      ? entry.id
+                      : spriteOverride ?? defaultResultIdentifier;
+                    const resultSpriteProps = showingYellow
+                      ? {
+                          gameSpritePath: "generation-i/yellow/transparent/",
+                          style: {
+                            width: "96px",
+                            height: "96px",
+                            imageRendering: "pixelated",
+                          },
+                        }
+                      : {
+                          style: {
+                            width: "96px",
+                            height: "96px",
+                          },
+                          // Use entry.id for form-specific sprites, fallback to nationalId for base forms
+                          speciesId: spriteNationalId ?? undefined,
+                          formName: pokemonSlug || entry.name,
+                        };
+                    const previewSpriteIdentifier = spriteIdentifier;
+                    const previewSpriteProps = showingYellow
+                      ? {
+                          gameSpritePath: "generation-i/yellow/transparent/",
+                          style: {
+                            width: "192px",
+                            height: "192px",
+                            imageRendering: "pixelated",
+                          },
+                        }
+                      : {
+                          style: {
+                            width: "192px",
+                            height: "192px",
+                          },
+                          // Use entry.id for form-specific sprites, fallback to nationalId for base forms
+                          speciesId: spriteNationalId ?? undefined,
+                          formName: pokemonSlug || entry.name,
+                        };
+                    const lazarusStats = referenceRecord?.stats;
+                    const lazarusStatRows = lazarusStats
+                      ? [
+                          ["HP", lazarusStats.hp],
+                          ["ATK", lazarusStats.attack],
+                          ["DEF", lazarusStats.defense],
+                          ["SP. ATK", lazarusStats.spAttack],
+                          ["SP. DEF", lazarusStats.spDefense],
+                          ["SPEED", lazarusStats.speed],
+                        ].filter(([_, value]) => value != null)
+                      : [];
+                    const lazarusTypes = referenceRecord?.types || [];
+                    const lazarusAbilities = referenceRecord?.abilities || [];
+                    const lazarusLocation = referenceRecord?.location || entry.visibleEntries[0]?.location || "";
 
                   return (
                     <div key={entry.id} className={cardClassNames}>
                       <div className="sav-result-row__pokemon">
                         <div className="sav-result-row__sprite">
-                          <SpriteImage
-                            id={entry.id}
-                            alt={pokemonName}
-                            gameSpritePath="generation-i/yellow/transparent/"
-                            style={{
-                              width: "96px",
-                              height: "96px",
-                              imageRendering: "pixelated",
-                            }}
-                          />
+                          <SpriteImage id={spriteIdentifier} alt={pokemonName} {...resultSpriteProps} />
                         </div>
                         <div className="sav-result-row__meta">
-                            <div className="sav-result-row__nameblock">
-                              <div className="sav-result-row__number">#{String(entry.id).padStart(3, "0")}</div>
+                          <div className="sav-result-row__nameblock">
+                            <div className="sav-result-row__number">#{String(entry.id).padStart(3, "0")}</div>
+                            {pokedexUrl ? (
                               <a
                                 className="sav-result-row__name"
                                 href={pokedexUrl}
@@ -1490,7 +1972,10 @@ export default function SavPage() {
                               >
                                 {pokemonName}
                               </a>
-                            </div>
+                            ) : (
+                              <div className="sav-result-row__name">{pokemonName}</div>
+                            )}
+                          </div>
                           <span
                             className={`sav-result-row__status ${
                               entry.caught ? "sav-result-row__status--caught" : "sav-result-row__status--missing"
@@ -1605,58 +2090,116 @@ export default function SavPage() {
                           )}
                         </div>
                         <div className="sav-result-row__yellow-hover-panel" aria-hidden="true">
-                          {yellowReferenceReady ? (
-                            yellowRecord ? (
-                              <div className="sav-party-slot sav-party-slot--dex-preview">
-                                <div className="sav-party-slot__content">
-                                  <div className="sav-party-slot__sprite-area">
-                                    <div className="sav-party-slot__sprite-panel">
-                                      <div className="sav-party-slot__sprite-wrapper">
+                          {referenceReady ? (
+                            referenceRecord ? (
+                              showingYellow ? (
+                                <div className="sav-party-slot sav-party-slot--dex-preview">
+                                  <div className="sav-party-slot__content">
+                                    <div className="sav-party-slot__sprite-area">
+                                      <div className="sav-party-slot__sprite-panel">
+                                        <div className="sav-party-slot__sprite-wrapper">
                                         <SpriteImage
-                                          id={entry.id}
+                                          id={previewSpriteIdentifier}
                                           alt={pokemonName}
-                                          gameSpritePath="generation-i/yellow/transparent/"
-                                          style={{
-                                            width: "192px",
-                                            height: "192px",
-                                            imageRendering: "pixelated",
-                                          }}
+                                          {...previewSpriteProps}
                                         />
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="sav-party-slot__info-area">
-                                    <div className="sav-party-slot__header-row">
-                                      <div className="sav-party-slot__display-name">{pokemonName}</div>
-                                    </div>
-                                    <div className="sav-party-slot__hp">
-                                      <div className="sav-party-slot__hp-row">
-                                        <span className="sav-party-slot__hp-label">{speciesLabel}</span>
+                                    <div className="sav-party-slot__info-area">
+                                      <div className="sav-party-slot__header-row">
+                                        <div className="sav-party-slot__display-name">{pokemonName}</div>
                                       </div>
-                                    <div className="sav-party-slot__stat-row">
-                                      <span className="sav-party-slot__meta-label">Height</span>
-                                      <span className="sav-party-slot__meta-value">{heightLabel}</span>
+                                      <div className="sav-party-slot__hp">
+                                        <div className="sav-party-slot__hp-row">
+                                          <span className="sav-party-slot__hp-label">{speciesLabel}</span>
+                                        </div>
+                                        <div className="sav-party-slot__stat-row">
+                                          <span className="sav-party-slot__meta-label">Height</span>
+                                          <span className="sav-party-slot__meta-value">{heightLabel}</span>
+                                        </div>
+                                        <div className="sav-party-slot__stat-row">
+                                          <span className="sav-party-slot__meta-label">Weight</span>
+                                          <span className="sav-party-slot__meta-value">{weightLabel}</span>
+                                        </div>
+                                      </div>
+                                      <div className="sav-party-slot__entry-block">
+                                        <div className="sav-party-slot__entry-label">Yellow Pokedex entry</div>
+                                        <p className="sav-party-slot__entry-text">{entryText}</p>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="sav-party-slot__stat-row">
-                                    <span className="sav-party-slot__meta-label">Weight</span>
-                                    <span className="sav-party-slot__meta-value">{weightLabel}</span>
-                                  </div>
-                                  </div>
-                                  <div className="sav-party-slot__entry-block">
-                                    <div className="sav-party-slot__entry-label">Yellow Pokedex entry</div>
-                                    <p className="sav-party-slot__entry-text">{entryText}</p>
                                   </div>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="sav-party-slot sav-party-slot--dex-preview">
+                                  <div className="sav-party-slot__content">
+                                    <div className="sav-party-slot__sprite-area">
+                                      <div className="sav-party-slot__sprite-panel">
+                                        <div className="sav-party-slot__sprite-wrapper">
+                                          <SpriteImage
+                                            id={previewSpriteIdentifier}
+                                            alt={pokemonName}
+                                            {...previewSpriteProps}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="sav-party-slot__info-area">
+                                      <div className="sav-party-slot__header-row">
+                                        <div className="sav-party-slot__display-name">{pokemonName}</div>
+                                      </div>
+                                      <div className="sav-party-slot__hp">
+                                        <div className="sav-party-slot__hp-row">
+                                          <span className="sav-party-slot__hp-label">Base Stat Total</span>
+                                        </div>
+                                        <div className="sav-party-slot__hp-value">
+                                          {referenceRecord?.bst != null ? referenceRecord.bst : "--"}
+                                        </div>
+                                      </div>
+                                      {lazarusStatRows.length > 0 && (
+                                        <div className="sav-party-slot__stat-grid">
+                                          {lazarusStatRows.map(([label, value]) => (
+                                            <div key={label} className="sav-party-slot__stat-row">
+                                              <span>{label}</span>
+                                              <span>{value != null ? value : "--"}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="sav-party-slot__meta-area">
+                                      <div className="sav-party-slot__meta-line">
+                                        <span className="sav-party-slot__meta-label">Types</span>
+                                        <span className="sav-party-slot__meta-value">
+                                          {lazarusTypes.length > 0 ? lazarusTypes.join(" / ") : "Unknown"}
+                                        </span>
+                                      </div>
+                                      {lazarusAbilities.length > 0 && (
+                                        <div className="sav-party-slot__meta-line">
+                                          <span className="sav-party-slot__meta-label">Abilities</span>
+                                          <span className="sav-party-slot__meta-value">
+                                            {lazarusAbilities.join(" / ")}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {lazarusLocation && (
+                                        <div className="sav-party-slot__meta-line">
+                                          <span className="sav-party-slot__meta-label">Location</span>
+                                          <span className="sav-party-slot__meta-value">{lazarusLocation}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
                             ) : (
                               <div className="sav-result-row__yellow-hover-placeholder">
-                                Yellow Pokedex entry unavailable.
+                                {showingYellow ? "Yellow Pokedex entry unavailable." : "Lazarus data unavailable."}
                               </div>
                             )
                           ) : (
                             <div className="sav-result-row__yellow-hover-placeholder">
-                              {yellowReferenceError || "Loading Yellow data..."}
+                              {referenceError || `Loading ${activeGameLabel} data...`}
                             </div>
                           )}
                         </div>
