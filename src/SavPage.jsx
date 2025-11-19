@@ -1531,14 +1531,14 @@ export default function SavPage() {
             <>
               <article className="sav-card sav-card--primary">
                 <div className="sav-card__header">
-                  <h2 className="sav-card__title">Choose your save</h2>
+                  <h2 className="sav-card__title">Pokemon Yellow Legacy</h2>
                   <p className="sav-card__description">
-                    Works with emulator exports or flash-cart backups (32KB Pokemon Yellow Legacy saves in .srm format).
+                    Upload your save file to view your caught Pokemon and party.
                   </p>
                 </div>
                 <div className="sav-card__body">
                   <label className="sav-field-label" htmlFor="sav-upload-input">
-                    Pokemon Yellow Legacy save file
+                    Choose your save file
                   </label>
                   <input
                     id="sav-upload-input"
@@ -1560,14 +1560,14 @@ export default function SavPage() {
               </article>
               <article className="sav-card sav-card--primary">
                 <div className="sav-card__header">
-                  <h2 className="sav-card__title">Choose your save</h2>
+                  <h2 className="sav-card__title">Pokemon Lazarus</h2>
                   <p className="sav-card__description">
-                    Works with 128KB Pokemon Lazarus saves exported from emulators or flash carts.
+                    Upload your save file to view your caught Pokemon and party.
                   </p>
                 </div>
                 <div className="sav-card__body">
                   <label className="sav-field-label" htmlFor="lazarus-upload-input">
-                    Pokemon Lazarus save file
+                    Choose your save file
                   </label>
                   <input
                     id="lazarus-upload-input"
