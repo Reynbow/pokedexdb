@@ -1602,8 +1602,17 @@ export default function SavPage() {
                       rel="noreferrer"
                     >
                       r/PokemonLegacy
-                    </a>
-                    .
+                    </a>{" "}
+                    and check out{" "}
+                    <a
+                      className="sav-card__info-link"
+                      href="https://pokemonlazarus.net/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      PokemonLazarus.net
+                    </a>{" "}
+                    for the latest Lazarus documentation and downloads.
                   </p>
                 </div>
               </article>
