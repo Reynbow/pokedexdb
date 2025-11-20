@@ -101,6 +101,8 @@ const REGIONAL_NAME_PREFIXES = new Map([
   ["galarian", "Galarian"],
   ["hisui", "Hisuian"],
   ["hisuan", "Hisuian"],
+  ["paldea", "Paldean"],
+  ["paldean", "Paldean"],
 ]);
 
 const formatDisplayName = (rawName) => {
@@ -163,7 +165,20 @@ const getSpriteVariantForGame = (selectedGame) => {
   return { variant: null, gameSpritePath: null };
 };
 
-function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCache, shiny = false, selectedGame = null, selectedDex = null, eagerLoad = false }) {
+function PokemonCard({
+  name,
+  id,
+  url,
+  onSelect,
+  selected,
+  dexNumber,
+  detailsCache,
+  shiny = false,
+  selectedGame = null,
+  selectedDex = null,
+  eagerLoad = false,
+  displayNameOverride = null,
+}) {
   const cache = detailsCache || localDetailsCache;
   const [types, setTypes] = useState(cache.get(String(id))?.types || []);
   const intersectionOptions = useMemo(() => ({ root: null, rootMargin: "600px 0px", threshold: 0.01 }), []);
@@ -441,7 +456,7 @@ function PokemonCard({ name, id, url, onSelect, selected, dexNumber, detailsCach
           />
         )}
       </div>
-      <div className="name">{formatDisplayName(name)}</div>
+      <div className="name">{formatDisplayName(displayNameOverride || name)}</div>
       <div className="types">
         {types.length === 0 ? (
           <span className="type-chip skeleton" />

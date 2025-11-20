@@ -16,6 +16,7 @@ import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
 import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
 import { EV_ITEM_GUIDE, FEATHER_VARIANTS, POWER_ITEM_VARIANTS } from "./constants/evItems.js";
 import { DEX_FILTERS, DEX_LOOKUP } from "./constants/dex.js";
+import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
 import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "./constants/tags.js";
 import { CONDITION_LABEL_OVERRIDES, TIME_OF_DAY_LABELS, METHOD_LABEL_OVERRIDES } from "./constants/labels.js";
 import { FORM_ORDER, ALT_FORM_HIDE_FLAGS } from "./constants/forms.js";
@@ -164,6 +165,30 @@ const getIdFromUrl = (url) => {
 const getIdNumberFromUrl = (url) => {
   const id = Number(getIdFromUrl(url));
   return Number.isNaN(id) ? null : id;
+};
+
+const getEntryDataUrl = (entry) => {
+  if (!entry) return null;
+  return entry.dataUrl || entry.url || null;
+};
+
+const getEntryDisplayId = (entry) => {
+  if (!entry) return null;
+  if (entry.syntheticId != null) return String(entry.syntheticId);
+  return getIdFromUrl(entry.url);
+};
+
+const getEntryDisplayNumber = (entry) => {
+  const idStr = getEntryDisplayId(entry);
+  if (idStr == null) return null;
+  const value = Number(idStr);
+  return Number.isNaN(value) ? null : value;
+};
+
+const getEntryBaseId = (entry) => {
+  const dataUrl = getEntryDataUrl(entry);
+  if (!dataUrl) return null;
+  return getIdFromUrl(dataUrl);
 };
 
 const toTitleCase = (value) => {
@@ -1774,13 +1799,25 @@ function App() {
   const pokemonIdLookup = useMemo(() => {
     const map = new Map();
     for (const entry of pokemon) {
-      const idStr = getIdFromUrl(entry?.url);
+      const idStr = getEntryDisplayId(entry);
       const idNum = Number(idStr);
       if (!idStr || Number.isNaN(idNum)) continue;
       map.set(idNum, String(entry?.name || "").toLowerCase());
     }
     return map;
   }, [pokemon]);
+
+  const speciesSlugLookup = useMemo(() => {
+    const map = new Map();
+    Object.entries(NATIONAL_ID_TO_SLUG || {}).forEach(([id, slug]) => {
+      if (!slug) return;
+      const key = String(slug).toLowerCase();
+      if (key && !map.has(key)) {
+        map.set(key, Number(id));
+      }
+    });
+    return map;
+  }, []);
 
   const findPokemonBySlug = useCallback(
     (slug) => {
@@ -1795,7 +1832,7 @@ function App() {
     (id) => {
       const idStr = String(id || "").trim();
       if (!idStr) return null;
-      return pokemon.find((entry) => getIdFromUrl(entry?.url) === idStr) || null;
+      return pokemon.find((entry) => getEntryDisplayId(entry) === idStr) || null;
     },
     [pokemon]
   );
@@ -1817,6 +1854,9 @@ function App() {
       if (speciesIdLookup.has(lower)) {
         return speciesIdLookup.get(lower);
       }
+      if (speciesSlugLookup.has(lower)) {
+        return speciesSlugLookup.get(lower);
+      }
       const parts = lower.split("-");
       while (parts.length > 1) {
         parts.pop();
@@ -1824,10 +1864,13 @@ function App() {
         if (speciesIdLookup.has(candidate)) {
           return speciesIdLookup.get(candidate);
         }
+        if (speciesSlugLookup.has(candidate)) {
+          return speciesSlugLookup.get(candidate);
+        }
       }
       return fallback;
     },
-    [speciesIdLookup]
+    [speciesIdLookup, speciesSlugLookup]
   );
 
   const REGION_CANON_MAP = useMemo(() => new Map([
@@ -1907,11 +1950,11 @@ function App() {
         // Append custom extras if not already present
         const merged = filtered.slice();
         const hasByName = (n) => merged.some((e) => String(e?.name || "").toLowerCase() === String(n || "").toLowerCase());
-        EXTRA_POKEMON.forEach((extra) => {
-          if (extra?.name && extra?.url && !hasByName(extra.name)) {
-            merged.push({ name: extra.name, url: extra.url });
-          }
-        });
+    EXTRA_POKEMON.forEach((extra) => {
+      if (extra?.name && extra?.url && !hasByName(extra.name)) {
+        merged.push({ ...extra });
+      }
+    });
         setPokemon(merged);
       });
   }, []);
@@ -2125,9 +2168,10 @@ function App() {
         setBootSelection(null);
         return;
       }
-      const id = getIdFromUrl(entry.url);
-      const name = entry.name || `pokemon-${id}`;
-      setSelected({ id, name, url: entry.url });
+      const displayId = getEntryDisplayId(entry) || getIdFromUrl(entry.url);
+      const dataUrl = getEntryDataUrl(entry) || entry.url;
+      const name = entry.name || `pokemon-${displayId}`;
+      setSelected({ id: displayId, name, url: dataUrl });
       if (shouldReplace) {
         updatePokemonLocation(name, { replace: true, pruneKeys: ["i", "m", "a", "p"] });
       }
@@ -2156,13 +2200,14 @@ function App() {
       if (slug) {
         const match = findPokemonByIdentifier(slug);
         if (match) {
-          const id = getIdFromUrl(match.url);
-          const name = match.name || `pokemon-${id}`;
+          const displayId = getEntryDisplayId(match) || getIdFromUrl(match.url);
+          const dataUrl = getEntryDataUrl(match) || match.url;
+          const name = match.name || `pokemon-${displayId}`;
           if (normalizePokemonSlug(slug) !== normalizePokemonSlug(name)) {
             updatePokemonLocation(name, { replace: true, pruneKeys: ["i", "m", "a", "p"] });
             return;
           }
-          setSelected({ id, name, url: match.url });
+          setSelected({ id: displayId, name, url: dataUrl });
           return;
         }
       }
@@ -2172,9 +2217,10 @@ function App() {
       if (legacy) {
         const match = findPokemonByIdentifier(legacy);
         if (match) {
-          const id = getIdFromUrl(match.url);
-          const name = match.name || `pokemon-${id}`;
-          setSelected({ id, name, url: match.url });
+          const displayId = getEntryDisplayId(match) || getIdFromUrl(match.url);
+          const dataUrl = getEntryDataUrl(match) || match.url;
+          const name = match.name || `pokemon-${displayId}`;
+          setSelected({ id: displayId, name, url: dataUrl });
           updatePokemonLocation(name, { replace: true, pruneKeys: ["i", "m", "a", "p"] });
           return;
         }
@@ -2226,10 +2272,18 @@ function App() {
       } catch {}
     }
     const parts = (target.url || "").split("/").filter(Boolean);
-    const prefId = parts[parts.length - 1] || id;
+    let prefId = parts[parts.length - 1] || id;
+    if (opts.displayIdOverride) {
+      prefId = opts.displayIdOverride;
+    }
     const targetName = target.name || name || `pokemon-${prefId}`;
     updatePokemonLocation(targetName, { pruneKeys: ["i", "m", "a", "p"] });
-    setSelected({ id: prefId, name: targetName, url: target.url || url });
+    setSelected({
+      id: prefId,
+      name: targetName,
+      url: target.url || url,
+      syntheticForm: opts.syntheticForm || null,
+    });
   };
 
   const clearSelection = () => {
@@ -2699,10 +2753,22 @@ function App() {
     [dexIndexes, selectedDex, selectedGame, gameIndexes, pokemonIdLookup, resolveSpeciesId]
   );
 
+  const getDexNumberForEntry = useCallback(
+    (name, idNum) => {
+      if (!Number.isFinite(idNum)) return undefined;
+      const speciesId = resolveSpeciesId(name, idNum < 10000 ? idNum : null);
+      const lookupId = speciesId ?? idNum;
+      if (!Number.isFinite(lookupId)) return undefined;
+      return formatDexNumber(lookupId);
+    },
+    [resolveSpeciesId, formatDexNumber]
+  );
+
   const selectedDexNumber = useMemo(() => {
     if (!selected) return null;
-    return formatDexNumber(selected.id);
-  }, [selected, formatDexNumber]);
+    const idNum = Number(selected.id);
+    return getDexNumberForEntry(selected.name, idNum);
+  }, [selected, getDexNumberForEntry]);
 
   // Ensure we have indexes for currently selected types so include filtering is accurate
   useEffect(() => {
@@ -2829,7 +2895,7 @@ function App() {
           const parts = pref.url.split("/").filter(Boolean);
           const id = parts[parts.length - 1];
           const idNum = Number(id);
-          const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+          const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
           return (
             <PokemonCard
               key={pref.name}
@@ -2858,7 +2924,7 @@ function App() {
                 const parts = pref.url.split("/").filter(Boolean);
                 const id = parts[parts.length - 1];
                 const idNum = Number(id);
-                const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
                 return {
                   id,
                   name: pref.name,
@@ -2883,7 +2949,7 @@ function App() {
           const parts = pref.url.split("/").filter(Boolean);
           const id = parts[parts.length - 1];
           const idNum = Number(id);
-          const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+          const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
           return (
             <PokemonCard
               key={pref.name}
@@ -2911,7 +2977,7 @@ function App() {
                 const parts = pref.url.split("/").filter(Boolean);
                 const id = parts[parts.length - 1];
                 const idNum = Number(id);
-                const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
                 return {
                   id,
                   name: pref.name,
@@ -3040,7 +3106,7 @@ function App() {
                         const parts = pref.url.split("/").filter(Boolean);
                         const id = parts[parts.length - 1];
                         const idNum = Number(id);
-                        const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                        const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
                         return (
                           <PokemonCard
                             key={pref.name}
@@ -3108,7 +3174,7 @@ function App() {
                     const parts = pref.url.split("/").filter(Boolean);
                     const id = parts[parts.length - 1];
                     const idNum = Number(id);
-                    const dexDisplay = Number.isNaN(idNum) ? undefined : formatDexNumber(idNum);
+                    const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
                     return (
                       <PokemonCard
                         key={pref.name}
@@ -3788,13 +3854,29 @@ function DetailPanel({
 
   const evolutionTree = useMemo(() => buildEvolutionTree(standardFormsEvoPaths, false), [standardFormsEvoPaths, buildEvolutionTree]);
 
+  const hasStandaloneAlternateForms = useMemo(() => {
+    if (!Array.isArray(evoPaths) || evoPaths.length === 0) return false;
+    return evoPaths.some((path) =>
+      path.some((node) => {
+        const forms = Array.isArray(node.forms) ? node.forms : [];
+        return forms.some((form) => {
+          if (!form || form.isDefault) return false;
+          const tags = Array.isArray(form.tags) ? form.tags : [];
+          if (tags.includes("Mega") || tags.includes("Gigantamax")) return false;
+          const speciesId = node.id != null ? Number(node.id) : null;
+          if (speciesId != null && speciesId < 10000 && ALT_FORM_HIDE_FLAGS.has(speciesId)) return false;
+          return true;
+        });
+      })
+    );
+  }, [evoPaths]);
+
   // Build a separate evolution tree that only shows alternate forms
   const alternateFormsEvolutionTree = useMemo(() => {
-    // Only build alternate forms tree if there are alternate forms evolution paths
-    // If there are no alternate forms paths, return empty array immediately
-    if (alternateFormsEvoPaths.length === 0) return [];
+    const shouldBuildAltTree = alternateFormsEvoPaths.length > 0 || hasStandaloneAlternateForms;
+    if (!shouldBuildAltTree) return [];
     
-    const pathsToUse = alternateFormsEvoPaths;
+    const pathsToUse = alternateFormsEvoPaths.length > 0 ? alternateFormsEvoPaths : evoPaths;
     const baseTree = buildEvolutionTree(pathsToUse, false);
     if (!baseTree || baseTree.length === 0) return [];
     
@@ -3852,7 +3934,7 @@ function DetailPanel({
       .filter(Boolean);
     
     return result;
-  }, [alternateFormsEvoPaths, buildEvolutionTree, compareForms]);
+  }, [alternateFormsEvoPaths, evoPaths, hasStandaloneAlternateForms, buildEvolutionTree, compareForms]);
 
   // Collect all non-regional, non-default alternate forms across the entire evolution tree
   // Excludes Mega and GMax forms (they have their own buttons)
