@@ -1884,6 +1884,20 @@ function App() {
     ["paldean", "paldea"],
   ]), []);
 
+  const getCanonicalRegionFromName = useCallback(
+    (name) => {
+      const lower = String(name || "").toLowerCase();
+      if (!lower) return null;
+      const tokens = lower.split("-");
+      for (const token of tokens) {
+        const canon = REGION_CANON_MAP.get(token);
+        if (canon) return canon;
+      }
+      return null;
+    },
+    [REGION_CANON_MAP]
+  );
+
   const activeRegionKey = useMemo(() => {
     if (selectedDex && selectedDex !== "national") return selectedDex;
     if (selectedGame) {
@@ -1892,6 +1906,32 @@ function App() {
     }
     return null;
   }, [selectedDex, selectedGame]);
+
+  const selectedGameGeneration = useMemo(() => {
+    if (!selectedGame) return null;
+    return GAME_GENERATION_LOOKUP.get(selectedGame) ?? null;
+  }, [selectedGame]);
+
+  const selectedDexGeneration = useMemo(() => {
+    if (!selectedDex || selectedDex === "national") return null;
+    return DEX_GENERATION_LOOKUP.get(selectedDex) ?? null;
+  }, [selectedDex]);
+
+  const activeGenerationCap = useMemo(() => {
+    if (selectedGameGeneration != null) return selectedGameGeneration;
+    if (selectedDexGeneration != null) return selectedDexGeneration;
+    return null;
+  }, [selectedGameGeneration, selectedDexGeneration]);
+
+  const getFormGeneration = useCallback(
+    (name) => {
+      const canonRegion = getCanonicalRegionFromName(name);
+      if (!canonRegion) return null;
+      const gen = REGION_GENERATION_LOOKUP.get(canonRegion);
+      return gen != null ? gen : null;
+    },
+    [getCanonicalRegionFromName]
+  );
 
   const regionFormsBySpecies = useMemo(() => {
     const result = new Map();
@@ -2491,6 +2531,13 @@ function App() {
       const isRegional = isRegionalFormName(p.name);
       const isAlternateForm = idNum >= 10000 || isRegional;
       if (!isAlternateForm) continue; // Skip base/default forms (they're in the primary list)
+
+      if (activeGenerationCap != null) {
+        const formGeneration = getFormGeneration(p.name);
+        if (formGeneration != null && formGeneration > activeGenerationCap) {
+          continue;
+        }
+      }
       
       // Allow alternate form entries for species in-scope
       const inScope =
@@ -2498,6 +2545,13 @@ function App() {
         speciesIdsToConsider.includes(speciesId);
       if (!inScope) continue;
       
+      if (activeGenerationCap != null) {
+        const formGeneration = getFormGeneration(p.name);
+        if (formGeneration != null && formGeneration > activeGenerationCap) {
+          continue;
+        }
+      }
+
       // Filters: type, tags, query
       if (hasTypeFilter) {
         let passesType =
@@ -2561,6 +2615,14 @@ function App() {
         (speciesIdsToConsider.includes(speciesId) ||
           (Array.isArray(extraAllowed) && extraAllowed.includes(speciesId)));
       if (!inScope) continue;
+
+      if (activeGenerationCap != null) {
+        const formGeneration = getFormGeneration(p.name);
+        if (formGeneration != null && formGeneration > activeGenerationCap) {
+          continue;
+        }
+      }
+
       // Gate by selected game/region feature support
       if (selectedGame) {
         const gf = GAME_FEATURES.get(selectedGame) || { mega: false, gmax: false };
