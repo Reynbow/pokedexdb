@@ -183,12 +183,30 @@ const DISPLAY_NAME_OVERRIDES = new Map([
   ["legends-za", "Legends: Z-A"],
 ]);
 
+const REGIONAL_NAME_PREFIXES = new Map([
+  ["alola", "Alolan"],
+  ["alolan", "Alolan"],
+  ["galar", "Galarian"],
+  ["galarian", "Galarian"],
+  ["hisui", "Hisuian"],
+  ["hisuan", "Hisuian"],
+]);
+
 const formatDisplayName = (rawName) => {
   const stripped = stripMegaGmaxTokens(rawName);
   const key = String(stripped || "").toLowerCase();
   if (DISPLAY_NAME_OVERRIDES.has(key)) {
     return DISPLAY_NAME_OVERRIDES.get(key);
   }
+
+  const parts = key.split("-");
+  const suffix = parts[parts.length - 1];
+  const prefix = REGIONAL_NAME_PREFIXES.get(suffix);
+  if (prefix && parts.length > 1) {
+    const baseName = parts.slice(0, -1).join("-");
+    return `${prefix} ${toTitleCase(baseName)}`;
+  }
+
   return toTitleCase(stripped);
 };
 
@@ -1044,7 +1062,7 @@ const mapVarietiesToForms = (speciesData, { currentId = null, includeDefault = t
         return {
           id: formId,
           name: formName,
-          displayName: humanizeName(formName),
+          displayName: formatDisplayName(formName),
           isDefault: Boolean(variant.is_default),
           tags: orderedTags,
           isCurrent: currentIdStr != null && String(formId) === currentIdStr,
@@ -1079,7 +1097,7 @@ function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
     tag === 'Primal' || tag === 'Gigantamax'
   );
   
-  const formName = currentForm?.displayName || humanizeName(pokemonName);
+  const formName = currentForm?.displayName || formatDisplayName(pokemonName);
   const displayTitle = isAlternateForm ? `Evolution Details (${formName})` : 'Evolution Requirement Details';
 
   const trigger = data.trigger?.name;
@@ -1592,7 +1610,7 @@ function AlternateFormsModal({ forms, onClose, onSelectPokemon, title, shiny = f
               {forms.map((form) => {
                 const formId = form?.id != null ? String(form.id) : null;
                 if (!formId) return null;
-                const formName = form.displayName || humanizeName(form.name);
+                const formName = form.displayName || formatDisplayName(form.name);
                 return (
                   <button
                     key={formId}
@@ -3567,7 +3585,7 @@ function DetailPanel({
         entry = {
           id: node.id,
           name: node.name,
-          displayName: node.displayName || humanizeName(node.name),
+          displayName: node.displayName || formatDisplayName(node.name),
           forms: Array.isArray(node.forms) ? node.forms.slice() : [],
           children: [],
           order: orderCounter++,
@@ -3772,8 +3790,11 @@ function DetailPanel({
 
   // Build a separate evolution tree that only shows alternate forms
   const alternateFormsEvolutionTree = useMemo(() => {
-    // Use alternate forms evolution paths if available, otherwise fall back to standard paths
-    const pathsToUse = alternateFormsEvoPaths.length > 0 ? alternateFormsEvoPaths : evoPaths;
+    // Only build alternate forms tree if there are alternate forms evolution paths
+    // If there are no alternate forms paths, return empty array immediately
+    if (alternateFormsEvoPaths.length === 0) return [];
+    
+    const pathsToUse = alternateFormsEvoPaths;
     const baseTree = buildEvolutionTree(pathsToUse, false);
     if (!baseTree || baseTree.length === 0) return [];
     
@@ -3818,7 +3839,7 @@ function DetailPanel({
       return {
         id: primaryAltForm.id,
         name: primaryAltForm.name,
-        displayName: primaryAltForm.displayName || humanizeName(primaryAltForm.name),
+        displayName: primaryAltForm.displayName || formatDisplayName(primaryAltForm.name),
         forms: alternateForms,
         children: altChildren,
         order: entry.order,
@@ -3831,7 +3852,7 @@ function DetailPanel({
       .filter(Boolean);
     
     return result;
-  }, [evoPaths, buildEvolutionTree, compareForms]);
+  }, [alternateFormsEvoPaths, buildEvolutionTree, compareForms]);
 
   // Collect all non-regional, non-default alternate forms across the entire evolution tree
   // Excludes Mega and GMax forms (they have their own buttons)
@@ -3965,7 +3986,7 @@ function DetailPanel({
   const renderEvolutionPokemon = (node, { isCurrent = false, isRoot = false, clickOptions = null } = {}) => {
     if (!node) return null;
     const nodeId = node.id != null ? String(node.id) : null;
-    const nodeName = node.displayName || humanizeName(node.name);
+    const nodeName = node.displayName || formatDisplayName(node.name);
     if (!nodeId || !nodeName) return null;
     const isActive = isCurrent || nodeId === String(id);
     const classes = ["evo-tree-pokemon", isRoot ? "is-root" : "", isActive ? "is-current" : ""]
@@ -4065,7 +4086,7 @@ function DetailPanel({
         primaryDisplayNode = {
           id: entry.baseEntry.id,
           name: entry.baseEntry.name,
-          displayName: entry.baseEntry.displayName || humanizeName(entry.baseEntry.name),
+          displayName: entry.baseEntry.displayName || formatDisplayName(entry.baseEntry.name),
         };
         promotedForm = null; // No promotion, using base entry
       } else {
@@ -4100,7 +4121,7 @@ function DetailPanel({
           ...(isAlternateTree ? [] : [{
             id: entry.id,
             name: entry.name,
-            displayName: entry.displayName || humanizeName(entry.name),
+            displayName: entry.displayName || formatDisplayName(entry.name),
             isDefault: true,
             tags: ["Default"],
           }]),
@@ -4366,7 +4387,7 @@ function DetailPanel({
       const formBranches = rawForms && rawForms.length ? rawForms.map((form) => ({ ...form })) : [];
       const currentNode = {
         name: node.species.name,
-        displayName: humanizeName(node.species.name),
+        displayName: formatDisplayName(node.species.name),
         id: speciesId,
         forms: formBranches,
       };
@@ -4463,7 +4484,7 @@ function DetailPanel({
             mergedForms.push({
               id: f.id,
               name: f.name,
-              displayName: f.displayName || humanizeName(f.name),
+              displayName: f.displayName || formatDisplayName(f.name),
               isDefault: !!f.isDefault,
               tags: Array.isArray(f.tags) ? f.tags.slice() : [],
               isCurrent: !!f.isCurrent,
@@ -6198,7 +6219,10 @@ function DetailPanel({
             </section>
             {evoPaths.length > 0 && (
               <section className="evo-section">
-                <div className={alternateFormsEvolutionTree.length > 0 ? "evo-tree-container" : "evo-tree"}>
+                <div
+                  className={alternateFormsEvolutionTree.length > 0 ? "evo-tree-container" : ""}
+                  style={{ position: "relative" }}
+                >
                   {(hasMegaForms || hasGmaxForms) && (
                     <div className="evo-tree-actions">
                       {hasMegaForms && (

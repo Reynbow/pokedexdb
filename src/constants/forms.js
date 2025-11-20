@@ -13,6 +13,8 @@ export const FORM_ORDER = new Map([
 // Alternate forms are shown by default - only add entries here to hide specific pokemon's alternate forms.
 export const ALT_FORM_HIDE_FLAGS = new Set([
   25, // hide Pikachu's alternates
+  1007, // koraidon
+  1008, // moraidon
 ]);
 
 

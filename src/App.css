@@ -4574,7 +4574,10 @@
 
 .weak-section { padding: 6px 0 12px; }
 
-.evo-section { padding: 0px 16px 0px; }
+.evo-section {
+  padding: 0px 16px 0px;
+  position: relative;
+}
 .evo-tree-container {
   display: flex;
   flex-direction: column;

@@ -94,8 +94,25 @@ function getLuminance(hex) {
     return 1;
   }
 }
+const REGIONAL_NAME_PREFIXES = new Map([
+  ["alola", "Alolan"],
+  ["alolan", "Alolan"],
+  ["galar", "Galarian"],
+  ["galarian", "Galarian"],
+  ["hisui", "Hisuian"],
+  ["hisuan", "Hisuian"],
+]);
+
 const formatDisplayName = (rawName) => {
   const stripped = stripMegaGmaxTokens(rawName);
+  const key = String(stripped || "").toLowerCase();
+  const parts = key.split("-");
+  const suffix = parts[parts.length - 1];
+  const prefix = REGIONAL_NAME_PREFIXES.get(suffix);
+  if (prefix && parts.length > 1) {
+    const baseName = parts.slice(0, -1).join("-");
+    return `${prefix} ${toTitleCase(baseName)}`;
+  }
   return toTitleCase(stripped);
 };
 
