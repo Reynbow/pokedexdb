@@ -4575,6 +4575,16 @@
 .weak-section { padding: 6px 0 12px; }
 
 .evo-section { padding: 0px 16px 0px; }
+.evo-tree-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.evo-tree-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 .evo-tree {
   border: 1px solid rgba(148, 163, 184, 0.24);
   background: rgba(15, 23, 42, 0.62);
@@ -4584,6 +4594,17 @@
   flex-direction: column;
   gap: 6px;
   box-shadow: 0 10px 24px rgba(8, 12, 24, 0.28);
+}
+.evo-tree-alt {
+  position: relative;
+}
+.evo-tree-alt-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #9aa8d6;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .evo-tree-roots,
 .evo-tree-children {
@@ -5258,11 +5279,19 @@
     font-size: 0.6rem;
   }
   
+  .evo-tree-wrapper {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
   .evo-tree { 
     padding: 10px 12px; 
     gap: 5px; 
     overflow-x: auto;
     overflow-wrap: break-word;
+  }
+  .evo-tree-alt-title {
+    font-size: 0.8rem;
+    margin-bottom: 6px;
   }
   .evo-tree-actions {
     top: 6px;

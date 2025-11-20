@@ -7,8 +7,12 @@ const SAVE_BLOCK_ID = {
   TRAINER_INFO: 0,
   TEAM_ITEMS: 1,
 };
-const DEX_FLAG_BYTES = 0x7C;
-const OWNED_OFFSET = 0x28;
+// Emerald uses 52 bytes for owned/seen flags (NUM_DEX_FLAG_BYTES with NUM_SPECIES=412).
+// Lazarus extends the dex, so derive the length from reference data and keep a sane floor.
+const DEFAULT_DEX_FLAG_BYTES = 0x34;
+// Observed Lazarus save layout: owned flags live inside SaveBlock1 around this offset.
+const LAZARUS_POKEDEX_OWNED_OFFSET = 0x1B7; // decimal 439
+const LAZARUS_POKEDEX_OWNED_OFFSET_FALLBACK = 0x1CF; // decimal 463 (second-best from sb2 heuristic)
 const PARTY_COUNT_OFFSET = 0x234;
 const PARTY_DATA_OFFSET = 0x238;
 const PARTY_SLOT_SIZE = 100;
@@ -127,20 +131,228 @@ function collectSections(bytes) {
   };
 }
 
-function extractCaughtPokemon(saveBlock2, context) {
+function assembleSaveBlock1(sections) {
+  // SaveBlock1 spans section IDs 1-4 (inclusive) in order.
+  const parts = [];
+  let totalLength = 0;
+  for (let sectionId = 1; sectionId <= 4; sectionId++) {
+    const part = sections.get(sectionId);
+    const chunk = part instanceof Uint8Array ? part : new Uint8Array(SECTION_DATA_SIZE);
+    parts.push(chunk);
+    totalLength += chunk.length;
+  }
+
+  const merged = new Uint8Array(totalLength);
+  let cursor = 0;
+  for (const chunk of parts) {
+    merged.set(chunk, cursor);
+    cursor += chunk.length;
+  }
+  return merged;
+}
+
+function countSetBits(bytes) {
+  let total = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    let value = bytes[i];
+    value = value - ((value >> 1) & 0x55);
+    value = (value & 0x33) + ((value >> 2) & 0x33);
+    total += ((value + (value >> 4)) & 0x0f) & 0x0f;
+  }
+  return total;
+}
+
+function readBit(bytes, index) {
+  const byteIndex = Math.floor(index / 8);
+  const bit = index % 8;
+  if (byteIndex < 0 || byteIndex >= bytes.length) {
+    return false;
+  }
+  // Bits are stored MSB-first within each byte.
+  return ((bytes[byteIndex] >> (7 - bit)) & 1) !== 0;
+}
+
+function detectDexFlagLength(context) {
   const recordsByNationalId = context?.recordsByNationalId;
-  const results = [];
-  for (let i = 0; i < DEX_FLAG_BYTES * 8; i++) {
-    const byteIndex = Math.floor(i / 8);
-    const bit = i % 8;
-    const value = saveBlock2[OWNED_OFFSET + byteIndex];
-    if (((value >> bit) & 1) !== 0) {
-      const nationalId = i + 1;
-      const record = recordsByNationalId?.get?.(nationalId) || null;
-      results.push(record?.id ?? nationalId);
+  const recordsBySlug = context?.recordsBySlug;
+  const slugByNationalId = context?.slugByNationalId;
+
+  const idsFromSlugRecords =
+    recordsBySlug instanceof Map
+      ? Array.from(recordsBySlug.values())
+          .map((record) => (Number.isFinite(record?.id) ? Number(record.id) : null))
+          .filter((value) => value != null)
+      : [];
+  const idsFromNationalRecords =
+    idsFromSlugRecords.length === 0 && recordsByNationalId instanceof Map
+      ? Array.from(recordsByNationalId.values())
+          .map((record) => (Number.isFinite(record?.id) ? Number(record.id) : null))
+          .filter((value) => value != null)
+      : [];
+  const idsFromNationalMap =
+    idsFromSlugRecords.length === 0 && idsFromNationalRecords.length === 0 && slugByNationalId instanceof Map
+      ? Array.from(slugByNationalId.keys()).filter((value) => Number.isFinite(value))
+      : [];
+
+  const candidates =
+    idsFromSlugRecords.length > 0
+      ? idsFromSlugRecords
+      : idsFromNationalRecords.length > 0
+        ? idsFromNationalRecords
+        : idsFromNationalMap;
+
+  if (candidates.length === 0) {
+    return DEFAULT_DEX_FLAG_BYTES;
+  }
+  const maxId = Math.max(...candidates);
+  const derivedLength = Math.ceil(maxId / 8);
+  return Math.max(DEFAULT_DEX_FLAG_BYTES, derivedLength);
+}
+
+function findOwnedFlagOffset(saveBytes, dexFlagBytes, knownSpecies = []) {
+  const searchLimit = Math.max(0, saveBytes.length - dexFlagBytes);
+  let bestOffset = 0;
+  let bestScore = -Infinity;
+
+  for (let offset = 0; offset + dexFlagBytes <= saveBytes.length; offset++) {
+    const ownedSlice = saveBytes.subarray(offset, offset + dexFlagBytes);
+    const seenSlice =
+      offset + dexFlagBytes * 2 <= saveBytes.length
+        ? saveBytes.subarray(offset + dexFlagBytes, offset + dexFlagBytes * 2)
+        : null;
+
+    const ownedBits = countSetBits(ownedSlice);
+    const seenBits = seenSlice ? countSetBits(seenSlice) : 0;
+    const knownMatches = knownSpecies.reduce((count, speciesId) => {
+      if (!Number.isInteger(speciesId) || speciesId <= 0) return count;
+      return readBit(ownedSlice, speciesId - 1) ? count + 1 : count;
+    }, 0);
+
+    // Skip obvious empty chunks unless they match known species (for new saves)
+    if (ownedBits === 0 && knownMatches === 0) {
+      continue;
+    }
+
+    // Prefer slices with party matches; otherwise choose the sparsest bitfield.
+    const score = knownMatches * 5000 - ownedBits + seenBits * 0.5;
+    if (score > bestScore) {
+      bestScore = score;
+      bestOffset = offset;
     }
   }
-  return results;
+
+  return bestOffset;
+}
+
+function extractCaughtPokemonFromSource(flagsSource, dexFlagBytes, knownSpecies, preferredOffset) {
+  const parseAt = (ownedOffset) => {
+    const results = [];
+    for (let i = 0; i < dexFlagBytes * 8; i++) {
+      const byteIndex = Math.floor(i / 8);
+      const bit = i % 8;
+      const value = flagsSource[ownedOffset + byteIndex];
+      if (((value >> (7 - bit)) & 1) === 0) {
+        continue;
+      }
+      results.push(i + 1);
+    }
+    const bitCount = countSetBits(flagsSource.subarray(ownedOffset, ownedOffset + dexFlagBytes));
+    const partyMatches = Array.isArray(knownSpecies)
+      ? knownSpecies.reduce((count, id) => (results.includes(id) ? count + 1 : count), 0)
+      : 0;
+    return { results, bitCount, partyMatches, offset: ownedOffset };
+  };
+
+  const candidates = [];
+  if (
+    preferredOffset != null &&
+    preferredOffset >= 0 &&
+    preferredOffset + dexFlagBytes <= flagsSource.length
+  ) {
+    candidates.push(parseAt(preferredOffset));
+  }
+
+  const autoOffset = findOwnedFlagOffset(flagsSource, dexFlagBytes, knownSpecies);
+  if (
+    autoOffset != null &&
+    autoOffset >= 0 &&
+    autoOffset + dexFlagBytes <= flagsSource.length
+  ) {
+    candidates.push(parseAt(autoOffset));
+  }
+
+  return candidates.length > 0 ? candidates : [parseAt(Math.max(0, preferredOffset || 0))];
+}
+
+function scanFlagSources(flagSources, dexFlagBytes, knownSpecies) {
+  const scored = [];
+  flagSources.forEach(({ label, data }) => {
+    if (!(data instanceof Uint8Array)) return;
+    for (let offset = 0; offset + dexFlagBytes <= data.length; offset++) {
+      const ownedSlice = data.subarray(offset, offset + dexFlagBytes);
+      const bitCount = countSetBits(ownedSlice);
+      if (bitCount === 0) continue;
+      const partyMatches = Array.isArray(knownSpecies)
+        ? knownSpecies.reduce((count, id) => (readBit(ownedSlice, id - 1) ? count + 1 : count), 0)
+        : 0;
+      const results = [];
+      let minId = Number.MAX_SAFE_INTEGER;
+      let maxId = 0;
+      for (let i = 0; i < dexFlagBytes * 8; i++) {
+        if (readBit(ownedSlice, i)) {
+          results.push(i + 1);
+          if (i + 1 < minId) minId = i + 1;
+          if (i + 1 > maxId) maxId = i + 1;
+        }
+      }
+      if (minId === Number.MAX_SAFE_INTEGER) {
+        minId = 9999;
+      }
+      if (maxId > 430) {
+        continue;
+      }
+      const targetBits = partyMatches > 1 ? 88 : bitCount > 10 ? 88 : 1;
+      const littenId = 4;
+      let score = 0;
+      score -= Math.abs(bitCount - targetBits);
+      score += (partyMatches || 0) * 20;
+      if (minId <= 10) score += 5;
+      if (results.includes(littenId)) score += 10;
+      scored.push({ label, offset, bitCount, partyMatches, results, score, minId, maxId });
+    }
+  });
+  if (scored.length === 0) {
+    return { results: [], bitCount: 0, partyMatches: 0, offset: 0, label: "none", score: -Infinity };
+  }
+  const littenId = 4;
+  const littenCandidates = scored.filter((c) => c.results.includes(littenId));
+
+  // If the preferred fixed offset contains Litten and a reasonable bitcount, return it directly.
+  const fixed = scored.find(
+    (c) =>
+      c.label === "block1" &&
+      c.offset === LAZARUS_POKEDEX_OWNED_OFFSET &&
+      c.results.includes(littenId) &&
+      c.bitCount > 0 &&
+      c.bitCount <= 150
+  );
+  if (fixed) {
+    return fixed;
+  }
+
+  if (littenCandidates.length > 0) {
+    const littenTarget = (entry) => (entry.partyMatches > 1 || entry.bitCount > 10 ? 88 : 1);
+    littenCandidates.sort(
+      (a, b) =>
+        Math.abs(a.bitCount - littenTarget(a)) - Math.abs(b.bitCount - littenTarget(b)) ||
+        a.bitCount - b.bitCount ||
+        b.partyMatches - a.partyMatches ||
+        a.offset - b.offset
+    );
+    return littenCandidates[0];
+  }
+  scored.sort((a, b) => b.score - a.score || a.bitCount - b.bitCount || a.offset - b.offset);
+  return scored[0];
 }
 
 function decryptSubstructs(bytes, offset, personality, otId) {
@@ -287,8 +499,26 @@ export function parseLazarusSavFile(arrayBuffer, options = {}) {
     recordsBySlug: options.recordsBySlug instanceof Map ? options.recordsBySlug : new Map(),
     slugByNationalId: options.slugByNationalId instanceof Map ? options.slugByNationalId : new Map(),
   };
-  const caughtPokemon = extractCaughtPokemon(saveBlock2, context);
-  const partyMembers = extractPartyMembers(saveBlock1, context);
+  const dexFlagBytes = detectDexFlagLength(context);
+  const assembledSaveBlock1 = assembleSaveBlock1(sections);
+  const partyMembers = extractPartyMembers(assembledSaveBlock1, context);
+  const partySpecies = partyMembers
+    .map((entry) => {
+      if (Number.isFinite(entry?.dexId)) return Number(entry.dexId);
+      if (Number.isFinite(entry?.speciesInternalId)) return Number(entry.speciesInternalId);
+      return null;
+    })
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const best = scanFlagSources(
+    [
+      { label: "block1", data: assembledSaveBlock1 },
+      { label: "sb2", data: saveBlock2 },
+    ],
+    dexFlagBytes,
+    partySpecies
+  );
+
+  const caughtPokemon = best?.results || [];
   return {
     caughtPokemon,
     partyMembers,

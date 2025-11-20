@@ -1380,7 +1380,9 @@ export default function SavPage() {
           name: record?.name || `Pokemon ${entryId}`,
           slug: recordSlug || null,
           nationalId: record?.nationalId ?? null,
-          caught: record?.id != null && caughtSet.has(Number(record.id)),
+          caught:
+            (record?.nationalId != null && caughtSet.has(Number(record.nationalId))) ||
+            (record?.id != null && caughtSet.has(Number(record.id))),
           visibleEntries,
           evolutionRequirement,
           record,
@@ -1465,7 +1467,9 @@ export default function SavPage() {
             slugMap.set(slug, {
               name: record?.name || slug,
               slug,
-              caught: record?.id != null && caughtSet.has(Number(record.id)),
+              caught:
+                (record?.nationalId != null && caughtSet.has(Number(record.nationalId))) ||
+                (record?.id != null && caughtSet.has(Number(record.id))),
             });
           }
         });
