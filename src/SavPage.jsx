@@ -150,6 +150,7 @@ const DEFAULT_METHOD_LABEL = "Grass";
 const PARTY_DATA_OFFSETS = [0x2F2C, BANK1_START + 0x2F2C];
 const PARTY_MAX_SIZE = 6;
 const LOCATION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const LAZARUS_PC_CODE_LOCATION = "Cheat Code";
 
 let legacyEncounterCache = null;
 let legacyEncounterPromise = null;
@@ -918,40 +919,58 @@ function buildLegacyEncounterMap(csvText) {
   return encounterMap;
 }
 
+function normalizeLazarusLocationSegment(segment) {
+  const trimmed = String(segment || "").trim();
+  if (!trimmed || trimmed === "?") return null;
+  if (/^\?\s*\(pc code\)/i.test(trimmed)) return LAZARUS_PC_CODE_LOCATION;
+  return trimmed;
+}
+
+function splitLazarusLocations(locationText) {
+  const rawSegments = String(locationText || "")
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+  let hasEvolutionFlag = false;
+  const segments = [];
+  rawSegments.forEach((segment) => {
+    if (/\(evolve\)/i.test(segment)) {
+      hasEvolutionFlag = true;
+      return;
+    }
+    const cleaned = normalizeLazarusLocationSegment(segment);
+    if (cleaned) {
+      segments.push(cleaned);
+    }
+  });
+  return { segments, hasEvolutionFlag };
+}
+
 function buildLazarusLocationEntries(record) {
   const locationText = String(record?.location || "").trim();
   const evolutionText = String(record?.evolution || "").trim();
   if (!locationText) {
     return { entries: [], evolutionRequirement: null };
   }
-  const locationSegments = locationText
-    .split(",")
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
-  if (locationSegments.length === 0) {
+  const { segments: locationSegments, hasEvolutionFlag } = splitLazarusLocations(locationText);
+  if (locationSegments.length === 0 && !hasEvolutionFlag) {
     return { entries: [], evolutionRequirement: null };
   }
 
-  const entries = [];
   let evolutionRequirement = null;
-  locationSegments.forEach((segment) => {
-    if (/\(evolve\)/i.test(segment)) {
-      if (!evolutionRequirement) {
-        evolutionRequirement = {
-          method: evolutionText || "Evolve",
-          target: record?.name || "Evolution",
-        };
-      }
-      return;
-    }
-    entries.push({
-      location: segment,
-      methodLabel: "Location",
-      methodType: "land",
-      levelSummary: "",
-      chanceSummary: "",
-    });
-  });
+  if (hasEvolutionFlag) {
+    evolutionRequirement = {
+      method: evolutionText || "Evolve",
+      target: record?.name || "Evolution",
+    };
+  }
+  const entries = locationSegments.map((segment) => ({
+    location: segment,
+    methodLabel: "Location",
+    methodType: "land",
+    levelSummary: "",
+    chanceSummary: "",
+  }));
 
   return { entries, evolutionRequirement };
 }
@@ -1352,9 +1371,11 @@ export default function SavPage() {
     if (!showingYellow) {
       return lazarusDex.map((record, index) => {
         const { entries: visibleEntries, evolutionRequirement } = buildLazarusLocationEntries(record);
-        const entryId = Number.isFinite(record?.id) ? Number(record.id) : index + 1;
         const recordSlug = normalizeSpeciesSlug(record?.slug || record?.name);
+        const entryId = Number.isFinite(record?.id) ? Number(record.id) : index + 1;
+        const entryKey = `${entryId}-${recordSlug || record?.name || "entry"}-${index}`;
         return {
+          entryKey,
           id: entryId,
           name: record?.name || `Pokemon ${entryId}`,
           slug: recordSlug || null,
@@ -1371,6 +1392,7 @@ export default function SavPage() {
       const slug = normalizeLegacyPokemonName(name);
       const encounterEntries = legacyMapReady ? legacyEncounters.get(slug) || [] : [];
       return {
+        entryKey: `gen1-${pokemonId}`,
         id: pokemonId,
         name,
         slug,
@@ -1403,10 +1425,8 @@ export default function SavPage() {
       }
     } else {
       lazarusDex.forEach((record) => {
-        const value = String(record?.location || "").trim();
-        if (value) {
-          names.add(value);
-        }
+        const { segments } = splitLazarusLocations(record?.location);
+        segments.forEach((segment) => names.add(segment));
       });
     }
     return Array.from(names).sort((a, b) => LOCATION_COLLATOR.compare(a, b));
@@ -1430,23 +1450,25 @@ export default function SavPage() {
     if (!showingYellow) {
       const aggregator = new Map();
       lazarusDex.forEach((record) => {
-        const locationName = String(record?.location || "").trim();
-        if (!locationName) {
+        const { segments: locationSegments } = splitLazarusLocations(record?.location);
+        if (locationSegments.length === 0) {
           return;
         }
-        let slugMap = aggregator.get(locationName);
-        if (!slugMap) {
-          slugMap = new Map();
-          aggregator.set(locationName, slugMap);
-        }
-        const slug = record?.slug || record?.name || locationName;
-        if (!slugMap.has(slug)) {
-          slugMap.set(slug, {
-            name: record?.name || slug,
-            slug,
-            caught: record?.id != null && caughtSet.has(Number(record.id)),
-          });
-        }
+        locationSegments.forEach((locationName) => {
+          let slugMap = aggregator.get(locationName);
+          if (!slugMap) {
+            slugMap = new Map();
+            aggregator.set(locationName, slugMap);
+          }
+          const slug = record?.slug || record?.name || locationName;
+          if (!slugMap.has(slug)) {
+            slugMap.set(slug, {
+              name: record?.name || slug,
+              slug,
+              caught: record?.id != null && caughtSet.has(Number(record.id)),
+            });
+          }
+        });
       });
       const result = new Map();
       for (const [locationName, slugMap] of aggregator.entries()) {
@@ -1972,7 +1994,7 @@ export default function SavPage() {
                     const lazarusAbilities = referenceRecord?.abilities || [];
 
                   return (
-                    <div key={entry.id} className={cardClassNames}>
+                    <div key={entry.entryKey || entry.id} className={cardClassNames}>
                       <div className="sav-result-row__pokemon">
                         <div className="sav-result-row__sprite">
                           <SpriteImage id={spriteIdentifier} alt={pokemonName} {...resultSpriteProps} />
