@@ -329,14 +329,24 @@ export default function MinigamePage() {
     try {
       const url = new URL(window.location.href);
       const basePath = (import.meta.env.BASE_URL || "/").replace(/\/+$|^$/, "/");
-      if (url.pathname !== basePath) {
-        url.pathname = basePath;
+      const expectedPath = basePath === "/" ? "/whosthat" : `${basePath}whosthat`;
+      
+      // Redirect hash-based #/whosthat to path-based /whosthat
+      if (url.hash === "#/whosthat" || url.hash.startsWith("#/whosthat")) {
+        url.pathname = expectedPath;
+        url.hash = "";
+        ["p", "i", "m", "a"].forEach((param) => url.searchParams.delete(param));
+        window.history.replaceState({}, "", url);
+        return;
       }
-      if (url.hash !== "#/whosthat") {
-        url.hash = "#/whosthat";
+      
+      // Ensure path is /whosthat
+      if (url.pathname !== expectedPath && !url.pathname.endsWith("/whosthat")) {
+        url.pathname = expectedPath;
+        url.hash = "";
+        ["p", "i", "m", "a"].forEach((param) => url.searchParams.delete(param));
+        window.history.replaceState({}, "", url);
       }
-      ["p", "i", "m", "a"].forEach((param) => url.searchParams.delete(param));
-      window.history.replaceState({}, "", url);
     } catch {}
   }, []);
 

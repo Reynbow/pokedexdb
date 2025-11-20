@@ -113,20 +113,42 @@ export default function AbilitiesPage() {
     return [...result].sort((a, b) => a.name.localeCompare(b.name));
   }, [abilities, query]);
 
+  // Function to read URL and select ability
+  const resolveAbilityFromUrl = useCallback(() => {
+    const u = new URL(window.location.href);
+    const name = u.searchParams.get("a");
+    if (!name) {
+      setSelectedAbility(null);
+      return;
+    }
+    const found = abilities.find((ab) => ab.name === name);
+    if (found) {
+      setSelectedAbility(found);
+    }
+  }, [abilities]);
+
+  // Check URL on mount and when abilities load
+  useEffect(() => {
+    if (abilities.length > 0) {
+      resolveAbilityFromUrl();
+    }
+  }, [abilities, resolveAbilityFromUrl]);
+
+  // Listen for back/forward navigation and location changes
   useEffect(() => {
     const onPop = () => {
-      const u = new URL(window.location.href);
-      const name = u.searchParams.get("a");
-      if (!name) {
-        setSelectedAbility(null);
-        return;
-      }
-      const found = abilities.find((ab) => ab.name === name);
-      if (found) setSelectedAbility(found);
+      resolveAbilityFromUrl();
+    };
+    const onLocationChange = () => {
+      resolveAbilityFromUrl();
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [abilities]);
+    window.addEventListener("locationchange", onLocationChange);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("locationchange", onLocationChange);
+    };
+  }, [resolveAbilityFromUrl]);
 
   function selectAbility(ab) {
     const u = new URL(window.location.href);

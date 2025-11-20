@@ -1112,13 +1112,22 @@ export default function SavPage() {
     try {
       const url = new URL(window.location.href);
       const basePath = (import.meta.env.BASE_URL || "/").replace(/\/+$|^$/, "/");
-      if (url.pathname !== basePath) {
-        url.pathname = basePath;
+      const expectedPath = basePath === "/" ? "/save" : `${basePath}save`;
+      
+      // Redirect hash-based #/sav to path-based /save
+      if (url.hash === "#/sav" || url.hash.startsWith("#/sav")) {
+        url.pathname = expectedPath;
+        url.hash = "";
+        window.history.replaceState({}, "", url);
+        return;
       }
-      if (url.hash !== "#/sav") {
-        url.hash = "#/sav";
+      
+      // Ensure path is /save
+      if (url.pathname !== expectedPath && !url.pathname.endsWith("/save")) {
+        url.pathname = expectedPath;
+        url.hash = "";
+        window.history.replaceState({}, "", url);
       }
-      window.history.replaceState({}, "", url);
     } catch {
       // Ignore browsers that cannot update the URL/hash
       return;
@@ -2131,10 +2140,10 @@ export default function SavPage() {
                                           <span className="sav-party-slot__meta-value">{weightLabel}</span>
                                         </div>
                                       </div>
-                                      <div className="sav-party-slot__entry-block">
-                                        <div className="sav-party-slot__entry-label">Yellow Pokedex entry</div>
-                                        <p className="sav-party-slot__entry-text">{entryText}</p>
-                                      </div>
+                                    </div>
+                                    <div className="sav-party-slot__entry-block">
+                                      <div className="sav-party-slot__entry-label">Yellow Pokedex entry</div>
+                                      <p className="sav-party-slot__entry-text">{entryText}</p>
                                     </div>
                                   </div>
                                 </div>

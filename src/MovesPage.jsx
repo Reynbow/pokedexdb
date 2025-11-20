@@ -195,20 +195,42 @@ export default function MovesPage() {
     return noSuffix || variants[0];
   }
 
+  // Function to read URL and select move
+  const resolveMoveFromUrl = useCallback(() => {
+    const u = new URL(window.location.href);
+    const name = u.searchParams.get("m");
+    if (!name) {
+      setSelectedMove(null);
+      return;
+    }
+    const found = moves.find((mv) => mv.name === name);
+    if (found) {
+      setSelectedMove(found);
+    }
+  }, [moves]);
+
+  // Check URL on mount and when moves load
+  useEffect(() => {
+    if (moves.length > 0) {
+      resolveMoveFromUrl();
+    }
+  }, [moves, resolveMoveFromUrl]);
+
+  // Listen for back/forward navigation and location changes
   useEffect(() => {
     const onPop = () => {
-      const u = new URL(window.location.href);
-      const name = u.searchParams.get("m");
-      if (!name) {
-        setSelectedMove(null);
-        return;
-      }
-      const found = moves.find((mv) => mv.name === name);
-      if (found) setSelectedMove(found);
+      resolveMoveFromUrl();
+    };
+    const onLocationChange = () => {
+      resolveMoveFromUrl();
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [moves]);
+    window.addEventListener("locationchange", onLocationChange);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("locationchange", onLocationChange);
+    };
+  }, [resolveMoveFromUrl]);
 
   function selectMove(mv) {
     const u = new URL(window.location.href);

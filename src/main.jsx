@@ -106,18 +106,85 @@ const LoadingFallback = () => (
 
 function RootRouter() {
   const [, setVersion] = useState(0)
+  const [pathname, setPathname] = useState(() => window.location.pathname.toLowerCase())
+  const [hash, setHash] = useState(() => String(window.location.hash || '').toLowerCase())
+  
   useEffect(() => {
-    const onChange = () => setVersion(v => v + 1)
+    const onChange = () => {
+      setPathname(window.location.pathname.toLowerCase())
+      setHash(String(window.location.hash || '').toLowerCase())
+      setVersion(v => v + 1)
+    }
     window.addEventListener('hashchange', onChange)
     window.addEventListener('popstate', onChange)
+    // Also listen for custom navigation events
+    window.addEventListener('locationchange', onChange)
     return () => {
       window.removeEventListener('hashchange', onChange)
       window.removeEventListener('popstate', onChange)
+      window.removeEventListener('locationchange', onChange)
     }
   }, [])
-
-  const hash = String(window.location.hash || '').toLowerCase()
+  
+  const basePath = (import.meta.env?.BASE_URL || '/').replace(/\/+$|^$/, '/')
+  const normalizedPath = pathname.replace(basePath === '/' ? '' : basePath, '').replace(/^\//, '').toLowerCase()
+  
+  // Path-based routing (preferred)
+  if (normalizedPath === 'save' || pathname.endsWith('/save')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <SavPage />
+      </Suspense>
+    )
+  }
+  if (normalizedPath === 'moves' || pathname.endsWith('/moves')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <MovesPage />
+      </Suspense>
+    )
+  }
+  if (normalizedPath === 'abilities' || pathname.endsWith('/abilities')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AbilitiesPage />
+      </Suspense>
+    )
+  }
+  if (normalizedPath === 'ev-training' || normalizedPath === 'ev' || pathname.endsWith('/ev-training') || pathname.endsWith('/ev')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <EvTrainingPage />
+      </Suspense>
+    )
+  }
+  if (normalizedPath === 'whosthat' || pathname.endsWith('/whosthat')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <MinigamePage />
+      </Suspense>
+    )
+  }
+  if (normalizedPath === 'items' || pathname.endsWith('/items')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <ItemsPage />
+      </Suspense>
+    )
+  }
+  if (normalizedPath === 'home' || pathname.endsWith('/home')) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <HomePage />
+      </Suspense>
+    )
+  }
+  
+  // Legacy hash-based routing (for backward compatibility and redirects)
   if (hash.startsWith('#/home')) {
+    const newPath = basePath === '/' ? '/home' : `${basePath}home`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <HomePage />
@@ -125,6 +192,9 @@ function RootRouter() {
     )
   }
   if (hash.startsWith('#/items')) {
+    const newPath = basePath === '/' ? '/items' : `${basePath}items`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <ItemsPage />
@@ -132,6 +202,9 @@ function RootRouter() {
     )
   }
   if (hash.startsWith('#/moves')) {
+    const newPath = basePath === '/' ? '/moves' : `${basePath}moves`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <MovesPage />
@@ -139,6 +212,9 @@ function RootRouter() {
     )
   }
   if (hash.startsWith('#/abilities')) {
+    const newPath = basePath === '/' ? '/abilities' : `${basePath}abilities`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <AbilitiesPage />
@@ -146,6 +222,9 @@ function RootRouter() {
     )
   }
   if (hash.startsWith('#/ev-training') || hash.startsWith('#/ev')) {
+    const newPath = basePath === '/' ? '/ev-training' : `${basePath}ev-training`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <EvTrainingPage />
@@ -153,13 +232,20 @@ function RootRouter() {
     )
   }
   if (hash.startsWith('#/whosthat')) {
+    const newPath = basePath === '/' ? '/whosthat' : `${basePath}whosthat`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <MinigamePage />
       </Suspense>
     )
   }
+  // Legacy hash-based /sav route - redirect to /save
   if (hash.startsWith('#/sav')) {
+    const newPath = basePath === '/' ? '/save' : `${basePath}save`
+    window.history.replaceState({}, '', newPath)
+    window.dispatchEvent(new Event('locationchange'))
     return (
       <Suspense fallback={<LoadingFallback />}>
         <SavPage />
