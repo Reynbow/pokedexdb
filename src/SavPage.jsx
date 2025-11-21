@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import "./App.css";
 import SpriteImage from "./components/SpriteImage.jsx";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
-import { buildPokemonPath } from "./utils/url.js";
+import { buildPokemonPath, getBasePath } from "./utils/url.js";
 import gen1TypeMapData from "./data/gen1-types.json";
 import gen1TypeChartData from "./data/gen1-type-chart.json";
 import parseLazarusSavFile, { normalizeSpeciesSlug } from "./utils/lazarusSave.js";
@@ -1072,6 +1072,7 @@ export default function SavPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [showCaught, setShowCaught] = useState(true);
+  const [showOnlyCaught, setShowOnlyCaught] = useState(false);
   const [lazarusDex, setLazarusDex] = useState([]);
   const [lazarusDexError, setLazarusDexError] = useState(null);
   const speciesSlugLookup = useMemo(() => {
@@ -1254,6 +1255,7 @@ export default function SavPage() {
     setLocationFilter("");
     setSearchTerm("");
     setShowCaught(true);
+    setShowOnlyCaught(false);
   }, []);
 
   const handleYellowFileChange = useCallback((event) => {
@@ -1437,7 +1439,10 @@ export default function SavPage() {
   const filteredResults = useMemo(() => {
     const search = String(searchTerm || "").trim().toLowerCase();
     const locationValue = String(locationFilter || "").trim();
+    const hasData = fileData instanceof Uint8Array;
     return combinedResults.filter((entry) => {
+      // If showOnlyCaught is true and we have save data, only show caught Pokemon
+      if (showOnlyCaught && hasData && !entry.caught) return false;
       if (locationValue) {
         const matchesLocation = entry.visibleEntries.some((loc) => loc.location === locationValue);
         if (!matchesLocation) return false;
@@ -1446,7 +1451,7 @@ export default function SavPage() {
       if (!search) return true;
       return entry.name.toLowerCase().includes(search);
     });
-  }, [combinedResults, locationFilter, searchTerm, showCaught]);
+  }, [combinedResults, locationFilter, searchTerm, showCaught, showOnlyCaught, fileData]);
 
   const locationPokemonLookup = useMemo(() => {
     if (!showingYellow) {
@@ -1530,8 +1535,24 @@ export default function SavPage() {
     setLocationFilter("");
     setSearchTerm("");
     setShowCaught(true);
+    setShowOnlyCaught(false);
     setLoading(false);
   }, []);
+
+  const handlePreviewPokedex = useCallback((gameType) => {
+    // Set the game key if not already set
+    if (gameKey !== gameType) {
+      setGameKey(gameType);
+    }
+    // Clear search and location filters
+    setSearchTerm("");
+    setLocationFilter("");
+    // Show caught Pokemon - only filter to caught if there's save data
+    setShowCaught(true);
+    // Only show caught Pokemon if we have save data loaded
+    const hasData = fileData instanceof Uint8Array;
+    setShowOnlyCaught(hasData && caughtPokemon.length > 0);
+  }, [gameKey, fileData, caughtPokemon.length]);
 
   return (
     <div className="app-shell sav-page">
@@ -1565,10 +1586,19 @@ export default function SavPage() {
           {!hasFileSelected && (
             <>
               <article className="sav-card sav-card--primary">
-                <div className="sav-card__header">
-                  <h2 className="sav-card__title">Pokemon Yellow Legacy</h2>
+                <div className="sav-card__header sav-card__header--with-actions">
+                  <div className="sav-card__header-body">
+                    <h2 className="sav-card__title">Pokemon Yellow Legacy</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="sav-card__preview-button"
+                    onClick={() => handlePreviewPokedex("yellow")}
+                  >
+                    Preview Pokedex
+                  </button>
                   <p className="sav-card__description">
-                    Upload your save file to view your caught Pokemon and party.
+                    Choose your save file to view your caught Pokemon and party.
                   </p>
                 </div>
                 <div className="sav-card__body">
@@ -1594,10 +1624,19 @@ export default function SavPage() {
                 </div>
               </article>
               <article className="sav-card sav-card--primary">
-                <div className="sav-card__header">
-                  <h2 className="sav-card__title">Pokemon Lazarus</h2>
+                <div className="sav-card__header sav-card__header--with-actions">
+                  <div className="sav-card__header-body">
+                    <h2 className="sav-card__title">Pokemon Lazarus</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="sav-card__preview-button"
+                    onClick={() => handlePreviewPokedex("lazarus")}
+                  >
+                    Preview Pokedex
+                  </button>
                   <p className="sav-card__description">
-                    Upload your save file to view your caught Pokemon and party.
+                    Choose your save file to view your caught Pokemon and party.
                   </p>
                 </div>
                 <div className="sav-card__body">
@@ -1890,7 +1929,10 @@ export default function SavPage() {
                 <button
                   type="button"
                   className={`sav-results-controls__toggle ${showCaught ? "is-active" : ""}`}
-                  onClick={() => setShowCaught((prev) => !prev)}
+                  onClick={() => {
+                    setShowCaught((prev) => !prev);
+                    setShowOnlyCaught(false);
+                  }}
                 >
                   {showCaught ? "Hide caught" : "Show caught"}
                 </button>

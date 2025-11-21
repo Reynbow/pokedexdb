@@ -7551,6 +7551,27 @@
   min-width: 0;
 }
 
+.sav-card--primary .sav-card__header--with-actions {
+  flex-wrap: wrap;
+}
+
+.sav-card--primary .sav-card__header--with-actions .sav-card__header-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sav-card--primary .sav-card__header--with-actions .sav-card__title {
+  margin-bottom: 0;
+}
+
+.sav-card--primary .sav-card__header--with-actions .sav-card__description {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 8px;
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .sav-card__reset-button {
   border: 1px solid rgba(148, 163, 184, 0.4);
   border-radius: 999px;
@@ -7573,6 +7594,30 @@
 .sav-card__reset-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.sav-card__preview-button {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: rgba(148, 163, 184, 0.08);
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  text-decoration: none;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.sav-card__preview-button:hover {
+  border-color: rgba(147, 197, 253, 0.7);
+  background: rgba(147, 197, 253, 0.1);
+  color: #e5e7eb;
+  text-decoration: none;
 }
 
 .sav-card__eyebrow {
