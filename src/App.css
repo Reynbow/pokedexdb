@@ -5207,6 +5207,65 @@
     --filters-games-gap: 12px;
   }
   
+  /* Make type chips flush with card borders in mobile */
+  .card {
+    padding-bottom: 0 !important; /* Remove bottom padding to allow types to sit at the very bottom */
+  }
+  
+  /* Lower the Pokemon name on cards in mobile view */
+  .card .name {
+    bottom: 20px !important; /* Lower the name to be closer to the type chips */
+  }
+  
+  .card .types {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    display: flex !important;
+    gap: 0 !important;
+    width: 100% !important;
+  }
+  
+  .card .type-chip {
+    flex: 1;
+    padding: 4px 0 !important;
+    font-size: 0.65rem;
+    border-radius: 0 !important;
+    border-width: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    line-height: 1.2;
+    text-align: center !important;
+    justify-content: center !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  
+  /* Match card bottom border radius on outer corners */
+  .card .type-chip:first-child {
+    border-bottom-left-radius: 16px;
+  }
+  
+  .card .type-chip:last-child {
+    border-bottom-right-radius: 16px;
+  }
+  
+  .card .type-chip:only-child {
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+  }
+  
+  .card .type-chip:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  
   /* Hide list panel on mobile */
   .content.split {
     display: flex;
