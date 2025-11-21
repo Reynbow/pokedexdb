@@ -113,6 +113,7 @@ export default function CategoryToggle() {
             aria-selected={isOn}
             aria-pressed={isOn}
             className={`filter-chip${isOn ? " is-on" : ""}`}
+            data-category={cat.key}
             onClick={() => handleNavigate(cat)}
           >
             {cat.label}

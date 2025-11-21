@@ -84,11 +84,12 @@
   transform: translateY(0);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 768px) {
   .discord-support-fab {
-    top: auto;
-    bottom: 14px;
-    right: 14px;
+    top: 14px;
+    left: 14px;
+    right: auto;
+    bottom: auto;
   }
 }
 
@@ -1085,22 +1086,23 @@
 @media (max-width: 768px) {
   .category-toggle-row.is-mobile {
     position: fixed;
-    bottom: 68px; /* Positioned above search bar (12px padding + 44px height + 12px padding = 68px) */
+    bottom: 0; /* At the very bottom of the screen */
     left: 0;
     right: 0;
     background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-bottom: none; /* No border since search bar is directly below */
+    border-bottom: none;
     padding: 12px 16px;
     margin: 0;
-    z-index: 1998; /* Below search bar */
+    z-index: 2000; /* Above search bar to ensure visibility */
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
     gap: 8px;
     justify-content: space-around;
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    display: flex; /* Ensure it's displayed */
   }
 
   .category-toggle-row.is-mobile .filter-chip {
@@ -1127,9 +1129,33 @@
     background: rgba(148, 163, 184, 0.3);
   }
 
+  /* Hide specific category buttons in mobile view */
+  .category-toggle-row.is-mobile .filter-chip[data-category="moves"],
+  .category-toggle-row.is-mobile .filter-chip[data-category="abilities"],
+  .category-toggle-row.is-mobile .filter-chip[data-category="ev"] {
+    display: none;
+  }
+
+  /* On Save Reader page, move buttons to bottom since there's no search bar */
+  .sav-page .category-toggle-row.is-mobile {
+    bottom: 0px; /* At the bottom since there's no search bar */
+    z-index: 2000; /* Ensure it's always visible */
+  }
+  
+  /* On pages without search bar (like Who's That), ensure buttons are at bottom */
+  .minigame-page .category-toggle-row.is-mobile {
+    bottom: 0px; /* At the bottom since there's no search bar */
+    z-index: 2000; /* Ensure it's always visible */
+  }
+
   /* Add padding to main content to account for fixed bottom nav and search bar */
   .app-shell > main.container {
     padding-bottom: 140px; /* Category buttons (64px) + Search bar (68px) + some extra */
+  }
+
+  /* Reduce padding on Save Reader page since there's no search bar */
+  .sav-page > main.container {
+    padding-bottom: 80px; /* Category buttons (64px) + some extra */
   }
 
   /* Hide only the small left type icon in mobile view, keep the background decorative icon */
@@ -5136,10 +5162,10 @@
     padding: 16px 12px;
   }
   
-  /* Make search bar fixed at bottom in mobile view, at the very bottom */
+  /* Make search bar fixed above category buttons in mobile view */
   .app-header .search-row {
     position: fixed;
-    bottom: 0; /* At the very bottom of the screen */
+    bottom: 64px; /* Above category toggle buttons (approximately 64px height) */
     left: 0;
     right: 0;
     gap: 10px;
@@ -5147,9 +5173,9 @@
     background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-bottom: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
-    z-index: 1999; /* On top */
+    z-index: 1999; /* Below category buttons */
     max-width: none;
     margin: 0;
     width: 100%;
@@ -5591,6 +5617,21 @@
   
   .stats-list {
     padding: 0 12px;
+  }
+
+  /* EV Training page: stack columns vertically and make full width on mobile */
+  .ev-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .ev-layout.pla-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ev-col-left,
+  .ev-col-right {
+    width: 100%;
   }
 }
 
@@ -6490,7 +6531,7 @@
   border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: radial-gradient(circle at top, rgba(59, 130, 246, 0.35), rgba(14, 23, 42, 0.92));
-  padding: clamp(32px, 8vw, 72px) 0;
+  padding: 0;
   margin: 32px auto 24px;
   display: flex;
   align-items: center;
@@ -6600,7 +6641,7 @@
   z-index: 2;
   gap: 16px;
   overflow: visible;
-  margin: 0 auto;
+  margin: 0;
   padding: 0;
 }
 
@@ -6625,6 +6666,8 @@
   background: rgba(15, 23, 42, 0.8);
   color: #f8fafc;
   font-size: 0.95rem;
+  line-height: 1.5;
+  height: 44px;
   transition: border 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
 }
@@ -6652,6 +6695,8 @@
   border-radius: var(--pill-radius);
   font-weight: 600;
   font-size: 0.95rem;
+  line-height: 1.5;
+  height: 44px;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.3);
@@ -6706,8 +6751,8 @@
   height: 512px;
   min-width: 512px;
   min-height: 512px;
-  padding: 0;
-  margin: 0 auto;
+  padding: 0 0 56px 0;
+  margin: 0;
   clip-path: none;
   -webkit-clip-path: none;
 }
@@ -6736,6 +6781,7 @@
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
   background: transparent !important;
   clip-path: none !important;
   -webkit-clip-path: none !important;
@@ -6745,12 +6791,12 @@
 }
 
 .minigame-sprite.is-hidden {
-  filter: brightness(0) saturate(150%) contrast(120%);
+  filter: brightness(0) saturate(150%) contrast(120%) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
 .minigame-sprite.is-pixelated {
   image-rendering: pixelated;
-  filter: brightness(0) saturate(150%) contrast(120%);
+  filter: brightness(0) saturate(150%) contrast(120%) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
 .minigame-name-clue {
@@ -7060,6 +7106,7 @@
   -webkit-user-drag: none;
   display: block;
   opacity: 0.2;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
 }
 
 .minigame-history-entry-meta {
@@ -7123,103 +7170,269 @@
   color: rgba(148, 163, 184, 0.8);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  /* Add padding for fixed bottom navigation */
+  .minigame-page {
+    padding-bottom: 80px; /* Category buttons (64px) + some extra */
+  }
+
+  .minigame-page .container {
+    padding: 16px 12px;
+  }
+
   .minigame-card {
-    padding: 24px 20px;
-    border-radius: 22px;
-  }
-
-  .minigame-status-row {
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .minigame-status-controls {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .minigame-status-button {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .minigame-stage-content {
-    min-height: 0;
-  }
-
-  .minigame-stage-hints.is-floating {
-    position: static;
-    transform: none;
-    margin-bottom: 16px;
-    align-items: center;
-    text-align: center;
-  }
-
-  .minigame-name-clue {
-    position: static;
-    transform: none;
-    margin-bottom: 16px;
-    align-items: center;
-    text-align: center;
-    right: auto;
-    top: auto;
-  }
-
-  .minigame-stage-hints,
-  .minigame-stage-hints-list {
-    width: 100%;
-    max-width: none;
-    align-items: center;
-  }
-
-  .minigame-stage-pill {
-    justify-content: center;
-    width: min(100%, 320px);
-    text-align: center;
+    padding: 20px 16px;
+    border-radius: 20px;
+    margin-top: 16px;
   }
 
   .minigame-header {
     margin-bottom: 16px;
   }
 
+  .minigame-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .minigame-status-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .minigame-status-controls {
+    width: auto;
+    flex-direction: row;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .minigame-status-button {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .minigame-stage {
+    padding: 0;
+    margin: 20px auto 20px;
+    min-height: 240px;
+  }
+
+  .minigame-stage-content {
+    min-height: 200px;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .minigame-stage-hints.is-floating {
+    position: static;
+    transform: none;
+    margin-bottom: 0;
+    align-items: center;
+    text-align: center;
+    left: auto;
+    top: auto;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .minigame-stage-content {
+    margin-bottom: 0;
+    position: relative;
+  }
+  
+  .minigame-stage-content .minigame-name-clue {
+    position: absolute;
+    top: auto;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 12px;
+    margin-bottom: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    max-width: 100%;
+    z-index: 10;
+  }
+  
+  .minigame-stage {
+    margin-bottom: 100px;
+  }
+  
   .minigame-guess-form {
-    flex-direction: column;
-    gap: 10px;
+    position: relative;
+    margin-top: 0;
+  }
+  
+  .minigame-nav-container {
+    margin-bottom: 0;
   }
 
-  .minigame-guess-input,
+  .minigame-stage-hints,
+  .minigame-stage-hints-list {
+    width: 100%;
+    max-width: 100%;
+    align-items: center;
+  }
+
+  .minigame-stage-pill {
+    justify-content: center;
+    width: 100%;
+    max-width: 280px;
+    text-align: center;
+  }
+
+  .minigame-stage-center {
+    order: -1;
+  }
+
+  .minigame-sprite-wrapper {
+    width: 180px;
+    height: 180px;
+    padding: 0 0 16px 0;
+  }
+
+  .minigame-sprite {
+    width: 180px;
+    height: 180px;
+  }
+
+  .minigame-name-clue-content {
+    font-size: 20px;
+    padding: 8px 12px;
+    justify-content: center;
+  }
+
+  .minigame-guess-form {
+    flex-direction: row;
+    gap: 8px;
+    margin-top: 16px;
+    align-items: center;
+    position: relative;
+    flex-wrap: nowrap;
+  }
+
+  .minigame-nav-container {
+    order: 1;
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: center;
+    margin-bottom: 0;
+    gap: 8px;
+  }
+
+  .minigame-guess-input {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 1rem;
+    padding: 12px 16px;
+  }
+
   .minigame-guess-button {
-    width: 100%;
+    order: 3;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 100px;
+    padding: 12px 16px;
+    font-size: 1rem;
   }
 
-  .minigame-actions {
-    flex-direction: column;
+  .minigame-progress {
+    margin-top: 60px;
+    margin-bottom: 16px;
   }
 
-  .minigame-button {
-    width: 100%;
+  .minigame-feedback {
+    margin-top: 12px;
+    padding: 10px 14px;
+    font-size: 0.875rem;
   }
 
   .minigame-success-summary {
     flex-direction: column;
     align-items: stretch;
+    margin-top: 16px;
   }
 
   .minigame-success-summary span {
     justify-content: center;
   }
 
+  .minigame-reveal {
+    margin-top: 20px;
+  }
+
+  .minigame-reveal-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .minigame-history {
+    margin-top: 24px;
+  }
+
   .minigame-history-entry {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
+    padding: 16px;
   }
 
   .minigame-history-entry-meta {
     align-items: flex-start;
+    width: 100%;
+  }
+
+  .minigame-history-entry-sprite {
+    align-self: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .minigame-card {
+    padding: 16px 12px;
+    border-radius: 18px;
+  }
+
+  .minigame-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .minigame-stage {
+    padding: 0;
+    min-height: 200px;
+  }
+
+  .minigame-stage-content {
+    min-height: 180px;
+  }
+
+  .minigame-sprite-wrapper {
+    width: 160px;
+    height: 160px;
+    padding: 0 0 12px 0;
+  }
+
+  .minigame-sprite {
+    width: 160px;
+    height: 160px;
+  }
+
+  .minigame-name-clue-content {
+    font-size: 18px;
+    padding: 6px 10px;
+  }
+
+  .minigame-reveal-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 }
 
@@ -7254,16 +7467,16 @@
 }
 
 .minigame-sprite.is-hidden {
-  filter: brightness(0) saturate(150%) contrast(120%);
+  filter: brightness(0) saturate(150%) contrast(120%) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
 .minigame-sprite.is-pixelated {
   image-rendering: pixelated;
-  filter: brightness(0) saturate(150%) contrast(120%);
+  filter: brightness(0) saturate(150%) contrast(120%) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
 .minigame-sprite.is-hidden.is-pixelated {
-  filter: brightness(0) saturate(150%) contrast(120%);
+  filter: brightness(0) saturate(150%) contrast(120%) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
 .minigame-sprite-wrapper.is-pixelated::after {
