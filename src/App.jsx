@@ -1708,7 +1708,7 @@ function App() {
   
   // Pagination for mobile
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20; // Number of items per page on mobile
+  const itemsPerPage = 51; // Number of items per page on mobile (51 to account for extra space)
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -3114,24 +3114,75 @@ function App() {
   }, [isMobile, currentPage, itemsPerPage, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, shiny, selectedGame, selectedDex, detailsCache]);
 
   // Calculate total entries for pagination and get flattened entries for mobile
+  // Include mega/gigantamax forms in the count
   const getTotalEntries = useCallback(() => {
+    let count = 0;
     if (sectionGroups && sectionGroups.length > 0) {
-      return sectionGroups.reduce((sum, group) => sum + (group.entries?.length || 0), 0);
+      count = sectionGroups.reduce((sum, group) => sum + (group.entries?.length || 0), 0);
+    } else {
+      count = regularFiltered.length;
     }
-    return regularFiltered.length;
-  }, [sectionGroups, regularFiltered.length]);
+    // On mobile, include mega/gigantamax forms in pagination
+    if (isMobile) {
+      count += megaGigantamaxFiltered.length;
+    }
+    return count;
+  }, [sectionGroups, regularFiltered.length, isMobile, megaGigantamaxFiltered.length]);
 
-  // Flatten all entries for mobile pagination
+  // Flatten all entries for mobile pagination, including mega/gigantamax at the end
   const getAllEntries = useCallback(() => {
+    let entries = [];
     if (sectionGroups && sectionGroups.length > 0) {
-      return sectionGroups.flatMap(group => group.entries || []);
+      entries = sectionGroups.flatMap(group => group.entries || []);
+    } else {
+      entries = regularFiltered;
     }
-    return regularFiltered;
-  }, [sectionGroups, regularFiltered]);
+    // On mobile, append mega/gigantamax forms at the end
+    if (isMobile && megaGigantamaxFiltered.length > 0) {
+      entries = [...entries, ...megaGigantamaxFiltered];
+    }
+    return entries;
+  }, [sectionGroups, regularFiltered, isMobile, megaGigantamaxFiltered]);
 
   const totalEntries = getTotalEntries();
   const totalPages = isMobile ? Math.ceil(totalEntries / itemsPerPage) : 1;
   const allEntries = getAllEntries();
+  
+  // On mobile, always use allEntries (includes mega/gigantamax). On desktop, use sections or regularFiltered.
+  const listPrimaryContent = isMobile
+    ? renderListEntries(allEntries)
+    : sectionGroups && sectionGroups.length > 0
+    ? sectionGroups
+        .map((group, index) => {
+          const content = renderListEntries(group.entries);
+          if (!content) return null;
+          return (
+            <div key={group.key || `section-${index}`} className="list-section">
+              {index > 0 && <div className="list-divider" role="separator" />}
+              {group.label && <h3 className="list-subheading">{group.label}</h3>}
+              {content}
+            </div>
+          );
+        })
+        .filter(Boolean)
+    : renderListEntries(regularFiltered);
+
+  const gridPrimaryContent = isMobile
+    ? renderGridEntries(allEntries)
+    : sectionGroups && sectionGroups.length > 0
+    ? sectionGroups
+        .map((group, index) => {
+          const content = renderGridEntries(group.entries);
+          if (!content) return null;
+          return (
+            <React.Fragment key={group.key || `section-${index}`}>
+              {group.label && <h2 className="grid-subheading">{group.label}</h2>}
+              {content}
+            </React.Fragment>
+          );
+        })
+        .filter(Boolean)
+    : renderGridEntries(regularFiltered);
 
   // Pagination component
   const renderPagination = useCallback(() => {
@@ -3237,42 +3288,6 @@ function App() {
     );
   }, [isMobile, currentPage, totalPages, totalEntries, itemsPerPage]);
 
-  // On mobile with pagination, flatten all entries. Otherwise, use sections.
-  const listPrimaryContent = isMobile && sectionGroups && sectionGroups.length > 0
-    ? renderListEntries(allEntries)
-    : sectionGroups && sectionGroups.length > 0
-    ? sectionGroups
-        .map((group, index) => {
-          const content = renderListEntries(group.entries);
-          if (!content) return null;
-          return (
-            <div key={group.key || `section-${index}`} className="list-section">
-              {index > 0 && <div className="list-divider" role="separator" />}
-              {group.label && <h3 className="list-subheading">{group.label}</h3>}
-              {content}
-            </div>
-          );
-        })
-        .filter(Boolean)
-    : renderListEntries(regularFiltered);
-
-  const gridPrimaryContent = isMobile && sectionGroups && sectionGroups.length > 0
-    ? renderGridEntries(allEntries)
-    : sectionGroups && sectionGroups.length > 0
-    ? sectionGroups
-        .map((group, index) => {
-          const content = renderGridEntries(group.entries);
-          if (!content) return null;
-          return (
-            <React.Fragment key={group.key || `section-${index}`}>
-              {group.label && <h2 className="grid-subheading">{group.label}</h2>}
-              {content}
-            </React.Fragment>
-          );
-        })
-        .filter(Boolean)
-    : renderGridEntries(regularFiltered);
-
   return (
     <div className="app-shell">
       {showScrollTop ? (
@@ -3344,8 +3359,9 @@ function App() {
           <section className="content split">
             <div className="list-panel">
               <div className="list-scroll" ref={listScrollRef}>
+                {isMobile && hasPrimaryContent && renderPagination()}
                 {listPrimaryContent}
-                {megaGigantamaxFiltered.length > 0 && (
+                {!isMobile && megaGigantamaxFiltered.length > 0 && (
                   <div className="list-special">
                     {hasPrimaryContent && <div className="list-divider" role="separator" />}
                     <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
@@ -3415,8 +3431,9 @@ function App() {
           </section>
         ) : (
           <>
+            {isMobile && hasPrimaryContent && renderPagination()}
             {gridPrimaryContent}
-            {megaGigantamaxFiltered.length > 0 && (
+            {!isMobile && megaGigantamaxFiltered.length > 0 && (
               <>
                 <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
                 <section className="grid grid-special">
