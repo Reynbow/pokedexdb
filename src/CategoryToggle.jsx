@@ -38,6 +38,12 @@ function getActiveCategory() {
 export default function CategoryToggle() {
   const [, forceUpdate] = useState(0);
   const active = useMemo(() => getActiveCategory(), [forceUpdate]);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const onChange = () => {
@@ -51,6 +57,14 @@ export default function CategoryToggle() {
       window.removeEventListener('popstate', onChange);
       window.removeEventListener('locationchange', onChange);
     };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleNavigate = (target) => {
@@ -88,7 +102,7 @@ export default function CategoryToggle() {
   };
 
   return (
-    <div className="category-toggle-row" role="tablist" aria-label="Pokedex Sections">
+    <div className={`category-toggle-row${isMobile ? " is-mobile" : ""}`} role="tablist" aria-label="Pokedex Sections">
       {CATEGORIES.map((cat) => {
         const isOn = active === cat.key;
         return (

@@ -113,9 +113,13 @@ const getTypeColor = (typeName) => {
 const getStatLabel = (statName, isMobile) => {
   const label = humanizeName(statName);
   if (isMobile) {
-    if (label === "Special Attack") return "Sp. Attack";
-    if (label === "Special Defense") return "Sp. Defense";
+    const lowerLabel = label.toLowerCase();
+    if (lowerLabel === "special attack") return "Sp. Atk";
+    if (lowerLabel === "special defense") return "Sp. Def";
+    // Capitalize other stats for mobile
+    return label.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   }
+  // Return lowercase - CSS will capitalize it for desktop
   return label;
 };
 
