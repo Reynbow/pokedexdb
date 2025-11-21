@@ -132,15 +132,15 @@
 
 @media (max-width: 768px) {
   .scroll-top-fab {
-    /* Position above the bottom navigation buttons */
-    bottom: 90px;
+    /* Position above the search bar and bottom navigation buttons */
+    bottom: 140px;
   }
 }
 
 @media (max-width: 520px) {
   .scroll-top-fab {
-    /* Lift above both the bottom navigation and Discord button */
-    bottom: 100px;
+    /* Lift above the search bar, bottom navigation, and Discord button */
+    bottom: 150px;
   }
 }
 
@@ -1085,15 +1085,16 @@
 @media (max-width: 768px) {
   .category-toggle-row.is-mobile {
     position: fixed;
-    bottom: 0;
+    bottom: 68px; /* Positioned above search bar (12px padding + 44px height + 12px padding = 68px) */
     left: 0;
     right: 0;
     background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none; /* No border since search bar is directly below */
     padding: 12px 16px;
     margin: 0;
-    z-index: 2000;
+    z-index: 1998; /* Below search bar */
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
     gap: 8px;
     justify-content: space-around;
@@ -1126,9 +1127,9 @@
     background: rgba(148, 163, 184, 0.3);
   }
 
-  /* Add padding to main content to account for fixed bottom nav */
+  /* Add padding to main content to account for fixed bottom nav and search bar */
   .app-shell > main.container {
-    padding-bottom: 80px;
+    padding-bottom: 140px; /* Category buttons (64px) + Search bar (68px) + some extra */
   }
 
   /* Hide only the small left type icon in mobile view, keep the background decorative icon */
@@ -5135,9 +5136,24 @@
     padding: 16px 12px;
   }
   
-  /* Make search bar more mobile-friendly */
-  .search-row {
+  /* Make search bar fixed at bottom in mobile view, at the very bottom */
+  .app-header .search-row {
+    position: fixed;
+    bottom: 0; /* At the very bottom of the screen */
+    left: 0;
+    right: 0;
     gap: 10px;
+    padding: 12px 16px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    z-index: 1999; /* On top */
+    max-width: none;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .search {
@@ -5150,6 +5166,7 @@
     padding: 10px 16px;
     font-size: 0.875rem;
     height: 44px;
+    flex-shrink: 0;
   }
   
   /* Adjust title on mobile */
