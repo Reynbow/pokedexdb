@@ -1706,13 +1706,9 @@ function App() {
     return false;
   });
   
-  // Virtual scrolling for mobile - only render visible cards + buffer
-  const [visibleRange, setVisibleRange] = useState(() => {
-    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-      return { start: 0, end: 50 }; // Initial render: first 50 cards on mobile
-    }
-    return null; // Desktop: render all
-  });
+  // Pagination for mobile
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20; // Number of items per page on mobile
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -2978,19 +2974,21 @@ function App() {
   const renderListEntries = useCallback((entries) => {
     if (!entries || entries.length === 0) return null;
     
-    // On mobile, only render visible range
-    const entriesToRender = isMobile && visibleRange 
-      ? entries.slice(visibleRange.start, visibleRange.end)
-      : entries;
+    // On mobile, paginate entries
+    let entriesToRender = entries;
+    let startIndex = 0;
+    let totalPages = 1;
     
-    const startIndex = isMobile && visibleRange ? visibleRange.start : 0;
+    if (isMobile) {
+      totalPages = Math.ceil(entries.length / itemsPerPage);
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      entriesToRender = entries.slice(start, end);
+      startIndex = start;
+    }
     
     return (
       <div className="list">
-        {/* Spacer for virtual scrolling on mobile */}
-        {isMobile && visibleRange && visibleRange.start > 0 && (
-          <div style={{ height: `${visibleRange.start * 80}px` }} aria-hidden="true" />
-        )}
         {entriesToRender.map((p, index) => {
           const actualIndex = startIndex + index;
           const pref = getRegionPreferredEntry(p);
@@ -3015,10 +3013,6 @@ function App() {
             />
           );
         })}
-        {/* Spacer for virtual scrolling on mobile */}
-        {isMobile && visibleRange && visibleRange.end < entries.length && (
-          <div style={{ height: `${(entries.length - visibleRange.end) * 80}px` }} aria-hidden="true" />
-        )}
         {
           (() => {
             const eagerCount = 6;
@@ -3044,85 +3038,31 @@ function App() {
         }
       </div>
     );
-  }, [isMobile, visibleRange, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, selected, shiny, selectedGame, selectedDex, detailsCache]);
+  }, [isMobile, currentPage, itemsPerPage, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, selected, shiny, selectedGame, selectedDex, detailsCache]);
 
-  // Reset visible range when filters change
+  // Reset to page 1 when filters change
   useEffect(() => {
-    if (isMobile && visibleRange) {
-      setVisibleRange({ start: 0, end: 50 });
+    if (isMobile) {
+      setCurrentPage(1);
     }
-  }, [query, selectedTypes, selectedTags, selectedDex, selectedGame]);
-
-  useEffect(() => {
-    if (!isMobile) {
-      setVisibleRange(null);
-      return;
-    }
-    
-    // Initialize visible range if not set
-    if (!visibleRange) {
-      setVisibleRange({ start: 0, end: 50 });
-      return;
-    }
-    
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight;
-      const cardHeight = 180; // Approximate card height with gap
-      const buffer = 300; // Buffer in pixels
-      
-      // Calculate which cards should be visible
-      const startIndex = Math.max(0, Math.floor((scrollTop - buffer) / cardHeight));
-      const endIndex = Math.min(
-        regularFiltered.length,
-        Math.ceil((scrollTop + windowHeight + buffer) / cardHeight)
-      );
-      
-      // Use functional update to avoid dependency on visibleRange
-      setVisibleRange(prev => {
-        if (!prev) return { start: startIndex, end: endIndex };
-        // Only update if range changed significantly (to avoid too many re-renders)
-        if (Math.abs(startIndex - prev.start) > 10 || Math.abs(endIndex - prev.end) > 10) {
-          return { start: startIndex, end: endIndex };
-        }
-        return prev;
-      });
-    };
-
-    // Throttle scroll events
-    let ticking = false;
-    const throttledScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener('scroll', throttledScroll, { passive: true });
-    handleScroll(); // Initial calculation
-    
-    return () => window.removeEventListener('scroll', throttledScroll);
-  }, [isMobile, regularFiltered.length]);
+  }, [isMobile, query, selectedTypes, selectedTags, selectedDex, selectedGame]);
 
   const renderGridEntries = useCallback((entries, className = "grid") => {
     if (!entries || entries.length === 0) return null;
     
-    // On mobile, only render visible range
-    const entriesToRender = isMobile && visibleRange 
-      ? entries.slice(visibleRange.start, visibleRange.end)
-      : entries;
+    // On mobile, paginate entries
+    let entriesToRender = entries;
+    let startIndex = 0;
     
-    const startIndex = isMobile && visibleRange ? visibleRange.start : 0;
+    if (isMobile) {
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      entriesToRender = entries.slice(start, end);
+      startIndex = start;
+    }
     
     return (
       <section className={className}>
-        {/* Spacer for virtual scrolling on mobile */}
-        {isMobile && visibleRange && visibleRange.start > 0 && (
-          <div style={{ height: `${visibleRange.start * 180}px`, gridColumn: '1 / -1' }} aria-hidden="true" />
-        )}
         {entriesToRender.map((p, index) => {
           const actualIndex = startIndex + index;
           const pref = getRegionPreferredEntry(p);
@@ -3146,10 +3086,6 @@ function App() {
             />
           );
         })}
-        {/* Spacer for virtual scrolling on mobile */}
-        {isMobile && visibleRange && visibleRange.end < entries.length && (
-          <div style={{ height: `${(entries.length - visibleRange.end) * 180}px`, gridColumn: '1 / -1' }} aria-hidden="true" />
-        )}
         {
           (() => {
             const eagerCount = 8;
@@ -3175,9 +3111,136 @@ function App() {
         }
       </section>
     );
-  }, [isMobile, visibleRange, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, shiny, selectedGame, selectedDex, detailsCache]);
+  }, [isMobile, currentPage, itemsPerPage, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, shiny, selectedGame, selectedDex, detailsCache]);
 
-  const listPrimaryContent = sectionGroups && sectionGroups.length > 0
+  // Calculate total entries for pagination and get flattened entries for mobile
+  const getTotalEntries = useCallback(() => {
+    if (sectionGroups && sectionGroups.length > 0) {
+      return sectionGroups.reduce((sum, group) => sum + (group.entries?.length || 0), 0);
+    }
+    return regularFiltered.length;
+  }, [sectionGroups, regularFiltered.length]);
+
+  // Flatten all entries for mobile pagination
+  const getAllEntries = useCallback(() => {
+    if (sectionGroups && sectionGroups.length > 0) {
+      return sectionGroups.flatMap(group => group.entries || []);
+    }
+    return regularFiltered;
+  }, [sectionGroups, regularFiltered]);
+
+  const totalEntries = getTotalEntries();
+  const totalPages = isMobile ? Math.ceil(totalEntries / itemsPerPage) : 1;
+  const allEntries = getAllEntries();
+
+  // Pagination component
+  const renderPagination = useCallback(() => {
+    if (!isMobile || totalPages <= 1) return null;
+
+    const handlePrev = () => {
+      if (currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    const handleNext = () => {
+      if (currentPage < totalPages) {
+        setCurrentPage(currentPage + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    const handlePageClick = (page) => {
+      setCurrentPage(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Calculate which page numbers to show
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisible = 5;
+      
+      if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        if (currentPage <= 3) {
+          for (let i = 1; i <= 4; i++) pages.push(i);
+          pages.push('ellipsis');
+          pages.push(totalPages);
+        } else if (currentPage >= totalPages - 2) {
+          pages.push(1);
+          pages.push('ellipsis');
+          for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+        } else {
+          pages.push(1);
+          pages.push('ellipsis');
+          for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+          pages.push('ellipsis');
+          pages.push(totalPages);
+        }
+      }
+      return pages;
+    };
+
+    const pageNumbers = getPageNumbers();
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalEntries);
+
+    return (
+      <div className="pagination-container">
+        <div className="pagination-info">
+          Showing {startItem}-{endItem} of {totalEntries}
+        </div>
+        <div className="pagination-controls">
+          <button
+            type="button"
+            className="pagination-btn"
+            onClick={handlePrev}
+            disabled={currentPage === 1}
+            aria-label="Previous page"
+          >
+            Previous
+          </button>
+          <div className="pagination-pages">
+            {pageNumbers.map((page, index) => {
+              if (page === 'ellipsis') {
+                return <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>;
+              }
+              return (
+                <button
+                  key={page}
+                  type="button"
+                  className={`pagination-page ${currentPage === page ? 'active' : ''}`}
+                  onClick={() => handlePageClick(page)}
+                  aria-label={`Page ${page}`}
+                  aria-current={currentPage === page ? 'page' : undefined}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="pagination-btn"
+            onClick={handleNext}
+            disabled={currentPage === totalPages}
+            aria-label="Next page"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  }, [isMobile, currentPage, totalPages, totalEntries, itemsPerPage]);
+
+  // On mobile with pagination, flatten all entries. Otherwise, use sections.
+  const listPrimaryContent = isMobile && sectionGroups && sectionGroups.length > 0
+    ? renderListEntries(allEntries)
+    : sectionGroups && sectionGroups.length > 0
     ? sectionGroups
         .map((group, index) => {
           const content = renderListEntries(group.entries);
@@ -3193,7 +3256,9 @@ function App() {
         .filter(Boolean)
     : renderListEntries(regularFiltered);
 
-  const gridPrimaryContent = sectionGroups && sectionGroups.length > 0
+  const gridPrimaryContent = isMobile && sectionGroups && sectionGroups.length > 0
+    ? renderGridEntries(allEntries)
+    : sectionGroups && sectionGroups.length > 0
     ? sectionGroups
         .map((group, index) => {
           const content = renderGridEntries(group.entries);
@@ -3312,6 +3377,7 @@ function App() {
                 {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
                   <div className="list-empty">No Pokémon found.</div>
                 )}
+                {isMobile && hasPrimaryContent && renderPagination()}
               </div>
             </div>
             <ErrorBoundary fallback={<button className="toggle-btn" onClick={clearSelection}>Close</button>}>
@@ -3343,6 +3409,7 @@ function App() {
               setShiny={setShiny}
               animated={animated}
               setAnimated={setAnimated}
+              isMobile={isMobile}
             />
             </ErrorBoundary>
           </section>
@@ -3382,6 +3449,7 @@ function App() {
                 <div className="dex-loading">No Pokémon found.</div>
               </section>
             )}
+            {isMobile && hasPrimaryContent && renderPagination()}
           </>
         )}
       </main>
@@ -3486,6 +3554,7 @@ function DetailPanel({
   setShiny,
   animated = false,
   setAnimated,
+  isMobile = false,
 }) {
   const pokemonIdMap = useMemo(() => {
     if (pokemonIdLookup instanceof Map) return pokemonIdLookup;
