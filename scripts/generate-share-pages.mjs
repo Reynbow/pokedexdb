@@ -129,24 +129,9 @@ const formatDexNumber = (id) => {
 };
 
 const selectImageUrl = (id) => {
-  if (!id || Number.isNaN(Number(id))) {
-    return {
-      primary: `${BASE_URL}/og-preview.png`,
-      alt: "Pokedex DB detail preview card.",
-    };
-  }
-  const num = Number(id);
-  const primary = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${num}.png`;
-  if (num >= 10000) {
-    const fallback = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${num}.png`;
-    return {
-      primary: fallback,
-      alt: "Pixel sprite showing this Pokemon.",
-    };
-  }
   return {
-    primary,
-    alt: "Official artwork of this Pokemon.",
+    primary: `${BASE_URL}/favicon-og.png`,
+    alt: "Pokedex DB Logo",
   };
 };
 
@@ -178,10 +163,10 @@ const buildMetaBlock = ({
     `${indent}<meta property="og:title" content="${escapeHtmlAttr(ogTitle)}" />`,
     `${indent}<meta property="og:description" content="${escapeHtmlAttr(description)}" />`,
     `${indent}<meta property="og:image" content="${escapeHtmlAttr(imageUrl)}" />`,
-    `${indent}<meta property="og:image:width" content="1200" />`,
-    `${indent}<meta property="og:image:height" content="1200" />`,
+    `${indent}<meta property="og:image:width" content="128" />`,
+    `${indent}<meta property="og:image:height" content="128" />`,
     `${indent}<meta property="og:image:alt" content="${escapeHtmlAttr(imageAlt)}" />`,
-    `${indent}<meta name="twitter:card" content="summary_large_image" />`,
+    `${indent}<meta name="twitter:card" content="summary" />`,
     `${indent}<meta name="twitter:title" content="${escapeHtmlAttr(twitterTitle)}" />`,
     `${indent}<meta name="twitter:description" content="${escapeHtmlAttr(description)}" />`,
     `${indent}<meta name="twitter:image" content="${escapeHtmlAttr(imageUrl)}" />`,
@@ -267,13 +252,7 @@ const fetchPokemonList = async () => {
 };
 
 const buildDescription = (displayName, flavor) => {
-  if (flavor) {
-    const clean = sanitizeText(flavor);
-    if (clean) {
-      return truncate(`${clean} Explore detailed stats, evolutions, abilities, moves, and weakness chart on Pokedex DB.`, 260);
-    }
-  }
-  return `${displayName}'s complete stats, evolutions, abilities, moves, and weakness chart on Pokedex DB.`;
+  return `View ${displayName}'s complete stats, evolutions, abilities, moves, and weakness chart on Pokedex DB - your complete Pokemon database with EV training tools, move/ability/item databases, save file reading, and more.`;
 };
 
 const generate = async () => {
