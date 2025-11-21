@@ -1699,6 +1699,20 @@ function App() {
   const listScrollRef = useRef(null);
   const pendingCenterIdRef = useRef(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
+  
+  // Virtual scrolling for mobile - only render visible cards + buffer
+  const [visibleRange, setVisibleRange] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      return { start: 0, end: 50 }; // Initial render: first 50 cards on mobile
+    }
+    return null; // Desktop: render all
+  });
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -1741,6 +1755,15 @@ function App() {
     updateVisibility();
     window.addEventListener("scroll", updateVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateVisibility);
+  }, []);
+
+  // Handle mobile resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Also watch the list panel's own scroll (it can scroll independently of window)
@@ -2288,7 +2311,7 @@ function App() {
     resolveSelectionFromLocation();
   }, [pokemon, bootSelection, resolveSelectionFromLocation]);
 
-  const selectPokemon = (id, name, url, options) => {
+  const selectPokemon = useCallback((id, name, url, options) => {
     // Clear any persisted highlight from the previously selected card
     try {
       if (lastSelectedFlashTimerRef.current) {
@@ -2328,7 +2351,7 @@ function App() {
       url: target.url || url,
       syntheticForm: opts.syntheticForm || null,
     });
-  };
+  }, [getRegionPreferredEntry, updatePokemonLocation, setSelectedDex, setSelectedGame]);
 
   const clearSelection = () => {
     updatePokemonLocation(null, { pruneKeys: ["i", "m", "a", "p"] });
@@ -2952,11 +2975,24 @@ function App() {
     </>
   );
 
-  const renderListEntries = (entries) => {
+  const renderListEntries = useCallback((entries) => {
     if (!entries || entries.length === 0) return null;
+    
+    // On mobile, only render visible range
+    const entriesToRender = isMobile && visibleRange 
+      ? entries.slice(visibleRange.start, visibleRange.end)
+      : entries;
+    
+    const startIndex = isMobile && visibleRange ? visibleRange.start : 0;
+    
     return (
       <div className="list">
-        {entries.map((p, index) => {
+        {/* Spacer for virtual scrolling on mobile */}
+        {isMobile && visibleRange && visibleRange.start > 0 && (
+          <div style={{ height: `${visibleRange.start * 80}px` }} aria-hidden="true" />
+        )}
+        {entriesToRender.map((p, index) => {
+          const actualIndex = startIndex + index;
           const pref = getRegionPreferredEntry(p);
           const parts = pref.url.split("/").filter(Boolean);
           const id = parts[parts.length - 1];
@@ -2975,10 +3011,14 @@ function App() {
               selectedGame={selectedGame}
               selectedDex={selectedDex}
               detailsCache={detailsCache}
-              eagerLoad={index < 6}
+              eagerLoad={actualIndex < 6}
             />
           );
         })}
+        {/* Spacer for virtual scrolling on mobile */}
+        {isMobile && visibleRange && visibleRange.end < entries.length && (
+          <div style={{ height: `${(entries.length - visibleRange.end) * 80}px` }} aria-hidden="true" />
+        )}
         {
           (() => {
             const eagerCount = 6;
@@ -3004,13 +3044,87 @@ function App() {
         }
       </div>
     );
-  };
+  }, [isMobile, visibleRange, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, selected, shiny, selectedGame, selectedDex, detailsCache]);
 
-  const renderGridEntries = (entries, className = "grid") => {
+  // Reset visible range when filters change
+  useEffect(() => {
+    if (isMobile && visibleRange) {
+      setVisibleRange({ start: 0, end: 50 });
+    }
+  }, [query, selectedTypes, selectedTags, selectedDex, selectedGame]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setVisibleRange(null);
+      return;
+    }
+    
+    // Initialize visible range if not set
+    if (!visibleRange) {
+      setVisibleRange({ start: 0, end: 50 });
+      return;
+    }
+    
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const cardHeight = 180; // Approximate card height with gap
+      const buffer = 300; // Buffer in pixels
+      
+      // Calculate which cards should be visible
+      const startIndex = Math.max(0, Math.floor((scrollTop - buffer) / cardHeight));
+      const endIndex = Math.min(
+        regularFiltered.length,
+        Math.ceil((scrollTop + windowHeight + buffer) / cardHeight)
+      );
+      
+      // Use functional update to avoid dependency on visibleRange
+      setVisibleRange(prev => {
+        if (!prev) return { start: startIndex, end: endIndex };
+        // Only update if range changed significantly (to avoid too many re-renders)
+        if (Math.abs(startIndex - prev.start) > 10 || Math.abs(endIndex - prev.end) > 10) {
+          return { start: startIndex, end: endIndex };
+        }
+        return prev;
+      });
+    };
+
+    // Throttle scroll events
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    handleScroll(); // Initial calculation
+    
+    return () => window.removeEventListener('scroll', throttledScroll);
+  }, [isMobile, regularFiltered.length]);
+
+  const renderGridEntries = useCallback((entries, className = "grid") => {
     if (!entries || entries.length === 0) return null;
+    
+    // On mobile, only render visible range
+    const entriesToRender = isMobile && visibleRange 
+      ? entries.slice(visibleRange.start, visibleRange.end)
+      : entries;
+    
+    const startIndex = isMobile && visibleRange ? visibleRange.start : 0;
+    
     return (
       <section className={className}>
-        {entries.map((p, index) => {
+        {/* Spacer for virtual scrolling on mobile */}
+        {isMobile && visibleRange && visibleRange.start > 0 && (
+          <div style={{ height: `${visibleRange.start * 180}px`, gridColumn: '1 / -1' }} aria-hidden="true" />
+        )}
+        {entriesToRender.map((p, index) => {
+          const actualIndex = startIndex + index;
           const pref = getRegionPreferredEntry(p);
           const parts = pref.url.split("/").filter(Boolean);
           const id = parts[parts.length - 1];
@@ -3028,10 +3142,14 @@ function App() {
               selectedGame={selectedGame}
               selectedDex={selectedDex}
               detailsCache={detailsCache}
-              eagerLoad={index < 8}
+              eagerLoad={actualIndex < 8}
             />
           );
         })}
+        {/* Spacer for virtual scrolling on mobile */}
+        {isMobile && visibleRange && visibleRange.end < entries.length && (
+          <div style={{ height: `${(entries.length - visibleRange.end) * 180}px`, gridColumn: '1 / -1' }} aria-hidden="true" />
+        )}
         {
           (() => {
             const eagerCount = 8;
@@ -3057,7 +3175,7 @@ function App() {
         }
       </section>
     );
-  };
+  }, [isMobile, visibleRange, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, shiny, selectedGame, selectedDex, detailsCache]);
 
   const listPrimaryContent = sectionGroups && sectionGroups.length > 0
     ? sectionGroups
@@ -3431,20 +3549,6 @@ function DetailPanel({
   const [moveDetailsMap, setMoveDetailsMap] = useState(() => new Map()); // move name -> {type, power, accuracy, pp, damage_class}
   const [moveUsageMap, setMoveUsageMap] = useState(() => new Map()); // move name -> usage percentage
   const [moveUsageLoading, setMoveUsageLoading] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth <= 768;
-    }
-    return false;
-  });
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
   
   const hasRecommendedEvs = useMemo(() => {
     if (!smogonEvs || typeof smogonEvs !== "object") return false;
