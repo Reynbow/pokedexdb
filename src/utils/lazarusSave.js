@@ -10,9 +10,14 @@ const SAVE_BLOCK_ID = {
 // Emerald uses 52 bytes for owned/seen flags (NUM_DEX_FLAG_BYTES with NUM_SPECIES=412).
 // Lazarus extends the dex, so derive the length from reference data and keep a sane floor.
 const DEFAULT_DEX_FLAG_BYTES = 0x34;
+// Lazarus National Dex currently goes well past 512 entries; 129 bytes covers IDs up to 1025.
+const LAZARUS_MIN_DEX_FLAG_BYTES = 0x81;
 // Observed Lazarus save layout: owned flags live inside SaveBlock1 around this offset.
 const LAZARUS_POKEDEX_OWNED_OFFSET = 0x1B7; // decimal 439
 const LAZARUS_POKEDEX_OWNED_OFFSET_FALLBACK = 0x1CF; // decimal 463 (second-best from sb2 heuristic)
+// Newer Lazarus builds store the National Dex caught flags further into SaveBlock1 (after section merge).
+// This offset (0x466) matches the provided sample saves when sections 1-4 are concatenated.
+const LAZARUS_POKEDEX_OWNED_OFFSET_V2 = 0x466; // decimal 1126
 const PARTY_COUNT_OFFSET = 0x234;
 const PARTY_DATA_OFFSET = 0x238;
 const PARTY_SLOT_SIZE = 100;
@@ -173,40 +178,55 @@ function readBit(bytes, index) {
 }
 
 function detectDexFlagLength(context) {
-  const recordsByNationalId = context?.recordsByNationalId;
-  const recordsBySlug = context?.recordsBySlug;
-  const slugByNationalId = context?.slugByNationalId;
+  const candidates = [];
 
-  const idsFromSlugRecords =
-    recordsBySlug instanceof Map
-      ? Array.from(recordsBySlug.values())
-          .map((record) => (Number.isFinite(record?.id) ? Number(record.id) : null))
-          .filter((value) => value != null)
-      : [];
-  const idsFromNationalRecords =
-    idsFromSlugRecords.length === 0 && recordsByNationalId instanceof Map
-      ? Array.from(recordsByNationalId.values())
-          .map((record) => (Number.isFinite(record?.id) ? Number(record.id) : null))
-          .filter((value) => value != null)
-      : [];
-  const idsFromNationalMap =
-    idsFromSlugRecords.length === 0 && idsFromNationalRecords.length === 0 && slugByNationalId instanceof Map
-      ? Array.from(slugByNationalId.keys()).filter((value) => Number.isFinite(value))
-      : [];
+  // Capture any National Dex IDs (preferred) plus Lazarus custom IDs from provided reference data.
+  if (context?.recordsByNationalId instanceof Map) {
+    for (const [key, record] of context.recordsByNationalId.entries()) {
+      const numericKey = Number(key);
+      if (Number.isFinite(numericKey)) {
+        candidates.push(numericKey);
+      }
+      const recordNationalId = Number(record?.nationalId);
+      if (Number.isFinite(recordNationalId)) {
+        candidates.push(recordNationalId);
+      }
+      const recordId = Number(record?.id);
+      if (Number.isFinite(recordId)) {
+        candidates.push(recordId);
+      }
+    }
+  }
 
-  const candidates =
-    idsFromSlugRecords.length > 0
-      ? idsFromSlugRecords
-      : idsFromNationalRecords.length > 0
-        ? idsFromNationalRecords
-        : idsFromNationalMap;
+  if (context?.recordsBySlug instanceof Map) {
+    for (const record of context.recordsBySlug.values()) {
+      const recordNationalId = Number(record?.nationalId);
+      if (Number.isFinite(recordNationalId)) {
+        candidates.push(recordNationalId);
+      }
+      const recordId = Number(record?.id);
+      if (Number.isFinite(recordId)) {
+        candidates.push(recordId);
+      }
+    }
+  }
+
+  if (context?.slugByNationalId instanceof Map) {
+    for (const key of context.slugByNationalId.keys()) {
+      const numericKey = Number(key);
+      if (Number.isFinite(numericKey)) {
+        candidates.push(numericKey);
+      }
+    }
+  }
 
   if (candidates.length === 0) {
     return DEFAULT_DEX_FLAG_BYTES;
   }
+
   const maxId = Math.max(...candidates);
   const derivedLength = Math.ceil(maxId / 8);
-  return Math.max(DEFAULT_DEX_FLAG_BYTES, derivedLength);
+  return Math.max(DEFAULT_DEX_FLAG_BYTES, LAZARUS_MIN_DEX_FLAG_BYTES, derivedLength);
 }
 
 function findOwnedFlagOffset(saveBytes, dexFlagBytes, knownSpecies = []) {
@@ -308,31 +328,61 @@ function scanFlagSources(flagSources, dexFlagBytes, knownSpecies) {
       if (minId === Number.MAX_SAFE_INTEGER) {
         minId = 9999;
       }
-      if (maxId > 430) {
+      // Allow higher maxId values - Lazarus dex has 529 pokemon, and saves may use National Dex IDs
+      // Only filter out obviously invalid results (e.g., maxId > 1025 which is beyond current National Dex)
+      if (maxId > 1025) {
         continue;
       }
-      const targetBits = partyMatches > 1 ? 88 : bitCount > 10 ? 88 : 1;
-      const littenId = 4;
+      // Calculate target bit count based on party matches
+      // For new saves with few pokemon, expect very few bits
+      // For saves with many pokemon, expect more bits
+      const targetBits = partyMatches > 0 ? Math.max(partyMatches, bitCount > 10 ? 88 : 1) : (bitCount > 10 ? 88 : 1);
+      // Litten has Lazarus custom ID 4 and National Dex ID 725
+      // Check for both to support either ID system
+      const littenLazarusId = 4;
+      const littenNationalId = 725;
       let score = 0;
-      score -= Math.abs(bitCount - targetBits);
-      score += (partyMatches || 0) * 20;
+      // Heavily prioritize party member matches - if we have party members, they MUST be in caught list
+      if (knownSpecies.length > 0) {
+        if (partyMatches === 0) {
+          // No party matches - heavily penalize (this is likely wrong)
+          score -= 1000;
+        } else {
+          // Party matches found - heavily boost
+          score += partyMatches * 100;
+        }
+      }
+      // Penalize if bit count is way off from target
+      score -= Math.abs(bitCount - targetBits) * 2;
+      // Prefer results with reasonable bit counts (not too many, not too few)
+      if (bitCount >= 1 && bitCount <= 200) {
+        score += 10;
+      } else if (bitCount > 200) {
+        // Too many bits - likely false positive
+        score -= 50;
+      }
       if (minId <= 10) score += 5;
-      if (results.includes(littenId)) score += 10;
+      // Boost score if Litten is found (either ID system)
+      if (results.includes(littenLazarusId) || results.includes(littenNationalId)) score += 10;
       scored.push({ label, offset, bitCount, partyMatches, results, score, minId, maxId });
     }
   });
   if (scored.length === 0) {
     return { results: [], bitCount: 0, partyMatches: 0, offset: 0, label: "none", score: -Infinity };
   }
-  const littenId = 4;
-  const littenCandidates = scored.filter((c) => c.results.includes(littenId));
+  // Litten has Lazarus custom ID 4 and National Dex ID 725
+  // Check for both to support either ID system
+  const littenLazarusId = 4;
+  const littenNationalId = 725;
+  const hasLitten = (results) => results.includes(littenLazarusId) || results.includes(littenNationalId);
+  const littenCandidates = scored.filter((c) => hasLitten(c.results));
 
   // If the preferred fixed offset contains Litten and a reasonable bitcount, return it directly.
   const fixed = scored.find(
     (c) =>
       c.label === "block1" &&
       c.offset === LAZARUS_POKEDEX_OWNED_OFFSET &&
-      c.results.includes(littenId) &&
+      hasLitten(c.results) &&
       c.bitCount > 0 &&
       c.bitCount <= 150
   );
@@ -341,6 +391,20 @@ function scanFlagSources(flagSources, dexFlagBytes, knownSpecies) {
   }
 
   if (littenCandidates.length > 0) {
+    // Prioritize candidates that match party members
+    const withPartyMatches = littenCandidates.filter((c) => c.partyMatches > 0);
+    if (withPartyMatches.length > 0) {
+      // Prefer results that match party members
+      withPartyMatches.sort(
+        (a, b) =>
+          b.partyMatches - a.partyMatches ||
+          Math.abs(a.bitCount - (a.partyMatches > 1 ? 88 : 1)) - Math.abs(b.bitCount - (b.partyMatches > 1 ? 88 : 1)) ||
+          a.bitCount - b.bitCount ||
+          a.offset - b.offset
+      );
+      return withPartyMatches[0];
+    }
+    // If no party matches, use original logic
     const littenTarget = (entry) => (entry.partyMatches > 1 || entry.bitCount > 10 ? 88 : 1);
     littenCandidates.sort(
       (a, b) =>
@@ -351,6 +415,13 @@ function scanFlagSources(flagSources, dexFlagBytes, knownSpecies) {
     );
     return littenCandidates[0];
   }
+  // Prioritize results with party matches
+  const withPartyMatches = scored.filter((c) => c.partyMatches > 0);
+  if (withPartyMatches.length > 0) {
+    withPartyMatches.sort((a, b) => b.score - a.score || b.partyMatches - a.partyMatches || a.bitCount - b.bitCount || a.offset - b.offset);
+    return withPartyMatches[0];
+  }
+  // Fallback to best score if no party matches
   scored.sort((a, b) => b.score - a.score || a.bitCount - b.bitCount || a.offset - b.offset);
   return scored[0];
 }
@@ -480,6 +551,24 @@ function extractPartyMembers(saveBlock1, context) {
   return members;
 }
 
+function readDexFlags(source, offset, dexFlagBytes) {
+  if (!(source instanceof Uint8Array)) return null;
+  if (offset == null || offset < 0 || offset + dexFlagBytes > source.length) {
+    return null;
+  }
+  const slice = source.subarray(offset, offset + dexFlagBytes);
+  const results = [];
+  for (let i = 0; i < dexFlagBytes * 8; i++) {
+    const byteIndex = Math.floor(i / 8);
+    const bit = i % 8;
+    if (((slice[byteIndex] >> (7 - bit)) & 1) === 0) {
+      continue;
+    }
+    results.push(i + 1);
+  }
+  return results;
+}
+
 export function parseLazarusSavFile(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer)) {
     throw new Error("Expected an ArrayBuffer for save data.");
@@ -502,23 +591,82 @@ export function parseLazarusSavFile(arrayBuffer, options = {}) {
   const dexFlagBytes = detectDexFlagLength(context);
   const assembledSaveBlock1 = assembleSaveBlock1(sections);
   const partyMembers = extractPartyMembers(assembledSaveBlock1, context);
+  // Use National Dex IDs for party species matching, as the save file likely uses National Dex IDs
+  // for caught flags. Fallback to speciesInternalId if nationalId is not available.
   const partySpecies = partyMembers
     .map((entry) => {
-      if (Number.isFinite(entry?.dexId)) return Number(entry.dexId);
+      if (Number.isFinite(entry?.nationalId)) return Number(entry.nationalId);
       if (Number.isFinite(entry?.speciesInternalId)) return Number(entry.speciesInternalId);
+      // Also check dexId as fallback (might be Lazarus custom ID or National Dex ID)
+      if (Number.isFinite(entry?.dexId)) return Number(entry.dexId);
       return null;
     })
     .filter((value) => Number.isInteger(value) && value > 0);
-  const best = scanFlagSources(
-    [
-      { label: "block1", data: assembledSaveBlock1 },
-      { label: "sb2", data: saveBlock2 },
-    ],
-    dexFlagBytes,
-    partySpecies
+  const preferredDexBytes = Math.max(dexFlagBytes, LAZARUS_MIN_DEX_FLAG_BYTES);
+  // First try the observed National Dex caught flag location used by current Lazarus saves.
+  let usedFixedDexFlags = false;
+  let caughtPokemon = readDexFlags(assembledSaveBlock1, LAZARUS_POKEDEX_OWNED_OFFSET_V2, preferredDexBytes);
+  if (Array.isArray(caughtPokemon) && caughtPokemon.length > 0) {
+    usedFixedDexFlags = true;
+  } else {
+    const best = scanFlagSources(
+      [
+        { label: "block1", data: assembledSaveBlock1 },
+        { label: "sb2", data: saveBlock2 },
+      ],
+      preferredDexBytes,
+      partySpecies
+    );
+    caughtPokemon = best?.results || [];
+  }
+  
+  // Validate the results: if we have party members, they should be in the caught list
+  // This helps filter out false positives from random bitfields
+  const partyNationalIds = new Set(
+    partyMembers
+      .map((entry) => entry?.nationalId)
+      .filter((id) => Number.isFinite(id) && id > 0)
+      .map((id) => Number(id))
+  );
+  const partyLazarusIds = new Set(
+    partyMembers
+      .map((entry) => {
+        // Get Lazarus custom ID from the record if available
+        if (entry?.slug && context.recordsBySlug instanceof Map) {
+          const record = context.recordsBySlug.get(entry.slug);
+          return record?.id != null ? Number(record.id) : null;
+        }
+        return null;
+      })
+      .filter((id) => Number.isFinite(id) && id > 0)
+      .map((id) => Number(id))
   );
 
-  const caughtPokemon = best?.results || [];
+  let hasPartyMatches = false;
+  if (partyMembers.length > 0 && caughtPokemon.length > 0) {
+    const caughtSet = new Set(caughtPokemon);
+    // Check if any party members are in the caught list (using either ID system)
+    hasPartyMatches = Array.from(partyNationalIds).some((id) => caughtSet.has(id)) ||
+                           Array.from(partyLazarusIds).some((id) => caughtSet.has(id));
+    
+    // If no party members match, this is likely a false positive - try to find a better match
+    // by prioritizing results that match party members
+    if (!hasPartyMatches && partyMembers.length > 0 && !usedFixedDexFlags) {
+      // Only discard when we relied on heuristics; fixed offsets can legitimately miss party members
+      // (e.g., pre-Pokedex captures).
+      if (caughtPokemon.length > partyMembers.length * 2) {
+        caughtPokemon = [];
+      }
+    }
+  }
+  // If the Pokédex flags missed current party members (common before receiving the Pokédex),
+  // ensure they display as caught without overwriting good flag data.
+  if (partyMembers.length > 0 && (!hasPartyMatches || caughtPokemon.length === 0)) {
+    const merged = new Set(caughtPokemon);
+    partyNationalIds.forEach((id) => merged.add(id));
+    caughtPokemon = Array.from(merged).sort((a, b) => a - b);
+  }
+  
   return {
     caughtPokemon,
     partyMembers,

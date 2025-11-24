@@ -926,6 +926,24 @@ function normalizeLazarusLocationSegment(segment) {
   return trimmed;
 }
 
+function extractBaseLocationName(locationText) {
+  // Remove all parenthetical information to get the base location name
+  // This includes (fish), (surf), (Peak), (West), (North), etc.
+  let baseName = String(locationText || "").trim();
+  if (!baseName) return "";
+
+  // Remove level information first
+  baseName = baseName.replace(/Lv\.\s*\d+(?:\s*-\s*\d+)?/gi, "").trim();
+
+  // Remove all parenthetical information
+  baseName = baseName.replace(/\s*\([^)]*\)/g, "").trim();
+
+  // Clean up extra spaces
+  baseName = baseName.replace(/\s+/g, " ").trim();
+
+  return baseName;
+}
+
 function splitLazarusLocations(locationText) {
   const rawSegments = String(locationText || "")
     .split(",")
@@ -946,9 +964,68 @@ function splitLazarusLocations(locationText) {
   return { segments, hasEvolutionFlag };
 }
 
+function getLazarusLocationSegments(record) {
+  const details = Array.isArray(record?.locationDetails) ? record.locationDetails : null;
+  if (details && details.length > 0) {
+    return details
+      .map((detail) => String(detail?.location || "").trim())
+      .filter((value) => value.length > 0);
+  }
+  const { segments } = splitLazarusLocations(record?.location);
+  return segments;
+}
+
+function deriveMethodTypeFromLabel(label) {
+  const normalized = String(label || "").toLowerCase();
+  if (!normalized) return "land";
+  if (normalized.includes("surf")) return "surf";
+  if (normalized.includes("fish")) return "fishing";
+  if (normalized.includes("rod")) return "fishing";
+  if (normalized.includes("event") || normalized.includes("quest") || normalized.includes("gift")) {
+    return "event";
+  }
+  return "land";
+}
+
+function formatLazarusLevel(levelText) {
+  const cleaned = String(levelText || "").trim();
+  if (!cleaned) return "";
+  if (/^lv/i.test(cleaned)) {
+    return cleaned;
+  }
+  return `Lv. ${cleaned}`;
+}
+
 function buildLazarusLocationEntries(record) {
   const locationText = String(record?.location || "").trim();
   const evolutionText = String(record?.evolution || "").trim();
+  const detailEntries = Array.isArray(record?.locationDetails) ? record.locationDetails : null;
+  let evolutionRequirement = null;
+
+  if (detailEntries && detailEntries.length > 0) {
+    const entries = detailEntries
+      .filter((detail) => String(detail?.location || "").trim().length > 0)
+      .map((detail) => {
+        const locationName = String(detail.location || "").trim();
+        const methodLabel = String(detail.method || "").trim() || null;
+        const methodType = deriveMethodTypeFromLabel(methodLabel);
+        const levelSummary = detail.level ? formatLazarusLevel(detail.level) : "";
+        const notes = [detail.moreInfo, detail.extraInfo]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+          .join(" · ");
+        return {
+          location: locationName,
+          methodLabel,
+          methodType,
+          levelSummary,
+          chanceSummary: "",
+          notes,
+        };
+      });
+    return { entries, evolutionRequirement };
+  }
+
   if (!locationText) {
     return { entries: [], evolutionRequirement: null };
   }
@@ -957,20 +1034,67 @@ function buildLazarusLocationEntries(record) {
     return { entries: [], evolutionRequirement: null };
   }
 
-  let evolutionRequirement = null;
   if (hasEvolutionFlag) {
     evolutionRequirement = {
       method: evolutionText || "Evolve",
       target: record?.name || "Evolution",
     };
   }
-  const entries = locationSegments.map((segment) => ({
-    location: segment,
-    methodLabel: "Location",
-    methodType: "land",
-    levelSummary: "",
-    chanceSummary: "",
-  }));
+  const entries = locationSegments.map((segment) => {
+    // Extract method type from segment (fish, surf)
+    let methodType = "land";
+    let methodLabel = "Location";
+    let cleanSegment = segment;
+    let levelSummary = "";
+    const noteParts = [];
+
+    // Extract and inspect parenthetical segments
+    const parentheticalMatches = Array.from(segment.matchAll(/\(([^)]+)\)/g));
+    parentheticalMatches.forEach((match) => {
+      const fullText = match[0];
+      const value = match[1]?.trim() || "";
+      const lower = value.toLowerCase();
+      if (lower === "fish") {
+        methodType = "fishing";
+        methodLabel = "Fish";
+        cleanSegment = cleanSegment.replace(fullText, "").trim();
+      } else if (lower === "surf") {
+        methodType = "surf";
+        methodLabel = "Surf";
+        cleanSegment = cleanSegment.replace(fullText, "").trim();
+      } else {
+        noteParts.push(value);
+        cleanSegment = cleanSegment.replace(fullText, "").trim();
+      }
+    });
+
+    // Extract level information: "Lv. X" or "Lv. X-Y"
+    // Can appear before or after method parentheses
+    const levelMatch = cleanSegment.match(/Lv\.\s*(\d+)(?:\s*-\s*(\d+))?/i);
+    if (levelMatch) {
+      const minLevel = parseInt(levelMatch[1], 10);
+      const maxLevel = levelMatch[2] ? parseInt(levelMatch[2], 10) : minLevel;
+      if (minLevel === maxLevel) {
+        levelSummary = `Lv. ${minLevel}`;
+      } else {
+        levelSummary = `Lv. ${minLevel}-${maxLevel}`;
+      }
+      cleanSegment = cleanSegment.replace(/Lv\.\s*\d+(?:\s*-\s*\d+)?/gi, "").trim();
+    }
+
+    // Extract base location name (remove any remaining parenthetical info like (West), (Peak), etc.)
+    const baseLocation = extractBaseLocationName(cleanSegment) || cleanSegment || "Unknown Location";
+    const notes = noteParts.join(", ");
+
+    return {
+      location: baseLocation,
+      methodLabel,
+      methodType,
+      levelSummary,
+      chanceSummary: "",
+      notes,
+    };
+  });
 
   return { entries, evolutionRequirement };
 }
@@ -1364,6 +1488,23 @@ export default function SavPage() {
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
   const hasSaveData = fileData instanceof Uint8Array;
   const showingYellow = gameKey === "yellow";
+  // Create a mapping from caught pokemon IDs to dex entries for more robust matching
+  const caughtIdToDexEntry = useMemo(() => {
+    if (showingYellow) return new Map();
+    const map = new Map();
+    lazarusDex.forEach((record) => {
+      const recordId = Number.isFinite(record?.id) ? Number(record.id) : null;
+      const nationalId = record?.nationalId != null ? Number(record.nationalId) : null;
+      // Map both Lazarus custom ID and National Dex ID to this record
+      if (recordId != null) {
+        map.set(recordId, record);
+      }
+      if (nationalId != null) {
+        map.set(nationalId, record);
+      }
+    });
+    return map;
+  }, [lazarusDex, showingYellow]);
   const legacyMapReady = showingYellow ? legacyEncountersReady && legacyEncounters instanceof Map : true;
   const yellowReferenceReady = yellowReference instanceof Map;
   const activeGameLabel = showingYellow ? "Pokémon Yellow Legacy" : "Pokémon Lazarus";
@@ -1376,15 +1517,31 @@ export default function SavPage() {
         const recordSlug = normalizeSpeciesSlug(record?.slug || record?.name);
         const entryId = Number.isFinite(record?.id) ? Number(record.id) : index + 1;
         const entryKey = `${entryId}-${recordSlug || record?.name || "entry"}-${index}`;
+        const recordId = Number.isFinite(record?.id) ? Number(record.id) : null;
+        const nationalId = record?.nationalId != null ? Number(record.nationalId) : null;
+        // Check if this record is caught by matching either its Lazarus custom ID or National Dex ID
+        const isCaughtById = (recordId != null && caughtSet.has(recordId)) || 
+                             (nationalId != null && caughtSet.has(nationalId));
+        // Also check reverse mapping: if any caught ID maps to this record (for reverse lookup)
+        // This handles cases where the caught IDs might not directly match record.id or record.nationalId
+        const isCaughtByMapping = Array.from(caughtSet).some((caughtId) => {
+          const mappedRecord = caughtIdToDexEntry.get(Number(caughtId));
+          // Compare by key properties to ensure we match the same record
+          // Use id and slug to uniquely identify records
+          if (!mappedRecord) return false;
+          const mappedId = Number.isFinite(mappedRecord?.id) ? Number(mappedRecord.id) : null;
+          const mappedSlug = normalizeSpeciesSlug(mappedRecord?.slug || mappedRecord?.name);
+          const currentRecordId = Number.isFinite(record?.id) ? Number(record.id) : null;
+          const currentRecordSlug = normalizeSpeciesSlug(record?.slug || record?.name);
+          return mappedId === currentRecordId && mappedSlug === currentRecordSlug;
+        });
         return {
           entryKey,
           id: entryId,
           name: record?.name || `Pokemon ${entryId}`,
           slug: recordSlug || null,
           nationalId: record?.nationalId ?? null,
-          caught:
-            (record?.nationalId != null && caughtSet.has(Number(record.nationalId))) ||
-            (record?.id != null && caughtSet.has(Number(record.id))),
+          caught: isCaughtById || isCaughtByMapping,
           visibleEntries,
           evolutionRequirement,
           record,
@@ -1429,8 +1586,13 @@ export default function SavPage() {
       }
     } else {
       lazarusDex.forEach((record) => {
-        const { segments } = splitLazarusLocations(record?.location);
-        segments.forEach((segment) => names.add(segment));
+        const segments = getLazarusLocationSegments(record);
+        segments.forEach((segment) => {
+          const baseName = extractBaseLocationName(segment);
+          if (baseName) {
+            names.add(baseName);
+          }
+        });
       });
     }
     return Array.from(names).sort((a, b) => LOCATION_COLLATOR.compare(a, b));
@@ -1457,17 +1619,19 @@ export default function SavPage() {
     if (!showingYellow) {
       const aggregator = new Map();
       lazarusDex.forEach((record) => {
-        const { segments: locationSegments } = splitLazarusLocations(record?.location);
+        const locationSegments = getLazarusLocationSegments(record);
         if (locationSegments.length === 0) {
           return;
         }
         locationSegments.forEach((locationName) => {
-          let slugMap = aggregator.get(locationName);
+          const baseLocationName = extractBaseLocationName(locationName);
+          if (!baseLocationName) return;
+          let slugMap = aggregator.get(baseLocationName);
           if (!slugMap) {
             slugMap = new Map();
-            aggregator.set(locationName, slugMap);
+            aggregator.set(baseLocationName, slugMap);
           }
-          const slug = record?.slug || record?.name || locationName;
+          const slug = record?.slug || record?.name || baseLocationName;
           if (!slugMap.has(slug)) {
             slugMap.set(slug, {
               name: record?.name || slug,
@@ -2084,16 +2248,28 @@ export default function SavPage() {
                                     .join(" ");
 
                                   const detailParts = [];
-                                  if (locationEntry.levelSummary) {
+                                  if (locationEntry.levelSummary && showingYellow) {
                                     detailParts.push(locationEntry.levelSummary);
                                   }
-                                  if (locationEntry.chanceSummary) {
+                                  if (locationEntry.chanceSummary && showingYellow) {
                                     detailParts.push(locationEntry.chanceSummary);
+                                  }
+                                  if (locationEntry.notes && showingYellow) {
+                                    detailParts.push(locationEntry.notes);
                                   }
 
                                   const hasSpecialLabel =
                                     locationEntry.methodLabel &&
                                     locationEntry.methodLabel !== DEFAULT_METHOD_LABEL;
+                                  const shouldShowMethodBadge = showingYellow
+                                    ? hasSpecialLabel
+                                    : Boolean(locationEntry.methodLabel);
+                                  const shouldShowBadgeRow =
+                                    !showingYellow &&
+                                    (shouldShowMethodBadge ||
+                                      locationEntry.levelSummary ||
+                                      locationEntry.notes ||
+                                      locationEntry.chanceSummary);
 
                                   const sharedPokemon =
                                     locationPokemonLookup.get(locationEntry.location) || [];
@@ -2106,12 +2282,36 @@ export default function SavPage() {
                                   return (
                                     <li key={`${locationEntry.location}-${index}`} className={rowClassNames}>
                                       <div className="sav-location-row__name">{locationEntry.location}</div>
-                                      {hasSpecialLabel && (
+                                      {shouldShowBadgeRow && (
+                                        <div className="sav-location-row__badges">
+                                          {shouldShowMethodBadge && (
+                                            <span className="sav-location-row__badge sav-location-row__badge--method">
+                                              {locationEntry.methodLabel}
+                                            </span>
+                                          )}
+                                          {locationEntry.levelSummary && (
+                                            <span className="sav-location-row__badge sav-location-row__badge--level">
+                                              {locationEntry.levelSummary}
+                                            </span>
+                                          )}
+                                          {locationEntry.notes && (
+                                            <span className="sav-location-row__badge sav-location-row__badge--note">
+                                              {locationEntry.notes}
+                                            </span>
+                                          )}
+                                          {locationEntry.chanceSummary && (
+                                            <span className="sav-location-row__badge sav-location-row__badge--chance">
+                                              {locationEntry.chanceSummary}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {showingYellow && hasSpecialLabel && (
                                         <div className="sav-location-row__method-line">
                                           <span className="sav-location-row__method">{locationEntry.methodLabel}</span>
                                         </div>
                                       )}
-                                      {detailParts.length > 0 && (
+                                      {showingYellow && detailParts.length > 0 && (
                                         <div className="sav-location-row__meta">{detailParts.join(" · ")}</div>
                                       )}
                                       <div className="sav-location-row__hover-panel">
