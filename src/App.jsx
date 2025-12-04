@@ -3601,6 +3601,7 @@ function DetailPanel({
   const [smogonLoading, setSmogonLoading] = useState(false);
   const [smogonEvs, setSmogonEvs] = useState(null);
   const [smogonItem, setSmogonItem] = useState(null);
+  const [smogonMoves, setSmogonMoves] = useState(null);
   const [isEvModalOpen, setIsEvModalOpen] = useState(false);
   const [activeItemName, setActiveItemName] = useState(null);
   const [activeAbility, setActiveAbility] = useState(null);
@@ -5026,11 +5027,16 @@ function DetailPanel({
     }
 
     let cancelled = false;
-    const allMoves = [
-      ...(learnset.levelUp || []).map(m => m.name),
-      ...(learnset.machine || []).map(m => m.name),
-    ];
-    const toFetch = allMoves.filter(name => !moveDetailsMap.has(name));
+    const levelMoves = (learnset.levelUp || []).map((m) => m.name);
+    const machineMoves = (learnset.machine || []).map((m) => m.name);
+    const recommendedMoves = Array.isArray(smogonMoves)
+      ? smogonMoves
+          .map((move) => normalizeSpeciesName(move))
+          .filter(Boolean)
+      : [];
+    const allMoves = [...levelMoves, ...machineMoves, ...recommendedMoves];
+    const uniqueMoves = Array.from(new Set(allMoves));
+    const toFetch = uniqueMoves.filter((name) => !moveDetailsMap.has(name));
     
     if (toFetch.length === 0) return;
 
@@ -5086,7 +5092,7 @@ function DetailPanel({
     return () => {
       cancelled = true;
     };
-  }, [learnset, shouldShowLearnset, moveDetailsMap]);
+  }, [learnset, shouldShowLearnset, moveDetailsMap, smogonMoves]);
 
   // Fetch Smogon move usage statistics
   useEffect(() => {
@@ -6069,6 +6075,7 @@ function DetailPanel({
     setSmogonNature(null);
     setSmogonEvs(null);
     setSmogonItem(null);
+    setSmogonMoves(null);
     setSmogonError(null);
     setSmogonLoading(false);
     if (!alias) return;
@@ -6092,12 +6099,14 @@ function DetailPanel({
         setSmogonNature(hasNature ? result.nature : null);
         setSmogonEvs(evs);
         setSmogonItem(result?.item || null);
+        setSmogonMoves(result?.moves || null);
         if (hasNature || evs) {
           setSmogonError(null);
           addLog("Smogon recommendations", {
             nature: result?.nature || null,
             item: result?.item || null,
             evs,
+            moves: result?.moves || null,
             generation: result.generation,
             format: result.format,
             set: result.setName,
@@ -6118,6 +6127,7 @@ function DetailPanel({
         const msg = `Smogon data unavailable for ${name}.`;
         setSmogonNature(null);
         setSmogonEvs(null);
+        setSmogonMoves(null);
         setSmogonError(msg);
         addLog("Smogon fetch failed", { alias, error: String(error) });
       } finally {
@@ -6132,48 +6142,6 @@ function DetailPanel({
       cancelled = true;
     };
   }, [name, species?.generation?.name]);
-
-  // Calculate learnset summary stats - type distribution for level-up moves
-  const learnsetSummary = useMemo(() => {
-    const levelUpMoves = learnset.levelUp || [];
-    
-    if (levelUpMoves.length === 0) {
-      return {
-        typeStats: [],
-        totalTypes: 0,
-        totalMoves: 0,
-      };
-    }
-
-    // Get move details and count types
-    const typeCounts = new Map();
-    let movesWithTypes = 0;
-
-    levelUpMoves.forEach(move => {
-      const details = moveDetailsMap.get(move.name);
-      if (details?.type) {
-        const type = details.type;
-        const currentCount = typeCounts.get(type) || 0;
-        typeCounts.set(type, currentCount + 1);
-        movesWithTypes++;
-      }
-    });
-
-    // Convert to array and sort by count (descending)
-    const typeStats = Array.from(typeCounts.entries())
-      .map(([type, count]) => ({
-        type,
-        count,
-        percentage: Math.round((count / levelUpMoves.length) * 100),
-      }))
-      .sort((a, b) => b.count - a.count);
-
-    return {
-      typeStats,
-      totalTypes: typeStats.length,
-      totalMoves: levelUpMoves.length,
-    };
-  }, [learnset.levelUp, moveDetailsMap]);
 
   // Get primary type and create gradient style
   const heroGradientStyle = useMemo(() => {
@@ -6216,6 +6184,14 @@ function DetailPanel({
   }, [details?.types]);
 
   const heroTypeIconUrl = primaryTypeName ? getTypeIconUrl(primaryTypeName) : null;
+  const pokemonTypeNames = useMemo(() => {
+    if (!details?.types || details.types.length === 0) return [];
+    return details.types
+      .slice()
+      .sort((a, b) => a.slot - b.slot)
+      .map((entry) => entry?.type?.name)
+      .filter(Boolean);
+  }, [details?.types]);
 
   return (
     <aside className="detail-panel">
@@ -6687,36 +6663,94 @@ function DetailPanel({
                       <span className="learnset-summary-click-indicator" aria-hidden="true">→</span>
                     </div>
                     <div className="learnset-summary-stats">
-                      {learnsetSummary.typeStats.length > 0 ? (
+                      {smogonMoves && Array.isArray(smogonMoves) && smogonMoves.length > 0 ? (
                         <>
                           <div className="learnset-summary-top-moves-label">
-                            Level-Up Move Types ({learnsetSummary.totalMoves} moves)
+                            Recommended Moves
                           </div>
-                          <div className="learnset-summary-type-stats">
-                            {learnsetSummary.typeStats.slice(0, 6).map((stat) => (
-                              <span key={stat.type} className={`type-chip type-${stat.type}`}>
-                                <img 
-                                  src={getTypeIconUrl(stat.type)} 
-                                  alt={stat.type}
-                                  className="type-icon"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                  }}
-                                />
-                                <span className="type-name">
-                                  {stat.type} {stat.count} ({stat.percentage}%)
-                                </span>
-                              </span>
-                            ))}
-                            {learnsetSummary.typeStats.length > 6 && (
-                              <span className="learnset-summary-type-more">
-                                +{learnsetSummary.typeStats.length - 6} more
-                              </span>
-                            )}
+                          <div className="learnset-summary-top-moves-list">
+                            {smogonMoves.slice(0, 4).map((moveName, index) => {
+                              const normalizedMoveName = normalizeSpeciesName(moveName);
+                              const lookupKeys = [
+                                normalizedMoveName,
+                                moveName,
+                                typeof moveName === "string" ? moveName.toLowerCase() : null,
+                              ].filter(Boolean);
+                              let moveDetails = null;
+                              for (const key of lookupKeys) {
+                                if (moveDetailsMap.has(key)) {
+                                  moveDetails = moveDetailsMap.get(key);
+                                  break;
+                                }
+                              }
+                              const moveType = moveDetails?.type || "normal";
+                              const typeColor = getTypeColor(moveType);
+                              const pillStyle = typeColor
+                                ? {
+                                    background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
+                                    borderColor: `${typeColor}cc`,
+                                  }
+                                : undefined;
+                              const tooltipEntries = [
+                                moveDetails?.type ? { label: "Type", value: humanizeName(moveDetails.type) } : null,
+                                moveDetails?.power != null ? { label: "Power", value: moveDetails.power } : null,
+                                moveDetails?.accuracy != null ? { label: "Accuracy", value: `${moveDetails.accuracy}%` } : null,
+                                moveDetails?.pp != null ? { label: "PP", value: moveDetails.pp } : null,
+                                moveDetails?.damage_class
+                                  ? { label: "Class", value: humanizeName(moveDetails.damage_class) }
+                                  : null,
+                              ].filter(Boolean);
+                              return (
+                                <div key={`${normalizedMoveName || moveName}-${index}`} className="learnset-summary-top-move">
+                                  <div className="learnset-summary-pill-wrapper">
+                                    <div
+                                      className={`learnset-move-pill learnset-summary-pill type-${moveType}`}
+                                      style={pillStyle}
+                                      tabIndex={0}
+                                      aria-label={`Recommended move ${humanizeName(moveName)}`}
+                                    >
+                                      <div className="learnset-move-name-wrapper">
+                                        {moveDetails?.type && (
+                                          <img
+                                            src={getTypeIconUrl(moveType)}
+                                            alt={moveType}
+                                            className="learnset-move-type-icon"
+                                            onError={(e) => {
+                                              e.target.style.display = "none";
+                                            }}
+                                          />
+                                        )}
+                                        <span className="learnset-move-name">{humanizeName(moveName)}</span>
+                                      </div>
+                                      <span className="learnset-summary-move-power">
+                                        {moveDetails?.power != null ? moveDetails.power : "—"}
+                                      </span>
+                                    </div>
+                                    <div className="learnset-move-tooltip" role="tooltip">
+                                      <div className="learnset-move-tooltip-title">{humanizeName(moveName)}</div>
+                                      {tooltipEntries.length > 0 ? (
+                                        <div className="learnset-move-tooltip-grid">
+                                          {tooltipEntries.map((entry) => (
+                                            <div key={entry.label} className="learnset-move-tooltip-row">
+                                              <span className="learnset-move-tooltip-label">{entry.label}</span>
+                                              <span className="learnset-move-tooltip-value">{entry.value}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="learnset-move-tooltip-empty">Details unavailable</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </>
+                      ) : smogonLoading ? (
+                        <div className="learnset-summary-loading">Loading recommended moves...</div>
                       ) : (
-                        <div className="learnset-summary-loading">Loading move types...</div>
+                        <div className="learnset-summary-loading">No recommended moves available</div>
                       )}
                     </div>
                   </div>

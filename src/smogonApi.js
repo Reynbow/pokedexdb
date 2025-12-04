@@ -102,6 +102,35 @@ const extractItemValue = (value) => {
   return null;
 };
 
+// Extract moves from a Smogon set-like structure
+// Returns an array of move names (up to 4), handling arrays and alternative moves
+const extractMovesValue = (value) => {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    const moves = [];
+    for (const entry of value) {
+      if (typeof entry === "string") {
+        moves.push(entry);
+      } else if (Array.isArray(entry)) {
+        // For alternative moves like ["Fire Blast", "Flamethrower"], take the first one
+        if (entry.length > 0 && typeof entry[0] === "string") {
+          moves.push(entry[0]);
+        }
+      }
+      // Limit to 4 moves
+      if (moves.length >= 4) break;
+    }
+    return moves.length > 0 ? moves : null;
+  }
+  if (typeof value === "object") {
+    const nested = value.moves || value.move;
+    if (nested) {
+      return extractMovesValue(nested);
+    }
+  }
+  return null;
+};
+
 const parseSpreadNature = (spread) => {
   if (!spread) return null;
   if (typeof spread === "string") {
@@ -242,6 +271,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
     for (const setName of setNames) {
       const set = sets[setName];
       const direct = extractNatureValue(set?.nature);
+      const moves = extractMovesValue(set?.moves);
       if (direct) {
         return {
           nature: direct,
@@ -249,6 +279,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
           format: formatKey,
           setName,
           evs: normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads),
+          moves: moves || null,
         };
       }
       const fromSpreads = extractNatureFromSpreads(set?.spreads);
@@ -259,6 +290,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
           format: formatKey,
           setName,
           evs: normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads),
+          moves: moves || null,
         };
       }
       const evs = normalizeEvs(set?.evs) || parseSpreadEvs(set?.spreads);
@@ -269,6 +301,7 @@ const selectNatureFromSpeciesSets = (speciesSets) => {
           format: formatKey,
           setName,
           evs,
+          moves: moves || null,
         };
       }
     }
@@ -386,6 +419,8 @@ export const findRecommendedNature = async (alias, options = {}) => {
     return {
       nature: null,
       item: null,
+      evs: null,
+      moves: null,
       generation: null,
       format: null,
       setName: null,
@@ -410,6 +445,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
           nature: selection.nature || null,
           item: selection.item || null,
           evs: selection.evs || null,
+          moves: selection.moves || null,
           generation,
           format: selection.format,
           setName: selection.setName,
@@ -421,6 +457,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
         nature: null,
         item: null,
         evs: null,
+        moves: null,
         generation,
         format: null,
         setName: null,
@@ -438,6 +475,7 @@ export const findRecommendedNature = async (alias, options = {}) => {
     nature: null,
     item: null,
     evs: null,
+    moves: null,
     generation: null,
     format: null,
     setName: null,
