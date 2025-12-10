@@ -1800,28 +1800,8 @@ export default function SavPage() {
                     Preview Pokedex
                   </button>
                   <p className="sav-card__description">
-                    Choose your save file to view your caught Pokemon and party.
+                    Preview the complete Pokedex for Pokemon Lazarus.
                   </p>
-                </div>
-                <div className="sav-card__body">
-                  <label className="sav-field-label" htmlFor="lazarus-upload-input">
-                    Choose your save file
-                  </label>
-                  <input
-                    id="lazarus-upload-input"
-                    className="sav-file-input"
-                    type="file"
-                    accept=".sav,.srm"
-                    onChange={handleLazarusFileChange}
-                    disabled={loading || !lazarusReferenceReady}
-                  />
-                  <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
-                  {!lazarusReferenceReady && !lazarusDexError && (
-                    <p className="sav-status">Loading Pokemon Lazarus data...</p>
-                  )}
-                  {lazarusDexError && <div className="sav-alert sav-alert--error">{lazarusDexError}</div>}
-                  {loading && gameKey === "lazarus" && <p className="sav-status">Processing save file...</p>}
-                  {error && gameKey === "lazarus" && <div className="sav-alert sav-alert--error">{error}</div>}
                 </div>
               </article>
               <article className="sav-card sav-card--info-panel-card">
