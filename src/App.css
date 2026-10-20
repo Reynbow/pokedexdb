@@ -23,25 +23,7 @@
   --filters-games-gap: 16px;
 }
 
-.title {
-  margin: 0 0 6px;
-  font-size: 2.25rem;
-  line-height: 1.1;
-  letter-spacing: 0.2px;
-}
 
-.title.logo {
-  font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  font-size: 2.25rem;
-  color: #e6edf3;
-  letter-spacing: -1px;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.6rem;
-  margin: 0 0 24px;
-}
 
 .search {
   flex: 1;
@@ -1626,15 +1608,6 @@ button.type-chip {
     height: 44px;
   }
   
-  /* Adjust title on mobile */
-  .title {
-    font-size: 1.75rem;
-  }
-  
-  .title.logo {
-    font-size: 1.75rem;
-  }
-  
   /* Grid adjustments for mobile */
   .grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 140px));
@@ -1769,15 +1742,6 @@ button.type-chip {
   .grid {
     grid-template-columns: repeat(auto-fit, minmax(120px, 120px));
     gap: 10px;
-  }
-  
-  /* Smaller title */
-  .title {
-    font-size: 1.5rem;
-  }
-  
-  .title.logo {
-    font-size: 1.5rem;
   }
   
   /* Smaller sprite in cards */
