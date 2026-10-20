@@ -2235,6 +2235,22 @@ function App() {
   // Keep typing responsive: the (large) list re-filters with a deferred copy of the query.
   const deferredQuery = useDeferredValue(query);
 
+  // Which part of the game's Pokédex is on screen: all of it, one of its own dexes (Paldea,
+  // Kitakami, Blueberry…, each listed in full with its own numbers), the rest ("main") or the
+  // Mega / Gigantamax forms. A new game starts on all of it.
+  const [dexPart, setDexPart] = useState(null);
+  useEffect(() => {
+    setDexPart(null);
+  }, [selectedGame, selectedDex]);
+  const gameSections = useMemo(() => {
+    if (!selectedGame) return [];
+    const stored =
+      selectedDex === "national" ? gameIndexes.get(selectedGame) : dexIndexes.get(selectedDex)?.games?.get(selectedGame);
+    const sections = stored && !(stored instanceof Map) ? stored.sections : null;
+    return Array.isArray(sections) ? sections.filter((section) => section?.entryMap instanceof Map) : [];
+  }, [selectedGame, selectedDex, gameIndexes, dexIndexes]);
+  const partSection = dexPart ? gameSections.find((section) => section.key === dexPart) || null : null;
+
   const filteredLists = useMemo(() => {
     const loadingResult = { primary: [], megaGigantamax: [], primarySectionGroups: null, loading: true };
     const q = normalizeSearchText(deferredQuery);
@@ -2275,6 +2291,8 @@ function App() {
     if (selectedDex !== "national" && !activeEntryMap) {
       return loadingResult;
     }
+    const listMap = partSection?.entryMap || activeEntryMap;
+    const listSections = partSection ? null : activeSections;
 
     let typeIntersection = null;
     if (hasTypeFilter) {
@@ -2332,8 +2350,8 @@ function App() {
     const megaGmaxMatches = [];
 
     // Build the set of species to consider based on the active dex/game (or all species if none)
-    const speciesIdsToConsider = activeEntryMap
-      ? Array.from(activeEntryMap.keys())
+    const speciesIdsToConsider = listMap
+      ? Array.from(listMap.keys())
       : Array.from(regionFormsBySpecies.keys());
     const speciesInScope = new Set(speciesIdsToConsider);
 
@@ -2393,8 +2411,8 @@ function App() {
 
     const sortMatches = (matches) => {
       if (matches.length === 0) return;
-      if (activeEntryMap) {
-        const activeOrder = activeEntryMap.order || activeEntryMap;
+      if (listMap) {
+        const activeOrder = listMap.order || listMap;
         const combinedOrder = combinedMap?.order || combinedMap;
         matches.sort((a, b) => {
           const speciesA = a.speciesId ?? (a.idNum < 10000 ? a.idNum : null);
@@ -2434,8 +2452,8 @@ function App() {
     sortMatches(megaGmaxMatches);
 
     let primarySectionGroups = null;
-    const normalizedSections = Array.isArray(activeSections)
-      ? activeSections
+    const normalizedSections = Array.isArray(listSections)
+      ? listSections
           .map((section, index) => {
             if (!section) return null;
             const entryMap = section.entryMap instanceof Map ? section.entryMap : null;
@@ -2506,6 +2524,7 @@ function App() {
     regionFormsBySpecies,
     activeRegionKey,
     activeGenerationCap,
+    partSection,
   ]);
 
   const regularFiltered = filteredLists.primary;
@@ -2525,6 +2544,10 @@ function App() {
           ? DEX_LOOKUP.get(gameCfg.dexKey) ?? DEX_LOOKUP.get(selectedDex)
           : DEX_LOOKUP.get(selectedDex);
       const pad = Math.max(1, padSource?.pad ?? 3);
+      if (partSection) {
+        const entry = partSection.entryMap.get(lookupId);
+        return entry == null ? "-" : `#${String(entry).padStart(pad, "0")}`;
+      }
       if (selectedDex === "national") {
         if (!selectedGame) {
           return `#${String(lookupId).padStart(pad, "0")}`;
@@ -2545,7 +2568,7 @@ function App() {
       if (entry == null) return "-";
       return `#${String(entry).padStart(pad, "0")}`;
     },
-    [dexIndexes, selectedDex, selectedGame, gameIndexes, pokemonIdLookup, resolveSpeciesId]
+    [dexIndexes, selectedDex, selectedGame, gameIndexes, pokemonIdLookup, resolveSpeciesId, partSection]
   );
 
   const getDexNumberForEntry = useCallback(
@@ -2574,8 +2597,9 @@ function App() {
 
   // Type indexes come from the static snapshot (see typeIndex above); no per-type API calls.
 
-  const dexName =
+  const regionDexName =
     selectedDex === "national" ? "National Pokédex" : `${DEX_LOOKUP.get(selectedDex)?.label ?? ""} Pokédex`;
+  const dexName = partSection ? partSection.label || regionDexName : regionDexName;
 
   // Special categories that exist in the chosen game (no Megas in Scarlet/Violet, no Paradox before Gen IX)
   const availableTags = useMemo(() => {
@@ -2670,10 +2694,34 @@ function App() {
     return groups;
   }, [sectionGroups, regularFiltered, megaGigantamaxFiltered, dexName]);
 
+  // "main" and "forms" pick a group; a sub-dex is already the whole list (see filteredLists)
+  const visibleGroups = useMemo(
+    () =>
+      partSection
+        ? dexGroups.filter((group) => group.key !== "forms")
+        : dexPart
+        ? dexGroups.filter((group) => group.key === dexPart)
+        : dexGroups,
+    [dexGroups, dexPart, partSection]
+  );
+  // Chip counts from the full view, so they don't change while one part is shown
+  const partCountsRef = useRef(new Map());
+  if (!dexPart) {
+    partCountsRef.current = new Map(dexGroups.map((group) => [group.key, group.entries.length]));
+  }
+  const choosePart = useCallback((key) => {
+    setDexPart(key);
+    try {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  }, []);
+
   // ◀ ▶ neighbours of the open entry, in the order this Pokédex lists them
   const neighbours = useMemo(() => {
     if (!selected) return { prev: null, next: null };
-    const flat = dexGroups.flatMap((group) => group.entries).map((entry) => getRegionPreferredEntry(entry));
+    const flat = visibleGroups.flatMap((group) => group.entries).map((entry) => getRegionPreferredEntry(entry));
     const toStep = (entry) => {
       if (!entry?.url) return null;
       const parts = entry.url.split("/").filter(Boolean);
@@ -2689,7 +2737,7 @@ function App() {
     }
     if (index < 0) return { prev: null, next: null };
     return { prev: toStep(flat[index - 1]), next: toStep(flat[index + 1]) };
-  }, [selected, dexGroups, getRegionPreferredEntry, getDexNumberForEntry]);
+  }, [selected, visibleGroups, getRegionPreferredEntry, getDexNumberForEntry]);
 
   const stepTo = useCallback(
     (entry) => {
@@ -2700,9 +2748,9 @@ function App() {
     [selectPokemon]
   );
 
-  const resultCount = dexGroups.reduce((sum, group) => sum + group.entries.length, 0);
+  const resultCount = visibleGroups.reduce((sum, group) => sum + group.entries.length, 0);
   // Alternate, regional, Mega and Gigantamax forms have their own Pokémon ids (10000+)
-  const formCount = dexGroups.reduce(
+  const formCount = visibleGroups.reduce(
     (sum, group) =>
       sum +
       group.entries.filter((entry) => {
@@ -2711,10 +2759,22 @@ function App() {
       }).length,
     0
   );
-  const showSectionHeads = dexGroups.length > 1;
-  const stripSections = showSectionHeads
-    ? dexGroups.map((group) => ({ key: group.key, label: group.label.replace(/ Pokédex$/, ""), count: group.entries.length }))
-    : null;
+  const showSectionHeads = visibleGroups.length > 1;
+  const partLabel = (label) => String(label || "").replace(/ Pokédex$/, "");
+  const formsCount = partCountsRef.current.get("forms") || 0;
+  const formsLabel = dexGroups.find((group) => group.key === "forms")?.label || "Mega & Gigantamax forms";
+  const dexParts = (() => {
+    const list =
+      gameSections.length > 1
+        ? gameSections.map((section) => ({
+            key: section.key,
+            label: partLabel(section.label || regionDexName),
+            count: section.entryMap.size,
+          }))
+        : [{ key: "main", label: partLabel(regionDexName), count: partCountsRef.current.get("main") || 0 }];
+    if (formsCount > 0) list.push({ key: "forms", label: formsLabel, count: formsCount });
+    return list.length > 1 ? list : null;
+  })();
   const activeFilterCount = selectedTypes.size + selectedTags.size;
   const isLoadingDex = !pokemonLoadError && filteredLists.loading;
 
@@ -2774,7 +2834,7 @@ function App() {
         </div>
       );
     }
-    return dexGroups.map((group, groupIndex) => (
+    return visibleGroups.map((group, groupIndex) => (
       <section
         key={group.key}
         id={`dex-${group.key}`}
@@ -2811,7 +2871,9 @@ function App() {
         resultCount={resultCount}
         formCount={formCount}
         loading={isLoadingDex}
-        sections={stripSections}
+        parts={dexParts}
+        activePart={dexPart}
+        onPart={choosePart}
       />
       {selected ? (
         <div className="dex__split">

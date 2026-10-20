@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Icon from "../components/Icon.jsx";
 import GamePicker, { CartLogos } from "./GamePicker.jsx";
 import FilterSheet from "./FilterSheet.jsx";
@@ -24,7 +24,9 @@ export default function DexStrip({
   resultCount,
   formCount = 0,
   loading,
-  sections,
+  parts,
+  activePart = null,
+  onPart,
 }) {
   const stripRef = useRef(null);
   const cartRef = useRef(null);
@@ -36,13 +38,19 @@ export default function DexStrip({
   const total = counts?.get(game ? game.key : "national");
   const activeCount = selectedTypes.size + selectedTags.size;
 
-  // Sections scroll under the sticky strip, so publish its height for scroll-margin
+  // The list beside an open entry sticks under the strip, so publish the strip's height:
+  // before the first paint, on every render (the strip gains a row of tokens or parts) and on resize
+  const publishHeight = () => {
+    const node = stripRef.current;
+    if (node && node.offsetHeight > 0) {
+      document.documentElement.style.setProperty("--strip-h", `${node.offsetHeight}px`);
+    }
+  };
+  useLayoutEffect(publishHeight);
   useEffect(() => {
     const node = stripRef.current;
     if (!node || typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(() => {
-      document.documentElement.style.setProperty("--strip-h", `${node.offsetHeight}px`);
-    });
+    const observer = new ResizeObserver(publishHeight);
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -139,7 +147,7 @@ export default function DexStrip({
         </p>
       </div>
 
-      {activeCount > 0 || (sections && sections.length > 1) ? (
+      {activeCount > 0 || (parts && parts.length > 1) ? (
         <div className="strip__row strip__row--sub">
           {activeCount > 0 ? (
             <ul className="strip__tokens" aria-label="Active filters">
@@ -168,23 +176,24 @@ export default function DexStrip({
               </li>
             </ul>
           ) : null}
-          {sections && sections.length > 1 ? (
-            <nav className="strip__jump" aria-label="Jump to section">
-              {sections.map((section) => (
-                <a
-                  key={section.key}
-                  className="strip__jump-link"
-                  href={`#dex-${section.key}`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    document.getElementById(`dex-${section.key}`)?.scrollIntoView({ block: "start" });
-                  }}
+          {parts && parts.length > 1 ? (
+            <div className="strip__parts" role="group" aria-label="Show part of this Pokédex">
+              <button type="button" className="btn btn--sm strip__part" aria-pressed={!activePart} onClick={() => onPart?.(null)}>
+                All
+              </button>
+              {parts.map((part) => (
+                <button
+                  key={part.key}
+                  type="button"
+                  className="btn btn--sm strip__part"
+                  aria-pressed={activePart === part.key}
+                  onClick={() => onPart?.(activePart === part.key ? null : part.key)}
                 >
-                  {section.label}
-                  <span className="num">{section.count}</span>
-                </a>
+                  {part.label}
+                  <span className="num">{part.count.toLocaleString("en-US")}</span>
+                </button>
               ))}
-            </nav>
+            </div>
           ) : null}
         </div>
       ) : null}

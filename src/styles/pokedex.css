@@ -172,37 +172,26 @@
   gap: 8px;
 }
 
-.strip__jump {
+/* Which part of the game's Pokédex is shown: one choice, the current one in inverse video */
+.strip__parts {
   display: flex;
-  gap: var(--s-1);
+  gap: 4px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
-.strip__jump::-webkit-scrollbar {
+.strip__parts::-webkit-scrollbar {
   display: none;
 }
-.strip__jump-link {
-  display: inline-flex;
-  align-items: center;
+.strip__part {
+  flex: none;
   gap: 8px;
-  min-height: 30px;
-  padding: 0 var(--s-3);
-  border: 1px solid var(--edge);
-  border-radius: var(--r-2);
-  color: var(--ink-2);
-  font-family: var(--font-pixel);
-  font-size: var(--text-sm);
-  letter-spacing: 0.03em;
-  text-decoration: none;
-  white-space: nowrap;
 }
-.strip__jump-link .num {
+.strip__part .num {
   color: var(--ink-3);
 }
-.strip__jump-link:hover {
-  border-color: var(--edge-hover);
-  color: var(--ink);
+.strip__part[aria-pressed="true"] .num {
+  color: var(--select-ink);
 }
 
 /* ---------------------------------------------------------------- Sections */
@@ -656,7 +645,7 @@
   width: 16px;
   height: 16px;
   padding: 2px;
-  border-radius: 2px;
+  border-radius: var(--r-1);
   flex: none;
 }
 .filter-types .tag--off img {
