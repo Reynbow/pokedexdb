@@ -1,0 +1,631 @@
+/* Pokedex DB components: Game Boy window language, rebuilt for today. */
+
+/* ---------------------------------------------------------------- Pixel type */
+
+.px {
+  font-family: var(--font-pixel);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.label {
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.dexno {
+  font-family: var(--font-pixel);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------------- Window */
+
+/* The double-ruled Game Boy window: a frame rule, a gap, a hairline. */
+.win {
+  position: relative;
+  background: var(--screen-1);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-3);
+  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line);
+}
+
+/* Single rule for dense, repeated items */
+.win--plain {
+  box-shadow: none;
+  border-width: 1px;
+  border-color: var(--line);
+}
+
+.win__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4) 0;
+}
+
+.win__title {
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.win__body {
+  padding: var(--s-3) var(--s-4) var(--s-4);
+}
+
+/* ---------------------------------------------------------------- Buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  padding: 0 var(--s-4);
+  background: var(--screen-2);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
+}
+.btn:hover {
+  background: var(--screen-3);
+  border-color: var(--frame-strong);
+  color: var(--ink);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--ink-mute);
+  border-color: var(--line);
+  background: var(--screen-1);
+  transform: none;
+}
+.btn[aria-pressed="true"],
+.btn--select {
+  background: var(--select);
+  border-color: var(--select);
+  color: var(--select-ink);
+}
+.btn[aria-pressed="true"]:hover,
+.btn--select:hover {
+  background: var(--select);
+  border-color: var(--ink);
+  color: var(--select-ink);
+}
+.btn--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+}
+.btn--quiet:hover {
+  background: var(--screen-2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.btn--sm {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--text-sm);
+}
+.btn--icon {
+  width: 36px;
+  padding: 0;
+}
+.btn--sm.btn--icon {
+  width: 28px;
+}
+.btn .icon {
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- Icons */
+
+.icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  shape-rendering: crispEdges;
+  fill: currentColor;
+}
+.icon--lg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------------------------------------------------------------- Fields */
+
+.field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.field > .icon {
+  position: absolute;
+  left: 12px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.field__input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--s-3);
+  background: var(--screen-2);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  transition: border-color var(--dur-1) var(--ease-out);
+}
+.field > .icon + .field__input {
+  padding-left: 36px;
+}
+.field__input::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+.field__input:hover {
+  border-color: var(--frame-strong);
+}
+.field__input:focus {
+  outline: none;
+  border-color: var(--select);
+}
+.field__input::-webkit-search-cancel-button {
+  display: none;
+}
+.field__clear {
+  position: absolute;
+  right: 6px;
+}
+
+select.field__input {
+  appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' shape-rendering='crispEdges'%3E%3Cpath fill='%23aeb8c7' d='M0 0h10v2H8v2H6v2H4V4H2V2H0z'/%3E%3C/svg%3E");
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  background-repeat: no-repeat;
+}
+
+/* ---------------------------------------------------------------- Type tags */
+
+.tag {
+  --type: var(--t-unknown);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  background: var(--type);
+  border-radius: var(--r-1);
+  color: #fff;
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tag img {
+  width: 13px;
+  height: 13px;
+}
+.tag--lg {
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+button.tag {
+  border: 0;
+  cursor: pointer;
+}
+button.tag:hover {
+  filter: brightness(1.12);
+}
+.tag--off {
+  background: var(--screen-2);
+  color: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tag--off:hover {
+  color: var(--ink);
+}
+
+.t-normal { --type: var(--t-normal); }
+.t-fire { --type: var(--t-fire); }
+.t-water { --type: var(--t-water); }
+.t-electric { --type: var(--t-electric); }
+.t-grass { --type: var(--t-grass); }
+.t-ice { --type: var(--t-ice); }
+.t-fighting { --type: var(--t-fighting); }
+.t-poison { --type: var(--t-poison); }
+.t-ground { --type: var(--t-ground); }
+.t-flying { --type: var(--t-flying); }
+.t-psychic { --type: var(--t-psychic); }
+.t-bug { --type: var(--t-bug); }
+.t-rock { --type: var(--t-rock); }
+.t-ghost { --type: var(--t-ghost); }
+.t-dragon { --type: var(--t-dragon); }
+.t-dark { --type: var(--t-dark); }
+.t-steel { --type: var(--t-steel); }
+.t-fairy { --type: var(--t-fairy); }
+.t-stellar { --type: var(--t-stellar); }
+.t-unknown { --type: var(--t-unknown); }
+
+/* ---------------------------------------------------------------- Stamps & marks */
+
+/* In-place status marks: nothing silently disappears */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-1);
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.stamp--red {
+  color: var(--red);
+}
+.stamp--select {
+  color: var(--select);
+}
+.stamp--gold {
+  color: var(--warn);
+}
+
+/* ---------------------------------------------------------------- Meters (stat bars) */
+
+.meter {
+  display: grid;
+  grid-template-columns: 5.5rem 2.75rem 1fr;
+  align-items: center;
+  gap: var(--s-3);
+}
+.meter__label {
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.meter__value {
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+}
+.meter__track {
+  position: relative;
+  height: 10px;
+  background: var(--screen-0);
+  border: 1px solid var(--frame);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.meter__fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--pct, 0) * 1%);
+  background: var(--meter-high);
+  transition: width 420ms var(--ease-out);
+}
+.meter--mid .meter__fill {
+  background: var(--meter-mid);
+}
+.meter--low .meter__fill {
+  background: var(--meter-low);
+}
+
+/* ---------------------------------------------------------------- Dialog box */
+
+/* The Game Boy text box: entries type themselves in, then the ▼ prompt blinks. */
+.dialog {
+  position: relative;
+  padding: var(--s-4) var(--s-5) var(--s-5);
+  background: var(--screen-1);
+  border: 3px solid var(--ink-2);
+  border-radius: var(--r-3);
+  box-shadow: inset 0 0 0 3px var(--screen-1), inset 0 0 0 4px var(--frame);
+  font-family: var(--font-pixel);
+  font-size: 1rem;
+  line-height: 1.6;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.dialog__text {
+  min-height: 3.2em;
+  max-width: 62ch;
+}
+.dialog__caret {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  color: var(--ink-2);
+  animation: dialog-blink 900ms steps(1) infinite;
+}
+@keyframes dialog-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- Tabs */
+
+.tabs {
+  display: flex;
+  gap: var(--s-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--s-3);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.tab .cursor {
+  visibility: hidden;
+  color: var(--select);
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab[aria-selected="true"],
+.tab[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: var(--select);
+}
+.tab[aria-selected="true"] .cursor,
+.tab[aria-current="page"] .cursor {
+  visibility: visible;
+}
+
+/* ---------------------------------------------------------------- Segmented */
+
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--screen-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+}
+.seg__btn {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-1);
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+}
+.seg__btn:hover {
+  color: var(--ink);
+  background: var(--screen-2);
+}
+.seg__btn[aria-pressed="true"] {
+  background: var(--select);
+  color: var(--select-ink);
+}
+
+/* ---------------------------------------------------------------- Key / value */
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-2) var(--s-4);
+  align-items: baseline;
+  margin: 0;
+}
+.kv dt {
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.kv dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- Popover sheet */
+
+.sheet {
+  position: fixed;
+  z-index: var(--z-sheet);
+  background: var(--screen-1);
+  border: 2px solid var(--frame-strong);
+  border-radius: var(--r-3);
+  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line), var(--shadow-pop);
+  color: var(--ink);
+}
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-sheet) - 1);
+  background: rgba(4, 6, 10, 0.7);
+}
+
+/* ---------------------------------------------------------------- Loading & empty */
+
+.skeleton {
+  background: var(--screen-2);
+  border-radius: var(--r-1);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-3);
+  padding: var(--s-7) var(--s-4);
+  text-align: center;
+  color: var(--ink-2);
+}
+.empty__title {
+  font-family: var(--font-pixel);
+  font-size: var(--text-lg);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- Cursor */
+
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 10px;
+  flex: none;
+  shape-rendering: crispEdges;
+  fill: currentColor;
+}
+
+/* ---------------------------------------------------------------- Popover / bottom sheet */
+
+.popsheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popsheet-in var(--dur-1) var(--ease-out);
+}
+.popsheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+.popsheet__title {
+  margin: 0;
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.popsheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--s-3) var(--s-4) var(--s-4);
+}
+.popsheet__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.popsheet--bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: min(86dvh, 760px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-bottom: 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
+  animation-name: popsheet-up;
+  animation-duration: var(--dur-2);
+}
+.popsheet__grip {
+  flex: none;
+  width: 40px;
+  height: 4px;
+  margin: var(--s-2) auto 0;
+  background: var(--frame);
+  border-radius: 2px;
+}
+.scrim--clear {
+  background: transparent;
+}
+@keyframes popsheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes popsheet-up {
+  from {
+    transform: translateY(32px);
+    opacity: 0;
+  }
+}
+
+/* The page's one main action: inverse ink, so blue stays the selection colour only */
+.btn--primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--screen-0);
+}
+.btn--primary:hover {
+  background: var(--screen-0);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.btn--primary:disabled,
+.btn--primary[aria-disabled="true"] {
+  background: var(--screen-1);
+  border-color: var(--line);
+  color: var(--ink-mute);
+}

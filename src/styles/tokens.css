@@ -1,0 +1,129 @@
+/* Pokedex DB design tokens: the Pokédex screen, dark, in slate greys and blues.
+   Neutrals are the blue-grey screen ramp; one bright blue is the selection colour;
+   Pokédex red is reserved for the wordmark and stamps; type colours only tag types.
+   The pixel voice is DotGothic16 (OFL, via @fontsource): a dot-matrix gothic whose B/G, C/O and
+   digits stay distinct at every size. Pixelify Sans (OFL, self-hosted) is the wordmark only. */
+
+@font-face {
+  font-family: "Pixelify Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/pixelify-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Pixelify Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/pixelify-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Screen ramp (darkest -> lightest), cool slate */
+  --screen-0: #0b0e13; /* screen off: page ground */
+  --screen-1: #121720; /* window fill */
+  --screen-2: #18202b; /* second layer: rails, inputs, wells */
+  --screen-3: #212b38; /* hover / pressed wells */
+  --line: #2a3442; /* hairlines, dividers */
+  --frame: #44536a; /* window frame rule */
+  --frame-strong: #8796ad; /* focused / emphasised frame */
+
+  /* Screen ink */
+  --ink: #e3e8f0; /* primary text */
+  --ink-2: #aeb8c7; /* secondary text */
+  --ink-3: #8592a5; /* labels, meta (>= 4.5:1 on screen-1) */
+  --ink-mute: #566275; /* disabled */
+
+  /* The one selection colour (cursor, active game, focus, current tab) */
+  --select: #62b2ff;
+  --select-ink: #06101c; /* text on a selection fill */
+  --select-wash: #142740; /* selected-row tint on dark */
+
+  /* Device colours: red wordmark + stamps, blue lens */
+  --red: #e5483a;
+  --red-wash: #2b1512;
+  --lens: #3d8fd6;
+
+  /* Meter colours (stat tiers) */
+  --meter-high: #62b2ff;
+  --meter-mid: #e3b341;
+  --meter-low: #e0503f;
+
+  /* States */
+  --warn: #e3b341;
+  --error: #ef6a5b;
+  --info: #8cc4f0;
+
+  /* Type colours: flat, white-text safe */
+  --t-normal: #7a7650;
+  --t-fire: #b24a1e;
+  --t-water: #3a64ad;
+  --t-electric: #8a6610;
+  --t-grass: #457a3a;
+  --t-ice: #3d7f87;
+  --t-fighting: #93241c;
+  --t-poison: #6b2769;
+  --t-ground: #85642e;
+  --t-flying: #5f56ad;
+  --t-psychic: #973a5f;
+  --t-bug: #627419;
+  --t-rock: #776227;
+  --t-ghost: #52407e;
+  --t-dragon: #4b24b3;
+  --t-dark: #563d2a;
+  --t-steel: #66688a;
+  --t-fairy: #8f4570;
+  --t-stellar: #3c6fa8;
+  --t-unknown: #505a68;
+
+  /* Type */
+  --font-pixel: "DotGothic16", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-logo: "Pixelify Sans", var(--font-pixel);
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  /* Space */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* Shape */
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 6px;
+
+  /* Layers */
+  --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --z-bar: 50;
+  --z-pop: 80;
+  --z-sheet: 90;
+  --z-modal: 100;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+
+  /* Layout */
+  --bar-h: 56px;
+  --tabbar-h: 60px;
+  --page-max: 1360px;
+  --list-w: 336px;
+}

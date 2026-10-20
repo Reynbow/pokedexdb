@@ -1,0 +1,927 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T04:30:02.388Z",
+  "title": "Design System: Pokedex DB",
+  "extensions": {
+    "colorMeta": {
+      "screen-0": {
+        "role": "neutral",
+        "displayName": "Screen Off",
+        "canonical": "#0b0e13",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "screen-1": {
+        "role": "neutral",
+        "displayName": "Window Fill",
+        "canonical": "#121720",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "screen-2": {
+        "role": "neutral",
+        "displayName": "Second Layer",
+        "canonical": "#18202b",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "screen-3": {
+        "role": "neutral",
+        "displayName": "Pressed Well",
+        "canonical": "#212b38",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#2a3442",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "frame": {
+        "role": "neutral",
+        "displayName": "Frame Rule",
+        "canonical": "#44536a",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "frame-strong": {
+        "role": "neutral",
+        "displayName": "Lit Frame",
+        "canonical": "#8796ad",
+        "tonalRamp": [
+          "#0b0e13",
+          "#121720",
+          "#18202b",
+          "#212b38",
+          "#2a3442",
+          "#44536a",
+          "#8796ad",
+          "#e3e8f0"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#e3e8f0",
+        "tonalRamp": [
+          "#18202b",
+          "#2a3442",
+          "#44536a",
+          "#566275",
+          "#8592a5",
+          "#aeb8c7",
+          "#e3e8f0",
+          "#f4f6fa"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "#aeb8c7",
+        "tonalRamp": [
+          "#18202b",
+          "#2a3442",
+          "#44536a",
+          "#566275",
+          "#8592a5",
+          "#aeb8c7",
+          "#e3e8f0",
+          "#f4f6fa"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "canonical": "#8592a5",
+        "tonalRamp": [
+          "#18202b",
+          "#2a3442",
+          "#44536a",
+          "#566275",
+          "#8592a5",
+          "#aeb8c7",
+          "#e3e8f0",
+          "#f4f6fa"
+        ]
+      },
+      "ink-mute": {
+        "role": "neutral",
+        "displayName": "Ink Mute",
+        "canonical": "#566275",
+        "tonalRamp": [
+          "#18202b",
+          "#2a3442",
+          "#44536a",
+          "#566275",
+          "#8592a5",
+          "#aeb8c7",
+          "#e3e8f0",
+          "#f4f6fa"
+        ]
+      },
+      "select": {
+        "role": "primary",
+        "displayName": "Cursor Blue",
+        "canonical": "#62b2ff",
+        "tonalRamp": [
+          "#000c1c",
+          "#012544",
+          "#004173",
+          "#0160a4",
+          "#3284ce",
+          "#57a7f3",
+          "#9cccfe",
+          "#e3f0fe"
+        ]
+      },
+      "select-ink": {
+        "role": "primary",
+        "displayName": "Screen-Off Ink",
+        "canonical": "#06101c",
+        "tonalRamp": [
+          "#030c17",
+          "#1a2532",
+          "#35414f",
+          "#525f6e",
+          "#748292",
+          "#95a3b4",
+          "#bac9db",
+          "#e4f0ff"
+        ]
+      },
+      "select-wash": {
+        "role": "primary",
+        "displayName": "Selection Wash",
+        "canonical": "#142740",
+        "tonalRamp": [
+          "#000a20",
+          "#12243d",
+          "#2d415c",
+          "#4a5f7c",
+          "#6b82a0",
+          "#8ca3c3",
+          "#b1c9ea",
+          "#e5f0fe"
+        ]
+      },
+      "red": {
+        "role": "secondary",
+        "displayName": "Pokédex Red",
+        "canonical": "#e5483a",
+        "tonalRamp": [
+          "#1f0000",
+          "#4b0001",
+          "#7d0001",
+          "#b20203",
+          "#dd4033",
+          "#ff6c5b",
+          "#ffb0a4",
+          "#fee9e5"
+        ]
+      },
+      "red-wash": {
+        "role": "secondary",
+        "displayName": "Red Wash",
+        "canonical": "#2b1512",
+        "tonalRamp": [
+          "#180504",
+          "#341d1a",
+          "#523835",
+          "#715652",
+          "#957874",
+          "#b89995",
+          "#debfba",
+          "#ffe9e5"
+        ]
+      },
+      "lens": {
+        "role": "secondary",
+        "displayName": "Lens Blue",
+        "canonical": "#3d8fd6",
+        "tonalRamp": [
+          "#000c1b",
+          "#002543",
+          "#004271",
+          "#0461a1",
+          "#3285cb",
+          "#56a7f0",
+          "#9acdfe",
+          "#e3f0fe"
+        ]
+      },
+      "meter-high": {
+        "role": "tertiary",
+        "displayName": "Meter High",
+        "canonical": "#62b2ff",
+        "tonalRamp": [
+          "#000c1c",
+          "#012544",
+          "#004173",
+          "#0160a4",
+          "#3284ce",
+          "#57a7f3",
+          "#9cccfe",
+          "#e3f0fe"
+        ]
+      },
+      "meter-mid": {
+        "role": "tertiary",
+        "displayName": "Meter Mid",
+        "canonical": "#e3b341",
+        "tonalRamp": [
+          "#110a00",
+          "#302201",
+          "#523c02",
+          "#765805",
+          "#a17901",
+          "#c99a1d",
+          "#f0c050",
+          "#ffedc7"
+        ]
+      },
+      "meter-low": {
+        "role": "tertiary",
+        "displayName": "Meter Low",
+        "canonical": "#e0503f",
+        "tonalRamp": [
+          "#1f0000",
+          "#4b0200",
+          "#7c0500",
+          "#ad190e",
+          "#d74838",
+          "#ff6c59",
+          "#ffb0a3",
+          "#ffe9e5"
+        ]
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Warn Amber",
+        "canonical": "#e3b341",
+        "tonalRamp": [
+          "#110a00",
+          "#302201",
+          "#523c02",
+          "#765805",
+          "#a17901",
+          "#c99a1d",
+          "#f0c050",
+          "#ffedc7"
+        ]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Error Coral",
+        "canonical": "#ef6a5b",
+        "tonalRamp": [
+          "#1f0000",
+          "#4b0101",
+          "#7d0002",
+          "#a8261e",
+          "#d14f42",
+          "#f87263",
+          "#feb1a5",
+          "#fee9e6"
+        ]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Info Blue",
+        "canonical": "#8cc4f0",
+        "tonalRamp": [
+          "#000c19",
+          "#01273f",
+          "#064469",
+          "#2c638a",
+          "#5086af",
+          "#71a8d3",
+          "#96cefb",
+          "#e0f1ff"
+        ]
+      },
+      "t-normal": {
+        "role": "tertiary",
+        "displayName": "Type: Normal (data only)",
+        "canonical": "#7a7650",
+        "tonalRamp": [
+          "#0e0c00",
+          "#292500",
+          "#45411c",
+          "#635f3a",
+          "#86825c",
+          "#a7a37c",
+          "#cdc9a1",
+          "#f5f1c7"
+        ]
+      },
+      "t-fire": {
+        "role": "tertiary",
+        "displayName": "Type: Fire (data only)",
+        "canonical": "#b24a1e",
+        "tonalRamp": [
+          "#1a0400",
+          "#421200",
+          "#6e2401",
+          "#9e3702",
+          "#c65c33",
+          "#ec7f55",
+          "#ffb296",
+          "#feeae2"
+        ]
+      },
+      "t-water": {
+        "role": "tertiary",
+        "displayName": "Type: Water (data only)",
+        "canonical": "#3a64ad",
+        "tonalRamp": [
+          "#000826",
+          "#001e57",
+          "#133b81",
+          "#325ba3",
+          "#537fcb",
+          "#74a1ef",
+          "#a9c9fe",
+          "#e6efff"
+        ]
+      },
+      "t-electric": {
+        "role": "tertiary",
+        "displayName": "Type: Electric (data only)",
+        "canonical": "#8a6610",
+        "tonalRamp": [
+          "#110a00",
+          "#302101",
+          "#533b03",
+          "#785701",
+          "#9f7a2c",
+          "#c19b50",
+          "#e9c176",
+          "#ffecca"
+        ]
+      },
+      "t-grass": {
+        "role": "tertiary",
+        "displayName": "Type: Grass (data only)",
+        "canonical": "#457a3a",
+        "tonalRamp": [
+          "#011000",
+          "#062d00",
+          "#184d0a",
+          "#386c2d",
+          "#5a904f",
+          "#7bb370",
+          "#a0d995",
+          "#cdffc3"
+        ]
+      },
+      "t-ice": {
+        "role": "tertiary",
+        "displayName": "Type: Ice (data only)",
+        "canonical": "#3d7f87",
+        "tonalRamp": [
+          "#000e10",
+          "#012a2e",
+          "#034950",
+          "#246870",
+          "#4a8c94",
+          "#6caeb6",
+          "#92d5dd",
+          "#c8f9ff"
+        ]
+      },
+      "t-fighting": {
+        "role": "tertiary",
+        "displayName": "Type: Fighting (data only)",
+        "canonical": "#93241c",
+        "tonalRamp": [
+          "#1f0000",
+          "#4b0001",
+          "#7c0404",
+          "#a03128",
+          "#c9574a",
+          "#f07a6b",
+          "#ffb0a4",
+          "#fee9e5"
+        ]
+      },
+      "t-poison": {
+        "role": "tertiary",
+        "displayName": "Type: Poison (data only)",
+        "canonical": "#6b2769",
+        "tonalRamp": [
+          "#190019",
+          "#40003f",
+          "#621e61",
+          "#843e81",
+          "#aa62a6",
+          "#cd83c9",
+          "#f6a8f1",
+          "#ffe5fd"
+        ]
+      },
+      "t-ground": {
+        "role": "tertiary",
+        "displayName": "Type: Ground (data only)",
+        "canonical": "#85642e",
+        "tonalRamp": [
+          "#120900",
+          "#322001",
+          "#563a01",
+          "#775720",
+          "#9c7a44",
+          "#be9b65",
+          "#e6c18a",
+          "#ffeccf"
+        ]
+      },
+      "t-flying": {
+        "role": "tertiary",
+        "displayName": "Type: Flying (data only)",
+        "canonical": "#5f56ad",
+        "tonalRamp": [
+          "#0b002d",
+          "#230b60",
+          "#3c2f82",
+          "#584fa5",
+          "#7972cc",
+          "#9a94f1",
+          "#c1c0ff",
+          "#ecedff"
+        ]
+      },
+      "t-psychic": {
+        "role": "tertiary",
+        "displayName": "Type: Psychic (data only)",
+        "canonical": "#973a5f",
+        "tonalRamp": [
+          "#1d000b",
+          "#480023",
+          "#71153f",
+          "#94385d",
+          "#bc5b7f",
+          "#e27da1",
+          "#feabc7",
+          "#fee8ee"
+        ]
+      },
+      "t-bug": {
+        "role": "tertiary",
+        "displayName": "Type: Bug (data only)",
+        "canonical": "#627419",
+        "tonalRamp": [
+          "#090d00",
+          "#202800",
+          "#3a4600",
+          "#556600",
+          "#778a33",
+          "#98ac56",
+          "#bdd37c",
+          "#e4fba2"
+        ]
+      },
+      "t-rock": {
+        "role": "tertiary",
+        "displayName": "Type: Rock (data only)",
+        "canonical": "#776227",
+        "tonalRamp": [
+          "#100a00",
+          "#2e2201",
+          "#503d00",
+          "#705b1f",
+          "#947e44",
+          "#b69f65",
+          "#dcc589",
+          "#ffedc0"
+        ]
+      },
+      "t-ghost": {
+        "role": "tertiary",
+        "displayName": "Type: Ghost (data only)",
+        "canonical": "#52407e",
+        "tonalRamp": [
+          "#100029",
+          "#29144e",
+          "#45326f",
+          "#625190",
+          "#8573b6",
+          "#a695da",
+          "#cbbcfe",
+          "#efecfe"
+        ]
+      },
+      "t-dragon": {
+        "role": "tertiary",
+        "displayName": "Type: Dragon (data only)",
+        "canonical": "#4b24b3",
+        "tonalRamp": [
+          "#0c002d",
+          "#250067",
+          "#410da4",
+          "#5b3cc9",
+          "#7b64f2",
+          "#9a90fe",
+          "#c2c0fe",
+          "#ededfe"
+        ]
+      },
+      "t-dark": {
+        "role": "tertiary",
+        "displayName": "Type: Dark (data only)",
+        "canonical": "#563d2a",
+        "tonalRamp": [
+          "#160700",
+          "#351e0b",
+          "#523a27",
+          "#725744",
+          "#967a65",
+          "#b89b85",
+          "#dfc1aa",
+          "#ffeadb"
+        ]
+      },
+      "t-steel": {
+        "role": "tertiary",
+        "displayName": "Type: Steel (data only)",
+        "canonical": "#66688a",
+        "tonalRamp": [
+          "#090720",
+          "#20203d",
+          "#3b3c5b",
+          "#585a7b",
+          "#7b7da0",
+          "#9b9ec3",
+          "#c1c4ea",
+          "#ebedfe"
+        ]
+      },
+      "t-fairy": {
+        "role": "tertiary",
+        "displayName": "Type: Fairy (data only)",
+        "canonical": "#8f4570",
+        "tonalRamp": [
+          "#1c0011",
+          "#45002f",
+          "#67214c",
+          "#89406b",
+          "#b0638e",
+          "#d484b0",
+          "#fda9d7",
+          "#fee7f3"
+        ]
+      },
+      "t-stellar": {
+        "role": "tertiary",
+        "displayName": "Type: Stellar (data only)",
+        "canonical": "#3c6fa8",
+        "tonalRamp": [
+          "#000b1e",
+          "#002449",
+          "#084075",
+          "#2d5f97",
+          "#5083be",
+          "#70a5e2",
+          "#a0cbfe",
+          "#e4f0fe"
+        ]
+      },
+      "t-unknown": {
+        "role": "tertiary",
+        "displayName": "Type: Unknown (data only)",
+        "canonical": "#505a68",
+        "tonalRamp": [
+          "#050b16",
+          "#1c2531",
+          "#37404e",
+          "#545e6d",
+          "#768190",
+          "#97a2b2",
+          "#bdc8d9",
+          "#e5effe"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "Pixelify Sans, the \"Pokédex\" wordmark only."
+      },
+      "display": {
+        "displayName": "Display",
+        "purpose": "Entry Pokémon name (1.75rem on narrow screens)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section heads, followed by a double rule filling the line."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Window and sheet titles (uppercase), buttons, tabs, device-bar links."
+      },
+      "dialog": {
+        "displayName": "Dialog",
+        "purpose": "The dex-text dialog box, max 62ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase key/value terms, meter and field labels in Ink 3."
+      },
+      "number": {
+        "displayName": "Number",
+        "purpose": "Dex numbers, stat values and counts; tabular, one face per figure."
+      },
+      "name": {
+        "displayName": "Name",
+        "purpose": "Pokémon, move, item and ability names in the UI sans."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text, field input and meta lines."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-pop",
+        "value": "0 10px 28px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4)",
+        "purpose": "Floating layers only: popover sheets and jump results."
+      },
+      {
+        "name": "window-rule",
+        "value": "inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line)",
+        "purpose": "Inner rule of the double-ruled window frame; structure, not elevation."
+      },
+      {
+        "name": "dialog-rule",
+        "value": "inset 0 0 0 3px var(--screen-1), inset 0 0 0 4px var(--frame)",
+        "purpose": "Inner rule of the dialog box under its 3px Ink 2 outer rule."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default easing for state changes, sheets and meters."
+      },
+      {
+        "name": "dur-1",
+        "value": "120ms",
+        "purpose": "Hover/state colour transitions and popover entry."
+      },
+      {
+        "name": "dur-2",
+        "value": "200ms",
+        "purpose": "Bottom sheet entry."
+      },
+      {
+        "name": "meter-fill",
+        "value": "width 420ms var(--ease-out)",
+        "purpose": "Stat meter fill."
+      },
+      {
+        "name": "dialog-blink",
+        "value": "900ms steps(1) infinite",
+        "purpose": "The dialog ▼ prompt blink."
+      },
+      {
+        "name": "skeleton-pulse",
+        "value": "1.4s ease-in-out infinite",
+        "purpose": "Loading skeleton opacity pulse."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "dex-rows (container query)",
+        "value": "600px"
+      },
+      {
+        "name": "phone",
+        "value": "900px"
+      },
+      {
+        "name": "bar-compact",
+        "value": "1100px"
+      },
+      {
+        "name": "entry-compact",
+        "value": "1180px"
+      },
+      {
+        "name": "page-max",
+        "value": "1360px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Default device key: framed, pixel face, Second Layer fill.",
+      "html": "<button class=\"ds-btn\">Filters</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; background: var(--screen-2, #18202b); border: 2px solid var(--frame, #44536a); border-radius: 4px; color: var(--ink, #e3e8f0); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { background: var(--screen-3, #212b38); border-color: var(--frame-strong, #8796ad); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The page's one main action: inverse ink, so blue stays selection-only.",
+      "html": "<button class=\"ds-btn-primary\">Guess</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; background: var(--ink, #e3e8f0); border: 2px solid var(--ink, #e3e8f0); border-radius: 4px; color: var(--screen-0, #0b0e13); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { background: var(--screen-0, #0b0e13); color: var(--ink, #e3e8f0); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+    },
+    {
+      "name": "Selected Button",
+      "kind": "button",
+      "refersTo": "button-select",
+      "description": "Pressed / selected state (aria-pressed): Cursor Blue fill with Screen-Off Ink.",
+      "html": "<button class=\"ds-btn-select\" aria-pressed=\"true\">Red / Blue</button>",
+      "css": ".ds-btn-select { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; background: var(--select, #62b2ff); border: 2px solid var(--select, #62b2ff); border-radius: 4px; color: var(--select-ink, #06101c); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; } .ds-btn-select:hover { border-color: var(--ink, #e3e8f0); } .ds-btn-select:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Frameless secondary control; gains a well on hover.",
+      "html": "<button class=\"ds-btn-quiet\">Clear</button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; background: transparent; border: 2px solid transparent; border-radius: 4px; color: var(--ink-2, #aeb8c7); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; line-height: 1; cursor: pointer; transition: background-color 120ms, border-color 120ms, color 120ms; } .ds-btn-quiet:hover { background: var(--screen-2, #18202b); border-color: var(--line, #2a3442); color: var(--ink, #e3e8f0); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Framed field in the UI sans with a pixel search icon; focus turns the frame blue.",
+      "html": "<label class=\"ds-field\"><svg class=\"ds-field-icon\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><path d=\"M3 0h4v1H3zM2 1h1v1H2zM7 1h1v1H7zM1 2h1v4H1zM8 2h1v4H8zM2 6h1v1H2zM7 6h1v1H7zM3 7h4v1H3zM8 7h1v1H8zM9 8h1v1H9zM10 9h1v1h-1zM11 10h1v1h-1z\"/></svg><input class=\"ds-field-input\" type=\"search\" placeholder=\"Name or number\"></label>",
+      "css": ".ds-field { position: relative; display: flex; align-items: center; width: 280px; } .ds-field-icon { position: absolute; left: 12px; width: 16px; height: 16px; fill: var(--ink-3, #8592a5); pointer-events: none; } .ds-field-input { width: 100%; min-height: 40px; padding: 0 12px 0 36px; background: var(--screen-2, #18202b); border: 2px solid var(--frame, #44536a); border-radius: 4px; color: var(--ink, #e3e8f0); font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-size: 0.9375rem; transition: border-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-field-input::placeholder { color: var(--ink-3, #8592a5); opacity: 1; } .ds-field-input:hover { border-color: var(--frame-strong, #8796ad); } .ds-field-input:focus { outline: none; border-color: var(--select, #62b2ff); }"
+    },
+    {
+      "name": "Device Bar Navigation",
+      "kind": "nav",
+      "refersTo": "device-bar",
+      "description": "56px device bar: pixel section links, current link underlined in Cursor Blue.",
+      "html": "<nav class=\"ds-bar\"><a class=\"ds-bar-link\" aria-current=\"page\" href=\"#\">Pokédex</a><a class=\"ds-bar-link\" href=\"#\">Moves</a><a class=\"ds-bar-link\" href=\"#\">Abilities</a><a class=\"ds-bar-link\" href=\"#\">Items</a></nav>",
+      "css": ".ds-bar { display: flex; align-items: stretch; gap: 2px; height: 56px; padding: 0 24px; background: var(--screen-0, #0b0e13); border-bottom: 2px solid var(--frame, #44536a); } .ds-bar-link { display: inline-flex; align-items: center; padding: 0 12px; margin-bottom: -2px; border-bottom: 3px solid transparent; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; letter-spacing: 0.03em; text-decoration: none; } .ds-bar-link:hover { color: var(--ink, #e3e8f0); } .ds-bar-link[aria-current=\"page\"] { color: var(--ink, #e3e8f0); border-bottom-color: var(--select, #62b2ff); } .ds-bar-link:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: -2px; }"
+    },
+    {
+      "name": "Tabs with Cursor",
+      "kind": "nav",
+      "refersTo": "tab-current",
+      "description": "Entry tabs: the selected tab shows the drawn ▶ cursor and a blue underline.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\"><svg class=\"ds-cursor\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>Stats</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\"><svg class=\"ds-cursor\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>Matchups</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\"><svg class=\"ds-cursor\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>Evolution</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line, #2a3442); } .ds-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; cursor: pointer; } .ds-tab:hover { color: var(--ink, #e3e8f0); } .ds-tab[aria-selected=\"true\"] { color: var(--ink, #e3e8f0); border-bottom-color: var(--select, #62b2ff); } .ds-cursor { width: 8px; height: 10px; fill: var(--select, #62b2ff); shape-rendering: crispEdges; visibility: hidden; } .ds-tab[aria-selected=\"true\"] .ds-cursor { visibility: visible; } .ds-tab:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+    },
+    {
+      "name": "Type Tags and Stamps",
+      "kind": "chip",
+      "refersTo": "type-tag",
+      "description": "Flat type-colour tags (data) and outlined in-place stamps.",
+      "html": "<div class=\"ds-tags\"><span class=\"ds-tag\" style=\"--type:#b24a1e\">Fire</span><span class=\"ds-tag\" style=\"--type:#5f56ad\">Flying</span><span class=\"ds-stamp\">Mega</span><span class=\"ds-stamp ds-stamp-red\">Not in this game</span></div>",
+      "css": ".ds-tags { display: flex; align-items: center; gap: 6px; } .ds-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: var(--type, #505a68); border-radius: 2px; color: #fff; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-stamp { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid currentColor; border-radius: 2px; color: var(--ink-2, #aeb8c7); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-stamp-red { color: var(--red, #e5483a); }"
+    },
+    {
+      "name": "Dex Cell in Window",
+      "kind": "card",
+      "refersTo": "dex-cell-selected",
+      "description": "Double-ruled window holding hairline-ruled dex cells; hover/focus/selected inverts to Cursor Blue with the ▶ cursor.",
+      "html": "<div class=\"ds-win\"><ul class=\"ds-grid\"><li><a class=\"ds-mon\" href=\"#\"><span class=\"ds-mon-no\"><svg class=\"ds-mon-cur\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>No. 0004</span><span class=\"ds-mon-name\">Charmander</span><span class=\"ds-mon-tag\">Fire</span></a></li><li><a class=\"ds-mon ds-is-selected\" href=\"#\"><span class=\"ds-mon-no\"><svg class=\"ds-mon-cur\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>No. 0006</span><span class=\"ds-mon-name\">Charizard</span><span class=\"ds-mon-tag\">Fire</span></a></li></ul></div>",
+      "css": ".ds-win { background: var(--screen-1, #121720); border: 2px solid var(--frame, #44536a); border-radius: 6px; box-shadow: inset 0 0 0 2px var(--screen-1, #121720), inset 0 0 0 3px var(--line, #2a3442); padding: 3px; width: 340px; } .ds-grid { display: grid; grid-template-columns: repeat(2, 1fr); margin: 0; padding: 0; list-style: none; } .ds-mon { display: grid; justify-items: center; gap: 8px; padding: 12px; color: var(--ink, #e3e8f0); text-decoration: none; box-shadow: inset -1px -1px 0 var(--line, #2a3442); } .ds-mon-no { justify-self: start; display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; font-variant-numeric: tabular-nums; } .ds-mon-cur { width: 8px; height: 10px; fill: currentColor; shape-rendering: crispEdges; visibility: hidden; } .ds-mon-name { font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-weight: 600; font-size: 0.9375rem; } .ds-mon-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: #b24a1e; border-radius: 2px; color: #fff; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; text-transform: uppercase; } .ds-mon:hover, .ds-mon:focus-visible, .ds-mon.ds-is-selected { background: var(--select, #62b2ff); color: var(--select-ink, #06101c); outline: none; } .ds-mon:hover .ds-mon-no, .ds-mon:focus-visible .ds-mon-no, .ds-mon.ds-is-selected .ds-mon-no { color: var(--select-ink, #06101c); } .ds-mon:hover .ds-mon-cur, .ds-mon:focus-visible .ds-mon-cur, .ds-mon.ds-is-selected .ds-mon-cur { visibility: visible; }"
+    },
+    {
+      "name": "Dex Dialog Box",
+      "kind": "custom",
+      "refersTo": "dialog",
+      "description": "The Game Boy text box: dex text types in, then the ▼ prompt blinks.",
+      "html": "<div class=\"ds-dialog\"><p class=\"ds-dialog-text\">It spits fire that is hot enough to melt boulders.</p><span class=\"ds-dialog-caret\" aria-hidden=\"true\">▼</span></div>",
+      "css": ".ds-dialog { position: relative; max-width: 520px; padding: 16px 24px 24px; background: var(--screen-1, #121720); border: 3px solid var(--ink-2, #aeb8c7); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--screen-1, #121720), inset 0 0 0 4px var(--frame, #44536a); color: var(--ink, #e3e8f0); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 1rem; line-height: 1.6; letter-spacing: 0; } .ds-dialog-text { margin: 0; min-height: 3.2em; max-width: 62ch; } .ds-dialog-caret { position: absolute; right: 14px; bottom: 10px; color: var(--ink-2, #aeb8c7); animation: ds-blink 900ms steps(1) infinite; } @keyframes ds-blink { 50% { opacity: 0; } }"
+    },
+    {
+      "name": "Stat Meter",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "Three-tier stat meter: blue high, amber mid, red low; never green.",
+      "html": "<div class=\"ds-meters\"><div class=\"ds-meter\"><span class=\"ds-meter-label\">Sp. Atk</span><span class=\"ds-meter-value\">109</span><span class=\"ds-meter-track\"><span class=\"ds-meter-fill\" style=\"width:64%\"></span></span></div><div class=\"ds-meter ds-meter-mid\"><span class=\"ds-meter-label\">HP</span><span class=\"ds-meter-value\">78</span><span class=\"ds-meter-track\"><span class=\"ds-meter-fill\" style=\"width:42%\"></span></span></div><div class=\"ds-meter ds-meter-low\"><span class=\"ds-meter-label\">Def</span><span class=\"ds-meter-value\">43</span><span class=\"ds-meter-track\"><span class=\"ds-meter-fill\" style=\"width:22%\"></span></span></div></div>",
+      "css": ".ds-meters { display: grid; gap: 8px; width: 360px; } .ds-meter { display: grid; grid-template-columns: 5.5rem 2.75rem 1fr; align-items: center; gap: 12px; } .ds-meter-label { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.8125rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-3, #8592a5); } .ds-meter-value { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink, #e3e8f0); } .ds-meter-track { height: 10px; background: var(--screen-0, #0b0e13); border: 1px solid var(--frame, #44536a); border-radius: 2px; overflow: hidden; } .ds-meter-fill { display: block; height: 100%; background: var(--meter-high, #62b2ff); transition: width 420ms cubic-bezier(0.16,1,0.3,1); } .ds-meter-mid .ds-meter-fill { background: var(--meter-mid, #e3b341); } .ds-meter-low .ds-meter-fill { background: var(--meter-low, #e0503f); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Pokédex Device",
+    "overview": "The site is the in-game Pokédex, rebuilt for today. It is a numbered list and a live entry page that always show the chosen game. It is not a dashboard of sprite cards under a wall of filter chips. Everything sits on a dark, cool slate screen. Content lives inside double-ruled Game Boy windows. Selection works like the device menu: a drawn ▶ cursor and inverse video. A dot-matrix pixel face carries the device's voice: numbers, headings, labels, tabs, buttons and the dex text. A plain system sans carries names and reading text, so a lookup made on a phone in a few seconds stays legible.\n\nDensity is high but ordered. The browse Pokédex is one window whose cells are split by hairline rules. With an entry open, the grid becomes a 336px numbered list beside the entry page. On phones, cells become numbered rows and a bottom tab bar holds the sections. Motion is short and functional, with one signature moment: the dex text types itself into a dialog box, a ▼ prompt blinks, and ◀ ▶ (arrow keys or a swipe) steps to the neighbouring entry.\n\nThe world is dark only, in slate greys and blues. Green never appears in the chrome. Fills are flat: no gradients, glows or glass.",
+    "keyCharacteristics": [
+      "Dark slate screen ramp as the only neutrals; one bright blue for selection and nothing else.",
+      "Double-ruled window frames (frame rule, gap, hairline) for every major container.",
+      "Inverse-video selection with a drawn ▶ cursor, on dex cells, tabs, menu rows and the phone tab bar.",
+      "DotGothic16 for the device voice, system sans for names and prose, Pixelify Sans for the wordmark only.",
+      "Pixel icons drawn on a 12×12 grid with crisp edges, in one stroke weight.",
+      "Tabular figures everywhere numbers line up."
+    ],
+    "rules": [
+      {
+        "name": "The No Green Rule",
+        "body": "Nothing in the chrome is green: no buttons, states, meters, success marks or accents. Green appears only where a type colour is the data.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Selection Colour Rule",
+        "body": "Cursor Blue means \"selected, current or focused\" and nothing else. The page's main action is inverse ink (Ink fill, Screen Off text), never blue, so blue keeps its meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Red Is The Device Rule",
+        "body": "Pokédex Red is for the wordmark plate and stamps. It is not a call-to-action colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Pixel Voice, Sans Names Rule",
+        "body": "The device speaks in DotGothic16: numbers, headings, labels, tabs, buttons and dex text. Names and anything read as prose use the UI sans. Pixelify Sans was the first pixel face. It was demoted to the wordmark because its 5 reads as S and its B/C read as G/O.",
+        "section": "typography"
+      },
+      {
+        "name": "The Near-Zero Tracking Rule",
+        "body": "DotGothic16 is monospaced. Pixel text keeps 0 to 0.04em tracking; small pixel text stays at 0 to 0.02em.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Face Per Number Rule",
+        "body": "A figure is set in one face. A number is never split between the pixel face and the sans. Tabular figures are on site-wide.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Zoom Field Rule",
+        "body": "Form fields render at 16px on touch screens (`pointer: coarse`) so iOS never zooms the page.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Screen Rule",
+        "body": "Fills are flat. No gradients, glows, blurs or glass. A surface rises by changing tone and frame, and floats only when it is a popover.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put every major container in a double-ruled window (2px Frame Rule, inset hairline, 6px corners).",
+      "Do show selection as inverse video in Cursor Blue (#62b2ff) with Screen-Off Ink, plus the ▶ cursor where the item is a list or tab.",
+      "Do set numbers, headings, labels, tabs, buttons and dex text in DotGothic16, and names and reading text in the UI sans.",
+      "Do keep tabular figures and keep each number in one face.",
+      "Do keep the chosen game visible as the context on every Pokédex view.",
+      "Do mark status in place with a stamp rather than hiding the item.",
+      "Do use three meter tiers, blue / amber / red.",
+      "Do draw new icons on the 12×12 pixel grid with crisp edges."
+    ],
+    "donts": [
+      "Don't use green anywhere in the chrome. Type colours on type tags are the only exception.",
+      "Don't use Cursor Blue for anything that isn't selection, current or focus. That includes the main action, which is inverse ink.",
+      "Don't use Pokédex Red as a button or accent colour. It belongs to the wordmark and stamps.",
+      "Don't add gradients, glows, blurs or glass, or cast shadows on anything that doesn't float.",
+      "Don't use Pixelify Sans outside the wordmark.",
+      "Don't track pixel text beyond 0.04em.",
+      "Don't set form fields below 16px on touch screens.",
+      "Don't add a light theme."
+    ]
+  }
+}

@@ -30,3 +30,9 @@ pnpm-debug.log*
 .vite/
 vite.config.timestamp*
 vite-plugin-*
+
+# Local design-tool scratch (Impeccable review captures, caches) and editor launch config
+.impeccable/review/
+.impeccable/questions/
+.impeccable/hook.cache.json
+.claude/
