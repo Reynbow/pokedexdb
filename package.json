@@ -9,6 +9,8 @@
     "build": "vite build && node scripts/generate-share-pages.mjs && node scripts/generate-sitemap.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "data:snapshot": "node scripts/build-data-snapshot.mjs",
+    "data:repair-flavor": "node scripts/repair-flavor-text.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
