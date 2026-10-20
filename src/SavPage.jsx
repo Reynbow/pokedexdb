@@ -133,75 +133,24 @@ const LAZARUS_SPRITE_OVERRIDES = new Map([
 ]);
 
 // Gen 1 (English Red/Blue/Yellow) save layout, verified against Bulbapedia
-// "Save data structure (Generation I)" and pret/pokeyellow ram/sram.asm + ram/wram.asm.
+// "Save data structure (Generation I)" and pret/pokeyellow ram/sram.asm.
+// Pokemon Yellow Legacy keeps the same layout: it removes 78 unused bytes from the
+// main data block but grows the bag by the same amount (BAG_ITEM_CAPACITY 20 -> 59).
 // - The file is 32 KiB (0x8000): four 8 KiB banks. Bank 0 is scratch + Hall of Fame,
 //   bank 1 (0x2000) is the main data, banks 2-3 hold PC boxes. There is no backup copy.
-// - 0x2598: player name (11 bytes, 0x50-terminated).
 // - 0x25A3: Pokedex owned flags, 19 bytes, bit (n - 1) for dex number n, LSB first.
-// - 0x25C9: bag (count, item/quantity pairs, 0xFF). Money, rival name, badges, player ID and
-//   the current box number follow it, so they sit later when the bag is bigger (see below).
-// - 0x29C3: the player's starter (internal species ID; Pikachu in Yellow).
-// - 0x2CED: play time: hours, a "maxed out" flag, minutes, seconds, frames.
 // - 0x2F2C: party list (count, 6 species + 0xFF, 6 x 44-byte mons, OT names, nicknames).
-// - 0x30C0: the current PC box (same list layout with 20 x 33-byte mons). The game copies it
-//   back to bank 2/3 only when you change boxes, so that copy of the current box is stale.
 // - 0x3523: checksum = bitwise NOT of the 8-bit sum of bytes 0x2598..0x3522.
-// - 0x4000 / 0x6000: boxes 1-6 / 7-12, 0x462 bytes each. They are only initialised the first
-//   time the player changes boxes (bit 7 of the current box number); until then they are junk.
 const GEN1_SAVE_SIZE = 0x8000;
 const GEN1_CHECKSUM_START = 0x2598;
 const GEN1_CHECKSUM_END = 0x3522; // inclusive
 const GEN1_CHECKSUM_OFFSET = 0x3523;
-const GEN1_PLAYER_NAME_OFFSET = 0x2598;
 const GEN1_POKEDEX_OWNED_OFFSET = 0x25A3;
-const GEN1_BAG_OFFSET = 0x25C9;
-const GEN1_PLAYER_STARTER_OFFSET = 0x29C3;
-const GEN1_PLAY_TIME_OFFSET = 0x2CED;
 const GEN1_POKEMON_COUNT = 151;
 const PARTY_DATA_OFFSET = 0x2F2C;
 const PARTY_MAX_SIZE = 6;
 const PARTY_MON_SIZE = 0x2C;
-const GEN1_NAME_LENGTH = 11;
-const CURRENT_BOX_DATA_OFFSET = 0x30C0;
-const BOX_BANK_OFFSETS = [0x4000, 0x6000];
-const BOX_COUNT = 12;
-const BOXES_PER_BANK = 6;
-const BOX_MAX_SIZE = 20;
-const BOX_MON_SIZE = 0x21;
-const BOX_DATA_SIZE = 0x462;
-// The current box number byte: bits 0-6 are the box index; bit 7 is set once the player has
-// changed boxes, so banks 2-3 hold real boxes.
-const BOX_NUMBER_MASK = 0x7f;
-const BOXES_INITIALISED_FLAG = 0x80;
-// Pokemon Yellow Legacy grows the bag from 20 to 59 items (78 bytes) and drops 78 unused bytes
-// at the end of the game progress flags, so everything between the two sits 0x4E bytes later;
-// the Pokedex flags, play time, party and boxes stay put. (Legacy constants/menu_constants.asm,
-// ram/wram.asm.) The two layouts are told apart in detectGen1Layout.
-const GEN1_LAYOUTS = [
-  {
-    key: "legacy",
-    bagCapacity: 59,
-    money: 0x2641,
-    rivalName: 0x2644,
-    badges: 0x2650,
-    playerId: 0x2653,
-    currentBox: 0x289A,
-  },
-  {
-    key: "vanilla",
-    bagCapacity: 20,
-    money: 0x25F3,
-    rivalName: 0x25F6,
-    badges: 0x2602,
-    playerId: 0x2605,
-    currentBox: 0x284C,
-  },
-];
-// wObtainedBadges, bit 0 first (pret constants/ram_constants.asm).
-const GEN1_BADGES = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh", "Volcano", "Earth"];
-// wPlayerStarter, internal species IDs: Pikachu in Yellow; Bulbasaur, Charmander, Squirtle in Red/Blue.
-const YELLOW_STARTER_ID = 0x54;
-const RED_BLUE_STARTER_IDS = new Set([0x99, 0xb0, 0xb1]);
+const PARTY_NAME_LENGTH = 11;
 // Largest file accepted before reading it (GBA saves are 128 KiB).
 const MAX_SAVE_FILE_BYTES = 0x40000;
 // Every 4 KiB Gen 3 (GBA) save section ends with this signature at offset 0xFF8.
@@ -633,25 +582,20 @@ const GEN1_TYPE_NAMES = new Map([
   [0x1A, "Dragon"],
 ]);
 
-// Party and box lists share one layout (Bulbapedia "Pokémon lists"; pret macros/ram.asm):
-// count, capacity + 1 species IDs (0xFF-terminated), capacity mons, capacity 11-byte OT names,
-// capacity 11-byte nicknames. Party mons are 44 bytes; box mons are the first 33 of those
-// (no level copy, max HP or stats). Multi-byte values are big-endian.
-// Returns null when the list isn't well formed (a strict list must also be 0xFF-terminated).
-function parseMonList(data, offset, capacity, monSize, { strict = false } = {}) {
+// Party list layout (Bulbapedia "Full Party Data"; pret macros/ram.asm party_struct):
+// +0x000 count, +0x001 species IDs (6 + 0xFF terminator), +0x008 6 x 44-byte mons,
+// +0x110 6 x 11-byte OT names, +0x152 6 x 11-byte nicknames. Multi-byte values are big-endian.
+function parsePartyPokemon(data) {
+  const offset = PARTY_DATA_OFFSET;
   const count = data[offset];
-  if (!Number.isInteger(count) || count > capacity) {
-    return null;
-  }
-  if (strict && data[offset + 1 + count] !== 0xff) {
-    return null;
+  if (!Number.isInteger(count) || count > PARTY_MAX_SIZE) {
+    return [];
   }
 
   const entries = [];
-  const monsOffset = offset + capacity + 2;
-  const otNamesOffset = monsOffset + capacity * monSize;
-  const nicknameOffset = otNamesOffset + capacity * GEN1_NAME_LENGTH;
-  const isParty = monSize === PARTY_MON_SIZE;
+  const partyDataOffset = offset + 0x08;
+  const otNamesOffset = offset + 0x110;
+  const nicknameOffset = offset + 0x152;
 
   for (let i = 0; i < count; i++) {
     const speciesInternalId = data[offset + 1 + i];
@@ -659,16 +603,15 @@ function parseMonList(data, offset, capacity, monSize, { strict = false } = {}) 
       continue;
     }
 
-    const pokemonDataOffset = monsOffset + i * monSize;
+    const pokemonDataOffset = partyDataOffset + i * PARTY_MON_SIZE;
     const slug = SPECIES_INDEX_TO_SLUG.get(speciesInternalId) || null;
     const dexId = slug ? GEN1_SLUG_TO_POKEDEX_ID.get(slug) || null : null;
     const status = data[pokemonDataOffset + 0x04] || 0;
     const type1 = resolveTypeName(data[pokemonDataOffset + 0x05]);
     const type2 = resolveTypeName(data[pokemonDataOffset + 0x06]);
     const trainerId = readUint16(data, pokemonDataOffset + 0x0C);
-    const otStart = otNamesOffset + i * GEN1_NAME_LENGTH;
-    const nicknameStart = nicknameOffset + i * GEN1_NAME_LENGTH;
-    const boxLevel = data[pokemonDataOffset + 0x03] || null;
+    const otStart = otNamesOffset + i * PARTY_NAME_LENGTH;
+    const nicknameStart = nicknameOffset + i * PARTY_NAME_LENGTH;
 
     entries.push({
       slot: i + 1,
@@ -676,126 +619,24 @@ function parseMonList(data, offset, capacity, monSize, { strict = false } = {}) 
       slug,
       dexId,
       currentHp: readUint16(data, pokemonDataOffset + 0x01),
-      maxHp: isParty ? readUint16(data, pokemonDataOffset + 0x22) : null,
-      level: isParty ? data[pokemonDataOffset + 0x21] || boxLevel : boxLevel,
+      maxHp: readUint16(data, pokemonDataOffset + 0x22),
+      level: data[pokemonDataOffset + 0x21] || data[pokemonDataOffset + 0x03] || null,
       status,
       statusText: interpretStatus(status),
       types: type1 === type2 ? [type1] : [type1, type2],
-      stats: isParty
-        ? {
-            attack: readUint16(data, pokemonDataOffset + 0x24),
-            defense: readUint16(data, pokemonDataOffset + 0x26),
-            speed: readUint16(data, pokemonDataOffset + 0x28),
-            special: readUint16(data, pokemonDataOffset + 0x2A),
-          }
-        : null,
+      stats: {
+        attack: readUint16(data, pokemonDataOffset + 0x24),
+        defense: readUint16(data, pokemonDataOffset + 0x26),
+        speed: readUint16(data, pokemonDataOffset + 0x28),
+        special: readUint16(data, pokemonDataOffset + 0x2A),
+      },
       originalTrainerId: trainerId,
       originalTrainerIdFormatted: String(trainerId).padStart(5, "0"),
-      originalTrainerName: decodeGen1String(data.subarray(otStart, otStart + GEN1_NAME_LENGTH)),
-      nickname: decodeGen1String(data.subarray(nicknameStart, nicknameStart + GEN1_NAME_LENGTH)),
+      originalTrainerName: decodeGen1String(data.subarray(otStart, otStart + PARTY_NAME_LENGTH)),
+      nickname: decodeGen1String(data.subarray(nicknameStart, nicknameStart + PARTY_NAME_LENGTH)),
     });
   }
   return entries;
-}
-
-// A player-typed name: 1-10 known characters, then the 0x50 terminator.
-function isGen1Name(data, offset) {
-  for (let i = 0; i < GEN1_NAME_LENGTH; i++) {
-    const value = data[offset + i];
-    if (value === 0x50) return i > 0;
-    if (!GEN1_CHAR_MAP.has(value)) return false;
-  }
-  return false;
-}
-
-function isBcd(data, offset, length) {
-  for (let i = 0; i < length; i++) {
-    const value = data[offset + i];
-    if ((value >> 4) > 9 || (value & 0x0f) > 9) return false;
-  }
-  return true;
-}
-
-function readBcd(data, offset, length) {
-  let result = 0;
-  for (let i = 0; i < length; i++) {
-    const value = data[offset + i];
-    result = result * 100 + (value >> 4) * 10 + (value & 0x0f);
-  }
-  return result;
-}
-
-// Yellow Legacy's bag can hold more than 20 items, which settles it. Otherwise both layouts
-// fit the bag, so each is scored by whether the player's own Pokemon (OT name = player name)
-// carry the player ID found there, and whether its money, rival name and box number are valid.
-function detectGen1Layout(data, ownMons) {
-  const bagCount = data[GEN1_BAG_OFFSET];
-  const bagTerminated = data[GEN1_BAG_OFFSET + 1 + bagCount * 2] === 0xff;
-  let best = null;
-  let bestScore = -1;
-  for (const layout of GEN1_LAYOUTS) {
-    if (bagCount > layout.bagCapacity || !bagTerminated) continue;
-    const playerId = readUint16(data, layout.playerId);
-    let score = ownMons.filter((mon) => mon.originalTrainerId === playerId).length * 4;
-    if (isBcd(data, layout.money, 3)) score += 1;
-    if (isGen1Name(data, layout.rivalName)) score += 1;
-    if ((data[layout.currentBox] & BOX_NUMBER_MASK) < BOX_COUNT) score += 1;
-    // Ties go to the first layout listed (Yellow Legacy, the game this reader is for).
-    if (score > bestScore) {
-      best = layout;
-      bestScore = score;
-    }
-  }
-  return best || GEN1_LAYOUTS[GEN1_LAYOUTS.length - 1];
-}
-
-function describeGen1Game(data, layout) {
-  if (layout.key === "legacy") return "Pokémon Yellow Legacy";
-  const starter = data[GEN1_PLAYER_STARTER_OFFSET];
-  if (starter === YELLOW_STARTER_ID) return "Pokémon Yellow";
-  if (RED_BLUE_STARTER_IDS.has(starter)) return "Pokémon Red or Blue";
-  return "Pokémon Red, Blue or Yellow";
-}
-
-// The current box is read from the main bank; the others from banks 2-3, once they exist.
-function parseBoxes(data, layout) {
-  const boxByte = data[layout.currentBox];
-  const boxIndex = boxByte & BOX_NUMBER_MASK;
-  const currentIndex = boxIndex < BOX_COUNT ? boxIndex : 0;
-  const initialised = Boolean(boxByte & BOXES_INITIALISED_FLAG);
-  const boxes = Array.from({ length: BOX_COUNT }, (_, index) => {
-    if (index !== currentIndex && !initialised) {
-      return { number: index + 1, members: [], readable: true };
-    }
-    const offset =
-      index === currentIndex
-        ? CURRENT_BOX_DATA_OFFSET
-        : BOX_BANK_OFFSETS[Math.floor(index / BOXES_PER_BANK)] + (index % BOXES_PER_BANK) * BOX_DATA_SIZE;
-    const members = parseMonList(data, offset, BOX_MAX_SIZE, BOX_MON_SIZE, { strict: true });
-    return { number: index + 1, members: members || [], readable: members !== null };
-  });
-  return { boxes, currentBox: currentIndex + 1 };
-}
-
-function parseTrainer(data, layout) {
-  const playerId = readUint16(data, layout.playerId);
-  const badgeFlags = data[layout.badges];
-  const maxed = data[GEN1_PLAY_TIME_OFFSET + 1] !== 0;
-  return {
-    name: decodeGen1String(data.subarray(GEN1_PLAYER_NAME_OFFSET, GEN1_PLAYER_NAME_OFFSET + GEN1_NAME_LENGTH)),
-    rivalName: decodeGen1String(data.subarray(layout.rivalName, layout.rivalName + GEN1_NAME_LENGTH)),
-    id: playerId,
-    idFormatted: String(playerId).padStart(5, "0"),
-    money: isBcd(data, layout.money, 3) ? readBcd(data, layout.money, 3) : null,
-    badges: GEN1_BADGES.map((name, bit) => ({ name, earned: Boolean((badgeFlags >> bit) & 1) })),
-    // The clock stops at 255:59 and sets the "maxed" flag.
-    playTime: {
-      hours: maxed ? 255 : data[GEN1_PLAY_TIME_OFFSET],
-      minutes: maxed ? 59 : Math.min(59, data[GEN1_PLAY_TIME_OFFSET + 2]),
-      maxed,
-    },
-    game: describeGen1Game(data, layout),
-  };
 }
 
 function formatLegacyLocationName(raw) {
@@ -1233,8 +1074,7 @@ const NOT_GEN1_SAVE_MESSAGE =
  * Parse an English Gen 1 (Red/Blue/Yellow, Yellow Legacy) .sav/.srm file.
  * Throws an Error with a user-facing message when the file isn't a valid Gen 1 save.
  * @param {ArrayBuffer} arrayBuffer
- * @returns {{caughtPokemon: Array<number>, partyMembers: Array<object>, trainer: object,
- *   boxes: Array<{number: number, members: Array<object>, readable: boolean}>, currentBox: number}}
+ * @returns {{caughtPokemon: Array<number>, partyMembers: Array<object>}}
  */
 function parseSavFile(arrayBuffer) {
   const data = new Uint8Array(arrayBuffer);
@@ -1261,23 +1101,9 @@ function parseSavFile(arrayBuffer) {
     }
   }
 
-  const partyMembers = parseMonList(data, PARTY_DATA_OFFSET, PARTY_MAX_SIZE, PARTY_MON_SIZE) || [];
-  // The party and the current box don't move between layouts, so they can pick the layout.
-  const playerName = decodeGen1String(
-    data.subarray(GEN1_PLAYER_NAME_OFFSET, GEN1_PLAYER_NAME_OFFSET + GEN1_NAME_LENGTH)
-  );
-  const currentBoxMembers =
-    parseMonList(data, CURRENT_BOX_DATA_OFFSET, BOX_MAX_SIZE, BOX_MON_SIZE, { strict: true }) || [];
-  const ownMons = [...partyMembers, ...currentBoxMembers].filter(
-    (mon) => playerName && mon.originalTrainerName === playerName
-  );
-  const layout = detectGen1Layout(data, ownMons);
-
   return {
     caughtPokemon,
-    partyMembers,
-    trainer: parseTrainer(data, layout),
-    ...parseBoxes(data, layout),
+    partyMembers: parsePartyPokemon(data),
   };
 }
 
@@ -1367,267 +1193,29 @@ const CART_PIXELS = [
   ".##########.",
   "............",
 ];
-// Each row of "#" runs becomes one rect, as in Icon.jsx.
-function toPixelRects(pixels) {
-  return pixels.flatMap((row, y) => {
-    const rects = [];
-    let x = 0;
-    while (x < row.length) {
-      if (row[x] !== "#") {
-        x += 1;
-        continue;
-      }
-      let run = 1;
-      while (row[x + run] === "#") run += 1;
-      rects.push(<rect key={`${x}-${y}`} x={x} y={y} width={run} height={1} />);
-      x += run;
+const CART_RECTS = CART_PIXELS.flatMap((row, y) => {
+  const rects = [];
+  let x = 0;
+  while (x < row.length) {
+    if (row[x] !== "#") {
+      x += 1;
+      continue;
     }
-    return rects;
-  });
-}
+    let run = 1;
+    while (row[x + run] === "#") run += 1;
+    rects.push(<rect key={`${x}-${y}`} x={x} y={y} width={run} height={1} />);
+    x += run;
+  }
+  return rects;
+});
 
-function PixelGlyph({ rects, className = "" }) {
+function CartIcon({ className = "" }) {
   return (
     <svg className={`icon ${className}`.trim()} viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-      {rects}
+      {CART_RECTS}
     </svg>
   );
 }
-
-const CART_RECTS = toPixelRects(CART_PIXELS);
-
-function CartIcon({ className = "" }) {
-  return <PixelGlyph rects={CART_RECTS} className={className} />;
-}
-
-// The eight Kanto badges on the 12×12 grid, after their in-game shapes, in GEN1_BADGES order.
-const BADGE_PIXELS = {
-  Boulder: [
-    "............",
-    "...######...",
-    "..#......#..",
-    ".#..####..#.",
-    ".#.#....#.#.",
-    ".#.#....#.#.",
-    ".#.#....#.#.",
-    ".#.#....#.#.",
-    ".#..####..#.",
-    "..#......#..",
-    "...######...",
-    "............",
-  ],
-  Cascade: [
-    ".....##.....",
-    ".....##.....",
-    "....####....",
-    "....####....",
-    "...######...",
-    "..##.#####..",
-    "..#.######..",
-    ".##.#######.",
-    ".##.#######.",
-    ".###.######.",
-    "..########..",
-    "...######...",
-  ],
-  Thunder: [
-    ".....##.....",
-    ".#...##...#.",
-    "..#.####.#..",
-    "...######...",
-    "..###..###..",
-    "#####..#####",
-    "#####..#####",
-    "..###..###..",
-    "...######...",
-    "..#.####.#..",
-    ".#...##...#.",
-    ".....##.....",
-  ],
-  Rainbow: [
-    "....####....",
-    "...######...",
-    "...######...",
-    ".##.####.##.",
-    "####....####",
-    "####.##.####",
-    "####.##.####",
-    "####....####",
-    ".##.####.##.",
-    "...######...",
-    "...######...",
-    "....####....",
-  ],
-  Soul: [
-    "............",
-    ".###....###.",
-    "#####..#####",
-    "##.#########",
-    "#.##########",
-    "############",
-    ".##########.",
-    "..########..",
-    "...######...",
-    "....####....",
-    ".....##.....",
-    "............",
-  ],
-  Marsh: [
-    "....####....",
-    "..##....##..",
-    ".#........#.",
-    ".#..####..#.",
-    "#..#....#..#",
-    "#..#.##.#..#",
-    "#..#.##.#..#",
-    "#..#....#..#",
-    ".#..####..#.",
-    ".#........#.",
-    "..##....##..",
-    "....####....",
-  ],
-  Volcano: [
-    ".....#......",
-    "....##......",
-    "....###.....",
-    "...####..#..",
-    "...#####.##.",
-    "..#########.",
-    ".##########.",
-    ".####..####.",
-    ".###....###.",
-    ".###....###.",
-    "..###..###..",
-    "...######...",
-  ],
-  Earth: [
-    "..........##",
-    "........####",
-    "......######",
-    ".....####.##",
-    "....####.###",
-    "...####.###.",
-    "...###.###..",
-    "..###.###...",
-    "..#.####....",
-    ".##.........",
-    "##..........",
-    "#...........",
-  ],
-};
-const BADGE_RECTS = new Map(Object.entries(BADGE_PIXELS).map(([name, pixels]) => [name, toPixelRects(pixels)]));
-
-const formatPlayTime = ({ hours, minutes }) => `${hours}:${String(minutes).padStart(2, "0")}`;
-
-// One Pokémon's save data, as a party row or in the box slot sheet. Box Pokémon store no max HP
-// or stats (the game works them out again on withdrawal), so those parts give way to a note.
-function MonSummary({ mon, as = "li", className = "" }) {
-  const Tag = as;
-  const speciesName = mon.slug ? getGen1DisplayName(mon.slug) : null;
-  const displayName = mon.nickname || speciesName || `Species #${mon.speciesInternalId}`;
-  const showSpecies = Boolean(speciesName) && speciesName.toLowerCase() !== displayName.toLowerCase();
-  const hasMaxHp = mon.maxHp != null && mon.maxHp > 0;
-  const hpPercent = hasMaxHp ? Math.max(0, Math.min(100, (mon.currentHp / mon.maxHp) * 100)) : 0;
-  const pokedexUrl = mon.dexId != null ? buildPokemonPath(mon.slug) : null;
-  const statusText = mon.statusText || "OK";
-  return (
-    <Tag className={`sv-mon ${className}`.trim()}>
-      <span className="sv-mon__sprite">
-        <SpriteImage
-          id={mon.dexId ?? 0}
-          alt=""
-          className="sv-mon__img"
-          width={96}
-          height={96}
-          gameSpritePath={YELLOW_SPRITE_PATH}
-        />
-      </span>
-      <div className="sv-mon__id">
-        <p className="sv-mon__no">{formatDexNo(mon.dexId)}</p>
-        <h3 className="sv-mon__name">
-          {pokedexUrl ? (
-            <a href={pokedexUrl} target="_blank" rel="noopener noreferrer">
-              {displayName}
-              <Icon name="external" className="sv-ext-icon" />
-              <span className="sr-only"> (opens the Pokédex in a new tab)</span>
-            </a>
-          ) : (
-            displayName
-          )}
-        </h3>
-        {showSpecies ? <p className="sv-mon__species">{speciesName}</p> : null}
-        <p className="sv-types sv-mon__types">
-          {mon.types.map((type) => (
-            <TypeTag key={type} typeName={String(type).toLowerCase()} icon={false} />
-          ))}
-        </p>
-      </div>
-      <div className="sv-mon__vitals">
-        <p className="sv-mon__lv">
-          <span className="sv-mon__lv-label">Lv</span>
-          {mon.level != null ? mon.level : "??"}
-        </p>
-        {hasMaxHp ? (
-          <div className={`sv-hp${hpTier(hpPercent)}`} style={{ "--pct": hpPercent }}>
-            <span className="sv-hp__label">HP</span>
-            <span className="meter__track sv-hp__track" aria-hidden="true">
-              <span className="meter__fill" />
-            </span>
-            <span className="sv-hp__value">
-              {(mon.currentHp ?? 0).toString()}
-              <span aria-hidden="true">/</span>
-              <span className="sr-only"> of </span>
-              {mon.maxHp.toString()}
-            </span>
-          </div>
-        ) : (
-          <p className="sv-hp sv-hp--plain">
-            <span className="sv-hp__label">HP</span>
-            <span className="sv-hp__value">{(mon.currentHp ?? 0).toString()}</span>
-          </p>
-        )}
-        <p className="sv-mon__status">
-          <span className="sv-mini-label">Status</span>
-          <span className={`stamp${statusText !== "OK" ? " stamp--gold" : ""}`}>{statusText}</span>
-        </p>
-      </div>
-      {/* Gen 1 (including Yellow Legacy) has a single Special stat. */}
-      {mon.stats ? (
-        <dl className="sv-mon__stats">
-          {[
-            ["Attack", mon.stats.attack],
-            ["Defense", mon.stats.defense],
-            ["Speed", mon.stats.speed],
-            ["Special", mon.stats.special],
-          ].map(([label, value]) => (
-            <div key={label} className="sv-mon__stat">
-              <dt>{label}</dt>
-              <dd>{value != null ? value : "--"}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="sv-mon__note">
-          Boxed Pokémon don&apos;t keep their stats in the save. The game works them out again when you withdraw
-          one.
-        </p>
-      )}
-      <dl className="sv-mon__ot">
-        <div>
-          <dt>OT</dt>
-          <dd>{mon.originalTrainerName || "Unknown"}</dd>
-        </div>
-        <div>
-          <dt>IDNo</dt>
-          <dd className="sv-num">{mon.originalTrainerIdFormatted}</dd>
-        </div>
-      </dl>
-    </Tag>
-  );
-}
-
-const monDisplayName = (mon) =>
-  mon.nickname || (mon.slug ? getGen1DisplayName(mon.slug) : `Species #${mon.speciesInternalId}`);
 
 export default function SavPage() {
   const [gameKey, setGameKey] = useState("yellow");
@@ -1637,13 +1225,6 @@ export default function SavPage() {
   // Only set once a save has been parsed successfully.
   const [fileName, setFileName] = useState(null);
   const [partyMembers, setPartyMembers] = useState([]);
-  const [trainer, setTrainer] = useState(null);
-  const [boxes, setBoxes] = useState(EMPTY_LIST);
-  // The box selected in-game, and the box being viewed here (1-based).
-  const [currentBox, setCurrentBox] = useState(1);
-  const [viewedBox, setViewedBox] = useState(1);
-  // The box slot whose Pokémon is open in the Sheet: { box, slot }, both 1-based.
-  const [openBoxSlot, setOpenBoxSlot] = useState(null);
   const [legacyEncounters, setLegacyEncounters] = useState(null);
   const [legacyEncountersReady, setLegacyEncountersReady] = useState(false);
   const [legacyEncounterError, setLegacyEncounterError] = useState(null);
@@ -1730,8 +1311,6 @@ export default function SavPage() {
   // The open Pokédex entry shows in a Sheet (popover on desktop, bottom sheet on phones), which
   // closes on Escape or a click/tap outside it and returns focus to the entry's sprite button.
   const dexAnchorRef = useRef(null);
-  // A box slot opens its Pokémon in a Sheet the same way, anchored to the slot.
-  const monAnchorRef = useRef(null);
   const [dragging, setDragging] = useState(false);
 
   const resetResultFilters = useCallback(() => {
@@ -1739,7 +1318,6 @@ export default function SavPage() {
     setSearchTerm("");
     setShowCaught(true);
     setOpenDexEntryKey(null);
-    setOpenBoxSlot(null);
   }, []);
 
   const readSaveFile = useCallback(
@@ -1761,15 +1339,11 @@ export default function SavPage() {
       setError(null);
       setLoading(true);
       try {
-        const save = parseSavFile(await file.arrayBuffer());
+        const { caughtPokemon: caught, partyMembers: party } = parseSavFile(await file.arrayBuffer());
         setGameKey("yellow");
         resetResultFilters();
-        setCaughtPokemon(save.caughtPokemon);
-        setPartyMembers(save.partyMembers);
-        setTrainer(save.trainer);
-        setBoxes(save.boxes);
-        setCurrentBox(save.currentBox);
-        setViewedBox(save.currentBox);
+        setCaughtPokemon(caught);
+        setPartyMembers(party);
         setFileName(file.name);
       } catch (err) {
         setError(`Couldn't read "${file.name}": ${err?.message || "unknown error"}`);
@@ -1995,8 +1569,6 @@ export default function SavPage() {
     setFileName(null);
     setCaughtPokemon([]);
     setPartyMembers([]);
-    setTrainer(null);
-    setBoxes(EMPTY_LIST);
     setError(null);
     resetResultFilters();
     setLoading(false);
@@ -2032,33 +1604,11 @@ export default function SavPage() {
   );
   const closeDexEntry = useCallback(() => setOpenDexEntryKey(null), []);
 
-  const openBoxMon = useCallback((event, box, slot) => {
-    const trigger = event.currentTarget;
-    monAnchorRef.current = trigger;
-    if (!window.matchMedia?.("(max-width: 900px)").matches) {
-      const rect = trigger.getBoundingClientRect();
-      if (rect.bottom > window.innerHeight - 420) {
-        trigger.scrollIntoView({ block: "start" });
-      }
-    }
-    setOpenBoxSlot({ box, slot });
-  }, []);
-  const closeBoxMon = useCallback(() => setOpenBoxSlot(null), []);
-  const stepBox = useCallback((delta) => {
-    setViewedBox((current) => ((current - 1 + delta + BOX_COUNT) % BOX_COUNT) + 1);
-  }, []);
-
   const viewContext = { showingYellow, yellowReference, yellowReferenceReady };
   const openEntry =
     openDexEntryKey != null ? combinedResults.find((entry) => entry.entryKey === openDexEntryKey) || null : null;
   const openView = openEntry ? buildEntryView(openEntry, viewContext) : null;
   const ownedPercent = totalDexCount > 0 ? Math.min(100, (caughtCount / totalDexCount) * 100) : 0;
-  const shownBox = boxes[viewedBox - 1] || null;
-  const boxedCount = boxes.reduce((sum, box) => sum + box.members.length, 0);
-  const openSlotMon = openBoxSlot
-    ? boxes[openBoxSlot.box - 1]?.members.find((mon) => mon.slot === openBoxSlot.slot) || null
-    : null;
-  const earnedBadgeCount = trainer ? trainer.badges.filter((badge) => badge.earned).length : 0;
 
   const renderEvolution = (requirement) => (
     <p className="sv-evo">
@@ -2398,57 +1948,26 @@ export default function SavPage() {
           <section className="win sv-card" aria-labelledby="sv-card-title">
             <div className="win__head">
               <h2 className="win__title" id="sv-card-title">
-                Trainer card
+                Save file
               </h2>
               <button type="button" className="btn btn--sm" onClick={handleClearSave}>
                 Close file
               </button>
             </div>
             <div className="win__body sv-card__body">
-              <div className="sv-trainer">
-                <p className="sv-trainer__name">{trainer?.name || "Unknown"}</p>
-                <dl className="kv sv-card__facts">
-                  <dt>ID No.</dt>
-                  <dd className="sv-num">{trainer?.idFormatted ?? "-----"}</dd>
-                  <dt>Money</dt>
-                  <dd className="sv-num">
-                    {trainer?.money != null ? (
-                      <>
-                        <span aria-hidden="true">¥</span>
-                        {trainer.money.toLocaleString("en-US")}
-                      </>
-                    ) : (
-                      "--"
-                    )}
-                  </dd>
-                  <dt>Time</dt>
-                  <dd className="sv-num">{trainer ? formatPlayTime(trainer.playTime) : "--"}</dd>
-                  <dt>Rival</dt>
-                  <dd className="sv-card__rival">{trainer?.rivalName || "Unknown"}</dd>
-                </dl>
-              </div>
-
-              <div className="sv-card__section">
-                <p className="sv-card__section-head">
-                  <span className="label">Badges</span>
-                  <span>
-                    <span className="sv-num">{earnedBadgeCount}</span>
-                    <span className="sv-num-of"> / {GEN1_BADGES.length}</span>
-                  </span>
-                </p>
-                <ul className="sv-badges">
-                  {(trainer?.badges || []).map((badge) => (
-                    <li key={badge.name} className={`sv-badge${badge.earned ? " is-earned" : ""}`}>
-                      <PixelGlyph rects={BADGE_RECTS.get(badge.name)} className="sv-badge__icon" />
-                      <span className="sv-badge__name">{badge.name}</span>
-                      <span className="sr-only">{badge.earned ? " Badge, earned" : " Badge, not earned"}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="sv-card__section">
-                <p className="sv-card__section-head">
+              <dl className="kv sv-card__facts">
+                <dt>File</dt>
+                <dd className="sv-card__file">{fileName}</dd>
+                <dt>Game</dt>
+                <dd>{activeGameLabel}</dd>
+                <dt>Party</dt>
+                <dd>
+                  <span className="sv-num">{partyMembers.length}</span>
+                  <span className="sv-num-of"> / {PARTY_MAX_SIZE}</span>
+                </dd>
+              </dl>
+              <div className="sv-card__dex">
+                <p className="sv-card__dex-head">
                   <span className="label">Pokédex owned</span>
                   <span>
                     <span className="sv-num sv-num--lg">{caughtCount}</span>
@@ -2459,17 +1978,6 @@ export default function SavPage() {
                   <span className="meter__fill" />
                 </span>
               </div>
-
-              <dl className="sv-card__meta">
-                <div>
-                  <dt>Game</dt>
-                  <dd>{trainer?.game || activeGameLabel}</dd>
-                </div>
-                <div>
-                  <dt>File</dt>
-                  <dd className="sv-card__file">{fileName}</dd>
-                </div>
-              </dl>
             </div>
           </section>
 
@@ -2485,155 +1993,118 @@ export default function SavPage() {
             <div className="win__body">
               {partySlots.some(Boolean) ? (
                 <ol className="sv-party__list">
-                  {partySlots.map((slot, index) =>
-                    slot ? (
-                      <MonSummary key={`party-slot-${index}`} mon={slot} />
-                    ) : (
-                      <li key={`party-slot-${index}`} className="sv-mon sv-mon--empty">
-                        <span className="sv-mon__sprite" aria-hidden="true" />
-                        <span className="sv-mon__empty-name">Slot {index + 1}</span>
-                        <span className="sv-mon__empty-label">Empty</span>
+                  {partySlots.map((slot, index) => {
+                    if (!slot) {
+                      return (
+                        <li key={`party-slot-${index}`} className="sv-mon sv-mon--empty">
+                          <span className="sv-mon__sprite" aria-hidden="true" />
+                          <span className="sv-mon__empty-name">Slot {index + 1}</span>
+                          <span className="sv-mon__empty-label">Empty</span>
+                        </li>
+                      );
+                    }
+
+                    const speciesName = slot.slug ? getGen1DisplayName(slot.slug) : null;
+                    const displayName = slot.nickname || speciesName || `Species #${slot.speciesInternalId}`;
+                    const showSpecies = Boolean(speciesName) && speciesName.toLowerCase() !== displayName.toLowerCase();
+                    const hpPercent =
+                      slot.maxHp && slot.maxHp > 0
+                        ? Math.max(0, Math.min(100, (slot.currentHp / slot.maxHp) * 100))
+                        : 0;
+                    const pokedexNumber = formatDexNo(slot.dexId);
+                    const pokedexUrl = slot.dexId != null ? buildPokemonPath(slot.slug) : null;
+                    const spriteIdentifier = slot.dexId ?? 0;
+                    const statusText = slot.statusText || "OK";
+                    return (
+                      <li key={`party-slot-${index}`} className="sv-mon">
+                        <span className="sv-mon__sprite">
+                          <SpriteImage
+                            id={spriteIdentifier}
+                            alt=""
+                            className="sv-mon__img"
+                            width={96}
+                            height={96}
+                            gameSpritePath={YELLOW_SPRITE_PATH}
+                          />
+                        </span>
+                        <div className="sv-mon__id">
+                          <p className="sv-mon__no">{pokedexNumber}</p>
+                          <h3 className="sv-mon__name">
+                            {pokedexUrl ? (
+                              <a href={pokedexUrl} target="_blank" rel="noopener noreferrer">
+                                {displayName}
+                                <Icon name="external" className="sv-ext-icon" />
+                                <span className="sr-only"> (opens the Pokédex in a new tab)</span>
+                              </a>
+                            ) : (
+                              displayName
+                            )}
+                          </h3>
+                          {showSpecies ? <p className="sv-mon__species">{speciesName}</p> : null}
+                          <p className="sv-types sv-mon__types">
+                            {slot.types.map((type) => (
+                              <TypeTag key={type} typeName={String(type).toLowerCase()} icon={false} />
+                            ))}
+                          </p>
+                        </div>
+                        <div className="sv-mon__vitals">
+                          <p className="sv-mon__lv">
+                            <span className="sv-mon__lv-label">Lv</span>
+                            {slot.level != null ? slot.level : "??"}
+                          </p>
+                          <div
+                            className={`sv-hp${hpTier(hpPercent)}`}
+                            style={{ "--pct": hpPercent }}
+                          >
+                            <span className="sv-hp__label">HP</span>
+                            <span className="meter__track sv-hp__track" aria-hidden="true">
+                              <span className="meter__fill" />
+                            </span>
+                            <span className="sv-hp__value">
+                              {(slot.currentHp ?? 0).toString()}
+                              <span aria-hidden="true">/</span>
+                              <span className="sr-only"> of </span>
+                              {(slot.maxHp ?? 0).toString()}
+                            </span>
+                          </div>
+                          <p className="sv-mon__status">
+                            <span className="sv-mini-label">Status</span>
+                            <span className={`stamp${statusText !== "OK" ? " stamp--gold" : ""}`}>{statusText}</span>
+                          </p>
+                        </div>
+                        {/* Gen 1 (including Yellow Legacy) has a single Special stat. */}
+                        <dl className="sv-mon__stats">
+                          {[
+                            ["Attack", slot.stats?.attack],
+                            ["Defense", slot.stats?.defense],
+                            ["Speed", slot.stats?.speed],
+                            ["Special", slot.stats?.special],
+                          ].map(([label, value]) => (
+                            <div key={label} className="sv-mon__stat">
+                              <dt>{label}</dt>
+                              <dd>{value != null ? value : "--"}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <dl className="sv-mon__ot">
+                          <div>
+                            <dt>OT</dt>
+                            <dd>{slot.originalTrainerName || "Unknown"}</dd>
+                          </div>
+                          <div>
+                            <dt>IDNo</dt>
+                            <dd className="sv-num">{slot.originalTrainerIdFormatted}</dd>
+                          </div>
+                        </dl>
                       </li>
-                    )
-                  )}
+                    );
+                  })}
                 </ol>
               ) : (
                 <div className="empty">
                   <p className="empty__title">No party Pokémon</p>
                   <p>Party data unavailable (or party is empty).</p>
                 </div>
-              )}
-            </div>
-          </section>
-
-          <section className="win sv-boxes" aria-labelledby="sv-boxes-title">
-            <div className="win__head">
-              <h2 className="win__title" id="sv-boxes-title">
-                PC boxes
-              </h2>
-              <p className="sv-count">
-                <span className="sv-num">{boxedCount}</span> stored
-              </p>
-            </div>
-            <div className="win__body sv-boxes__body">
-              <div className="sv-boxbar">
-                <button
-                  type="button"
-                  className="btn btn--icon"
-                  onClick={() => stepBox(-1)}
-                  aria-label={`Previous box (Box ${((viewedBox + BOX_COUNT - 2) % BOX_COUNT) + 1})`}
-                >
-                  <Icon name="left" />
-                </button>
-                <p className="sv-boxbar__label" aria-live="polite">
-                  <span className="sv-boxbar__name">Box {viewedBox}</span>
-                  <span className="sr-only">: </span>
-                  <span className="sv-boxbar__count">
-                    <span className="sv-num">{shownBox ? shownBox.members.length : 0}</span>
-                    <span className="sv-num-of">
-                      <span aria-hidden="true"> / </span>
-                      <span className="sr-only"> of </span>
-                      {BOX_MAX_SIZE}
-                    </span>
-                  </span>
-                  {viewedBox === currentBox ? (
-                    <>
-                      <span className="sr-only">, </span>
-                      <span className="stamp stamp--select">Current</span>
-                    </>
-                  ) : null}
-                </p>
-                <button
-                  type="button"
-                  className="btn btn--icon"
-                  onClick={() => stepBox(1)}
-                  aria-label={`Next box (Box ${(viewedBox % BOX_COUNT) + 1})`}
-                >
-                  <Icon name="right" />
-                </button>
-              </div>
-
-              <ol className="sv-boxlist" aria-label="Boxes">
-                {boxes.map((box) => (
-                  <li key={box.number}>
-                    <button
-                      type="button"
-                      className={`sv-boxlist__btn${box.members.length === 0 ? " is-empty" : ""}`}
-                      aria-pressed={box.number === viewedBox}
-                      aria-label={`Box ${box.number}, ${box.members.length} Pokémon${
-                        box.number === currentBox ? ", current box" : ""
-                      }`}
-                      onClick={() => setViewedBox(box.number)}
-                    >
-                      <span className="sv-boxlist__no">{box.number}</span>
-                      <span className="sv-boxlist__count" aria-hidden="true">
-                        {box.members.length}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-
-              {!shownBox || !shownBox.readable ? (
-                <div className="empty sv-boxes__empty">
-                  <p className="empty__title">Can&apos;t read Box {viewedBox}</p>
-                  <p>This box&apos;s data in the save isn&apos;t a valid box list.</p>
-                </div>
-              ) : shownBox.members.length === 0 ? (
-                <div className="empty sv-boxes__empty">
-                  <p className="empty__title">Box {viewedBox} is empty</p>
-                </div>
-              ) : (
-                <ol className="sv-slots" aria-label={`Box ${viewedBox}`}>
-                  {Array.from({ length: BOX_MAX_SIZE }, (_, index) => {
-                    const mon = shownBox.members[index];
-                    if (!mon) {
-                      // Empty slots only fill out the last row, at 5 or 4 across; n / 20 gives the rest.
-                      const count = shownBox.members.length;
-                      const padsFive = index < Math.ceil(count / 5) * 5;
-                      const padsFour = index < Math.ceil(count / 4) * 4;
-                      if (!padsFive && !padsFour) return null;
-                      return (
-                        <li
-                          key={`empty-${index}`}
-                          className={`sv-slot sv-slot--empty${padsFive ? " is-pad-5" : ""}${padsFour ? " is-pad-4" : ""}`}
-                          aria-hidden="true"
-                        />
-                      );
-                    }
-                    const name = monDisplayName(mon);
-                    const isOpen = openBoxSlot?.box === viewedBox && openBoxSlot?.slot === mon.slot;
-                    return (
-                      <li key={`slot-${mon.slot}`} className={`sv-slot${isOpen ? " is-open" : ""}`}>
-                        <button
-                          type="button"
-                          className="sv-slot__btn"
-                          aria-haspopup="dialog"
-                          aria-expanded={isOpen}
-                          aria-label={`${name}, level ${mon.level ?? "unknown"}`}
-                          onClick={(event) => openBoxMon(event, viewedBox, mon.slot)}
-                        >
-                          <Cursor className="sv-slot__cursor" />
-                          <span className="sv-slot__sprite">
-                            <SpriteImage
-                              id={mon.dexId ?? 0}
-                              alt=""
-                              className="sv-slot__img"
-                              width={96}
-                              height={96}
-                              gameSpritePath={YELLOW_SPRITE_PATH}
-                            />
-                          </span>
-                          <span className="sv-slot__name">{name}</span>
-                          <span className="sv-slot__lv">
-                            <span className="sv-slot__lv-label">Lv</span>
-                            {mon.level ?? "??"}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
               )}
             </div>
           </section>
@@ -2845,37 +2316,6 @@ export default function SavPage() {
         className="sv-sheet"
       >
         {renderDexDetail()}
-      </Sheet>
-
-      <Sheet
-        open={Boolean(openSlotMon)}
-        onClose={closeBoxMon}
-        anchorRef={monAnchorRef}
-        label={openSlotMon ? `Box ${openBoxSlot.box}: ${monDisplayName(openSlotMon)}` : "Box Pokémon"}
-        width={440}
-        className="sv-sheet"
-      >
-        {openSlotMon ? (
-          <>
-            <div className="popsheet__head">
-              <h2 className="popsheet__title">
-                Box {openBoxSlot.box}
-                <span className="sv-sheet__slot"> · Slot {openSlotMon.slot}</span>
-              </h2>
-              <button
-                type="button"
-                className="btn btn--quiet btn--icon btn--sm"
-                onClick={closeBoxMon}
-                aria-label="Close"
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-            <div className="popsheet__body">
-              <MonSummary mon={openSlotMon} as="div" className="sv-mon--sheet" />
-            </div>
-          </>
-        ) : null}
       </Sheet>
     </main>
   );
