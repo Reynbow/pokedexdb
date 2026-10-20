@@ -65,14 +65,6 @@ export const PAGE_ROUTES = [
     description:
       "Open a Pokemon Yellow .sav or .srm save file in your browser to see your party, Pokedex progress and where to find the Pokemon you're missing.",
   },
-  {
-    key: "home",
-    path: "home",
-    aliases: [],
-    nav: null,
-    title: `All Pokemon and Forms | ${SITE_NAME}`,
-    description: "Every Pokemon and alternate form in one grid.",
-  },
 ];
 
 export const PAGE_ROUTE_BY_KEY = new Map(PAGE_ROUTES.map((route) => [route.key, route]));

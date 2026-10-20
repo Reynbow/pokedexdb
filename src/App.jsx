@@ -1,13 +1,16 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
-import HeaderSection from "./sections/Header.jsx";
-import GameFilters from "./sections/GameFilters.jsx";
-import FilterTabs from "./sections/FilterTabs.jsx";
 import SpriteImage from "./components/SpriteImage.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
+import "./styles/pokedex.css";
+import "./styles/entry.css";
+import "./styles/overlays.css";
+import Icon, { Cursor } from "./components/Icon.jsx";
+import { AreaPanel, DexDialog, Matchups, MovesPanel, StatMeters, TypeTag } from "./pokedex/EntryParts.jsx";
+import DexStrip from "./pokedex/DexStrip.jsx";
+import { readGamePreference, writeGamePreference } from "./pokedex/games.js";
 import { findRecommendedNature, fetchSmogonSets, fetchSmogonImgsIndex, normalizeSpeciesName } from "./smogonApi";
-import CategoryToggle from "./CategoryToggle.jsx";
 import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation, getBasePath } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
 import { formatPokemonName } from "./utils/pokemonNames.js";
@@ -107,57 +110,6 @@ const normalizeSearchText = (value) =>
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]/g, "");
-
-// Type color mapping - using the primary (first) color from the gradient
-const getTypeColor = (typeName) => {
-  const typeColors = {
-    normal: "#b0aa79",
-    fire: "#d17f56",
-    water: "#5d8ed2",
-    electric: "#c09c38",
-    grass: "#6ea964",
-    ice: "#6baab4",
-    fighting: "#bb544c",
-    poison: "#955b9a",
-    ground: "#bd975f",
-    flying: "#8f84d1",
-    psychic: "#c0668f",
-    bug: "#8fa43a",
-    rock: "#aa9150",
-    ghost: "#7768a3",
-    dragon: "#7158cc",
-    dark: "#826a52",
-    steel: "#a6a8c2",
-    fairy: "#bd82a7",
-  };
-  return typeColors[typeName?.toLowerCase()] || "#b0aa79"; // Default to normal if type not found
-};
-
-const getStatLabel = (statName, isMobile) => {
-  const label = humanizeName(statName);
-  if (isMobile) {
-    const lowerLabel = label.toLowerCase();
-    if (lowerLabel === "special attack") return "Sp. Atk";
-    if (lowerLabel === "special defense") return "Sp. Def";
-    // Capitalize other stats for mobile
-    return label.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  }
-  // Return lowercase - CSS will capitalize it for desktop
-  return label;
-};
-
-const getStatColor = (baseStat) => {
-  // Normalize stat value from 0-180 range to 0-1 for interpolation
-  const normalized = Math.max(0, Math.min(1, baseStat / 180));
-  
-  // Interpolate from red (low) to green (high)
-  // Red: rgb(220, 50, 50), Green: rgb(50, 220, 50)
-  const red = Math.round(220 - (normalized * 170));
-  const green = Math.round(50 + (normalized * 170));
-  const blue = Math.round(50);
-  
-  return `rgb(${red}, ${green}, ${blue})`;
-};
 
 const deriveSpecialTags = (name) => {
   const lower = String(name || "").toLowerCase();
@@ -1221,7 +1173,7 @@ function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
   );
   
   const formName = currentForm?.displayName || formatDisplayName(pokemonName);
-  const displayTitle = isAlternateForm ? `Evolution Details (${formName})` : 'Evolution Requirement Details';
+  const displayTitle = isAlternateForm ? `How ${formName} evolves` : "Evolution method";
 
   const trigger = data.trigger?.name;
   const item = data.item?.name;
@@ -1368,16 +1320,14 @@ function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
         style={{ width: "min(560px, 90vw)" }}
       >
         <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close">
-          X
+          <Icon name="close" />
         </button>
         <div className="game-modal-header">
           <h2 className="game-modal-title">
             {displayTitle}
           </h2>
           <p className="game-modal-subtitle">
-            {isAlternateForm 
-              ? `Evolution conditions for ${formName}` 
-              : 'Complete conditions for this evolution method'}
+            Everything this evolution needs
           </p>
         </div>
         <div className="game-modal-body" style={{ gridTemplateColumns: "1fr" }}>
@@ -1436,269 +1386,6 @@ function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
   );
 }
 
-function PokedexEntriesModal({ versions, selectedVersion, onSelect, onClose, pokemonName }) {
-  const handleBackdropMouseDown = (event) => {
-    event.stopPropagation();
-    onClose();
-  };
-
-  const handleModalMouseDown = (event) => {
-    event.stopPropagation();
-  };
-
-  const getVersionLogo = (versionName) => {
-    const logoFile = VERSION_LOGO_FILES.get(versionName);
-    return logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
-  };
-
-  const sortedVersions = useMemo(() => {
-    return [...versions].sort((a, b) => {
-      const orderA = VERSION_ORDER_LOOKUP.has(a.name)
-        ? VERSION_ORDER_LOOKUP.get(a.name)
-        : Number.NEGATIVE_INFINITY;
-      const orderB = VERSION_ORDER_LOOKUP.has(b.name)
-        ? VERSION_ORDER_LOOKUP.get(b.name)
-        : Number.NEGATIVE_INFINITY;
-
-      if (orderA !== orderB) return orderB - orderA;
-      return a.displayName.localeCompare(b.displayName);
-    });
-  }, [versions]);
-
-  return (
-    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
-      <div
-        className="game-modal"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={handleModalMouseDown}
-        style={{ width: "min(560px, 90vw)" }}
-      >
-        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close">
-          X
-        </button>
-        <div className="game-modal-header">
-          <h2 className="game-modal-title">
-            Pokedex Entries for <span className="game-modal-title-name text-capitalize">{formatDisplayName(pokemonName)}</span>
-          </h2>
-          <p className="game-modal-subtitle">
-            Select a version to view its Pokedex entry
-          </p>
-        </div>
-        <div className="game-modal-body" style={{ gridTemplateColumns: "1fr" }}>
-          <div className="game-modal-column game-modal-column-left" style={{ overflowY: "auto" }}>
-            <ul className="game-modal-game-options">
-              {sortedVersions.map((version) => {
-                const logo = getVersionLogo(version.name);
-                const isSelected = version.name === selectedVersion;
-                return (
-                  <li key={version.name}>
-                    <button
-                      type="button"
-                      className={`game-modal-game-button${isSelected ? " is-active" : ""}`}
-                      onClick={() => onSelect(version.name)}
-                    >
-                      {logo && (
-                        <span className="game-modal-game-logos">
-                          <img src={logo} alt="" className="game-modal-game-logo" />
-                        </span>
-                      )}
-                      <div className="game-modal-game-info">
-                        <div className="game-modal-game-name text-capitalize">{version.displayName}</div>
-                        {version.text && (
-                          <div className="game-modal-game-summary" style={{ 
-                            fontSize: "0.8rem", 
-                            color: "#94a3b8",
-                            fontStyle: "italic",
-                            lineHeight: "1.3",
-                            marginTop: "4px"
-                          }}>
-                            {version.text}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetailsMap, pokemonTypes }) {
-  const handleBackdropMouseDown = (event) => {
-    event.stopPropagation();
-    onClose();
-  };
-
-  const handleModalMouseDown = (event) => {
-    event.stopPropagation();
-  };
-
-  // Extract Pokemon type names for STAB checking
-  const pokemonTypeNames = useMemo(() => {
-    if (!pokemonTypes || !Array.isArray(pokemonTypes)) return [];
-    return pokemonTypes
-      .map(t => t?.type?.name)
-      .filter(Boolean);
-  }, [pokemonTypes]);
-
-  const renderMoveItem = (move, category) => {
-    const details = moveDetailsMap.get(move.name);
-    const moveType = details?.type || 'normal';
-    const typeColor = getTypeColor(moveType);
-    const isStab = pokemonTypeNames.includes(moveType);
-    
-    return (
-      <li key={move.name} className={`learnset-item-single ${isStab ? 'is-stab' : ''}`}>
-        <div className="learnset-move-row">
-          <div className={`learnset-move-pill type-${moveType}`} style={{
-            background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
-            borderColor: `${typeColor}cc`,
-          }}>
-            <div className="learnset-move-name-wrapper">
-              {details?.type && (
-                <img 
-                  src={getTypeIconUrl(details.type)} 
-                  alt={details.type} 
-                  className="learnset-move-type-icon"
-                />
-              )}
-              <span className="learnset-move-name">{move.label}</span>
-            </div>
-            {category === 'levelUp' && move.levelLabel && (
-              <span className="learnset-move-level-badge">{move.levelLabel}</span>
-            )}
-            {category === 'tm' && <span className="learnset-move-badge">TM</span>}
-            {category === 'hm' && <span className="learnset-move-badge">HM</span>}
-          </div>
-          <div className="learnset-move-details">
-            <span className="learnset-move-detail">
-              <span className="learnset-detail-label">Power</span>
-              <span className="learnset-detail-value">
-                {details?.power != null ? details.power : '—'}
-              </span>
-            </span>
-            <span className="learnset-move-detail">
-              <span className="learnset-detail-label">Acc</span>
-              <span className="learnset-detail-value">
-                {details?.accuracy != null ? `${details.accuracy}%` : '—'}
-              </span>
-            </span>
-            <span className="learnset-move-detail">
-              <span className="learnset-detail-label">PP</span>
-              <span className="learnset-detail-value">
-                {details?.pp != null ? details.pp : '—'}
-              </span>
-            </span>
-            <span className="learnset-move-detail">
-              <span className="learnset-detail-label">Class</span>
-              <span className={`learnset-detail-value learnset-damage-class learnset-damage-class-${details?.damage_class || ''}`}>
-                {details?.damage_class ? (
-                  <>
-                    <img 
-                      src={`/move-categories/${details.damage_class}.png`} 
-                      alt={details.damage_class}
-                      className="learnset-damage-class-icon"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                    {details.damage_class}
-                  </>
-                ) : '—'}
-              </span>
-            </span>
-            {isStab && (
-              <span className="learnset-move-stab-indicator" title="STAB (Same Type Attack Bonus)" aria-label="STAB move">
-                ⭐
-              </span>
-            )}
-          </div>
-        </div>
-      </li>
-    );
-  };
-
-  return (
-    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
-      <div
-        className="game-modal"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={handleModalMouseDown}
-        style={{ width: "min(800px, 92vw)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
-      >
-        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close learned moves">
-          X
-        </button>
-        <div className="game-modal-header">
-          <div className="game-modal-header-left">
-            <h2 className="game-modal-title">
-              Learned Moves for <span className="game-modal-title-name text-capitalize">{formatDisplayName(pokemonName)}</span>
-            </h2>
-            {learnsetMeta.versionGroupLabel ? (
-              <p className="game-modal-subtitle">
-                {learnsetMeta.hasMixedSources ? "Latest data: " : "Data source: "}
-                {learnsetMeta.versionGroupLabel}
-              </p>
-            ) : null}
-          </div>
-          <div className="learnset-stab-info">
-            <div className="learnset-stab-icon">⭐</div>
-            <div className="learnset-stab-text">
-              <strong>STAB (Same Type Attack Bonus):</strong> Moves that match this Pokémon's type deal 1.5× damage. Highlighted moves are STAB moves.
-            </div>
-          </div>
-        </div>
-        <div className="game-modal-body" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <div className="game-modal-column game-modal-column-left" style={{ flex: 1, overflowY: "auto", paddingRight: "8px" }}>
-            <div className="learnset-modal-content">
-              {learnset.levelUp.length > 0 && (
-                <div className="learnset-section">
-                  <div className="learnset-section-title">
-                    Level Up Moves ({learnsetMeta.levelCount})
-                  </div>
-                  <ul className="learnset-list-single">
-                    {learnset.levelUp.map((move) => renderMoveItem(move, 'levelUp'))}
-                  </ul>
-                </div>
-              )}
-              {learnset.tm && learnset.tm.length > 0 && (
-                <div className="learnset-section">
-                  <div className="learnset-section-title">
-                    TM Moves ({learnsetMeta.tmCount})
-                  </div>
-                  <ul className="learnset-list-single">
-                    {learnset.tm.map((move) => renderMoveItem(move, 'tm'))}
-                  </ul>
-                </div>
-              )}
-              {learnset.hm && learnset.hm.length > 0 && (
-                <div className="learnset-section">
-                  <div className="learnset-section-title">
-                    HM Moves ({learnsetMeta.hmCount})
-                  </div>
-                  <ul className="learnset-list-single">
-                    {learnset.hm.map((move) => renderMoveItem(move, 'hm'))}
-                  </ul>
-                </div>
-              )}
-              {learnsetMeta.hasMixedSources && (
-                <div className="learnset-footnote">Includes moves from multiple game versions.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const [pokemon, setPokemon] = useState([]);
   const [pokemonLoadError, setPokemonLoadError] = useState(null);
@@ -1710,12 +1397,15 @@ function App() {
       return "";
     }
   });
-  const [showFilters, setShowFilters] = useState(true);
   const [selected, setSelected] = useState(null);
   const [selectedTypes, setSelectedTypes] = useState(() => new Set());
   const [selectedTags, setSelectedTags] = useState(() => new Set());
-  const [selectedDex, setSelectedDex] = useState("national");
-  const [selectedGame, setSelectedGame] = useState(null);
+  // The chosen game is remembered: players come back mid-playthrough
+  const [selectedGame, setSelectedGame] = useState(readGamePreference);
+  const [selectedDex, setSelectedDex] = useState(() => {
+    const game = readGamePreference();
+    return (game && GAME_LOOKUP.get(game)?.dexKey) || "national";
+  });
   const [shiny, setShiny] = useState(() => {
     try {
       return localStorage.getItem("pref:shiny") === "1";
@@ -1733,7 +1423,6 @@ function App() {
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
   const [gameIndexes, setGameIndexes] = useState(() => new Map());
   const specialTagCacheRef = useRef(new Map());
-  const gameFiltersRef = useRef(null);
   const pokedexCacheRef = useRef(new Map());
   const pokedexPromiseRef = useRef(new Map());
   const lastSelectedIdRef = useRef(null);
@@ -1741,16 +1430,6 @@ function App() {
   const listScrollRef = useRef(null);
   const pendingCenterIdRef = useRef(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth <= 768;
-    }
-    return false;
-  });
-  
-  // Pagination for mobile
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 51; // Number of items per page on mobile (51 to account for extra space)
   const [bootSelection, setBootSelection] = useState(() => {
     try {
       const current = new URL(window.location.href);
@@ -1793,15 +1472,6 @@ function App() {
     updateVisibility();
     window.addEventListener("scroll", updateVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateVisibility);
-  }, []);
-
-  // Handle mobile resize
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Also watch the list panel's own scroll (it can scroll independently of window)
@@ -2418,7 +2088,7 @@ function App() {
         clearTimeout(lastSelectedFlashTimerRef.current);
         lastSelectedFlashTimerRef.current = null;
       }
-      document.querySelectorAll(".card.is-previous").forEach((el) => el.classList.remove("is-previous"));
+      document.querySelectorAll(".mon.is-previous").forEach((el) => el.classList.remove("is-previous"));
     } catch {}
     // Remember which card was selected so we can restore/flash it after closing
     try { lastSelectedIdRef.current = String(id); } catch {}
@@ -2461,7 +2131,7 @@ function App() {
     if (!targetId) return;
     let attempts = 0;
     const tryRestore = () => {
-      const node = document.querySelector(`.card[data-id="${CSS.escape(targetId)}"]`);
+      const node = document.querySelector(`.mon[data-id="${CSS.escape(targetId)}"]`);
       if (node) {
         try {
           node.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
@@ -2484,31 +2154,29 @@ function App() {
     requestAnimationFrame(tryRestore);
   };
 
-  // Center the selected card in the list panel immediately (no animation)
+  // Keep the open entry's row in view in the list beside it: centred when it's off screen
+  // (direct links, ◀ ▶ stepping), left alone when it's already visible (a click in the list).
+  // The list can render a few frames after the entry (the Pokédex data may still be loading).
   useLayoutEffect(() => {
-    if (!selected) return;
-    const id = pendingCenterIdRef.current ? String(pendingCenterIdRef.current) : null;
-    if (!id) return;
-    const container = listScrollRef.current;
-    if (!container) return;
-    const node = container.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
-    if (!node) return;
-    try {
-      // Compute offset of node relative to the scroll container
-      const getOffsetTopRelative = (parent, el) => {
-        let top = 0;
-        let current = el;
-        while (current && current !== parent) {
-          top += current.offsetTop;
-          current = current.offsetParent;
-        }
-        return top;
-      };
-      const nodeTop = getOffsetTopRelative(container, node);
-      const target = Math.max(0, nodeTop - Math.max(0, (container.clientHeight - node.clientHeight) / 2));
-      container.scrollTop = target;
-    } catch {}
+    if (!selected) return undefined;
+    const id = String(pendingCenterIdRef.current || selected.id);
     pendingCenterIdRef.current = null;
+    let frame = 0;
+    let attempts = 0;
+    const place = () => {
+      const container = listScrollRef.current;
+      const node = container?.querySelector(`.mon[data-id="${CSS.escape(id)}"]`);
+      if (!container || !node) {
+        if (attempts++ < 60) frame = requestAnimationFrame(place);
+        return;
+      }
+      const box = container.getBoundingClientRect();
+      const row = node.getBoundingClientRect();
+      if (row.top >= box.top && row.bottom <= box.bottom) return;
+      container.scrollTop += row.top - box.top - Math.max(0, (box.height - row.height) / 2);
+    };
+    place();
+    return () => cancelAnimationFrame(frame);
   }, [selected]);
 
   // When region changes, migrate current selection to region-preferred form if available
@@ -2832,14 +2500,9 @@ function App() {
     activeGenerationCap,
   ]);
 
-  const emptyStateMessage =
-    pokemonLoadError || (filteredLists.loading ? "Loading Pokédex…" : "No Pokémon found.");
-  const regularFiltered = filteredLists.primary ?? [];
-  const megaGigantamaxFiltered = filteredLists.megaGigantamax ?? [];
-  const regularSectionGroups = filteredLists.primarySectionGroups ?? null;
-  const sectionGroups = Array.isArray(regularSectionGroups) ? regularSectionGroups : null;
-  const hasPrimaryContent =
-    (sectionGroups && sectionGroups.some((group) => (group.entries?.length ?? 0) > 0)) || regularFiltered.length > 0;
+  const regularFiltered = filteredLists.primary;
+  const megaGigantamaxFiltered = filteredLists.megaGigantamax;
+  const sectionGroups = Array.isArray(filteredLists.primarySectionGroups) ? filteredLists.primarySectionGroups : null;
 
   const formatDexNumber = useCallback(
     (value) => {
@@ -2903,83 +2566,50 @@ function App() {
 
   // Type indexes come from the static snapshot (see typeIndex above); no per-type API calls.
 
-  const selectedDexConfig = DEX_LOOKUP.get(selectedDex);
-  const availableGames = selectedDex === "national" ? NATIONAL_GAME_OPTIONS : selectedDexConfig?.games || [];
-  const nationalOrderIndex = useMemo(() => new Map(NATIONAL_GAME_OPTIONS.map((g, idx) => [g.key, idx])), []);
-  const sortedAvailableGames = useMemo(() => {
-    const list = availableGames || [];
-    return list.slice().sort((a, b) => {
-      const ia = nationalOrderIndex.get(a?.key);
-      const ib = nationalOrderIndex.get(b?.key);
-      if (ia == null && ib == null) return 0;
-      if (ia == null) return 1;
-      if (ib == null) return -1;
-      return ib - ia; // newest first
+  const dexName =
+    selectedDex === "national" ? "National Pokédex" : `${DEX_LOOKUP.get(selectedDex)?.label ?? ""} Pokédex`;
+
+  // Special categories that exist in the chosen game (no Megas in Scarlet/Violet, no Paradox before Gen IX)
+  const availableTags = useMemo(() => {
+    const features = selectedGame ? GAME_FEATURES.get(selectedGame) : null;
+    return SPECIAL_FILTERS.filter((tag) => {
+      if (tag === "Mega") return !features || features.mega;
+      if (tag === "Gigantamax") return !features || features.gmax;
+      if (tag === "Ultra Beast") return activeGenerationCap == null || activeGenerationCap >= 7;
+      if (tag === "Paradox") return activeGenerationCap == null || activeGenerationCap >= 9;
+      return true;
     });
-  }, [availableGames, nationalOrderIndex]);
-  const showGameFilters = availableGames.length > 0;
+  }, [selectedGame, activeGenerationCap]);
 
-  const handleGameClick = useCallback((gameKey) => {
-    if (selectedGame === gameKey) {
-      if (selectedDex === "national") {
-        setSelectedGame(null);
-        clearSelection();
-      }
-      return;
+  // Drop category filters the newly chosen game doesn't have
+  useEffect(() => {
+    setSelectedTags((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter((tag) => availableTags.includes(tag)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [availableTags]);
+
+  // The cartridge: one game drives numbering, forms, types, sprites and locations everywhere
+  const pickGame = useCallback((gameKey) => {
+    const cfg = gameKey ? GAME_LOOKUP.get(gameKey) : null;
+    if (cfg) {
+      setSelectedDex(cfg.dexKey);
+      setSelectedGame(cfg.key);
+    } else {
+      setSelectedDex("national");
+      setSelectedGame(null);
     }
-    setSelectedGame(gameKey);
-    clearSelection();
-  }, [selectedGame, selectedDex, setSelectedGame, clearSelection]);
-
-  const resolveLogoUrls = useCallback((game) => {
-    const logos = (game.logos || []);
-    return logos
-      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-      .filter(Boolean);
+    writeGamePreference(cfg ? cfg.key : null);
   }, []);
 
-  useEffect(() => {
-    const el = gameFiltersRef.current;
-    if (!el) return;
-    const onWheel = (event) => {
-      if (event.deltaY === 0) return;
-      event.preventDefault();
-      el.scrollBy({ left: event.deltaY * 2, behavior: "smooth" });
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [selectedDex, availableGames.length]);
-
-  const shouldShowActiveFilters =
-    !showFilters && (selectedTypes.size + selectedTags.size > 0 || selectedDex || selectedGame);
-
-  const renderActiveFilterTokens = () => (
-    <>
-      {selectedDex && (
-        <span className="filter-token" key={`dex-${selectedDex}`}>
-          {DEX_FILTERS.find((d) => d.key === selectedDex)?.label || selectedDex}
-        </span>
-      )}
-      {selectedGame && (
-        <span className="filter-token" key={`game-${selectedGame}`}>
-          {(selectedDexConfig?.games || []).find((g) => g.key === selectedGame)?.label || selectedGame}
-        </span>
-      )}
-      {Array.from(selectedTypes).map((t) => (
-        <span key={`t-${t}`} className="filter-token">
-          {t}
-        </span>
-      ))}
-      {Array.from(selectedTags).map((tag) => (
-        <span key={`tag-${tag}`} className="filter-token">
-          {tag}
-        </span>
-      ))}
-    </>
-  );
+  const clearFilters = useCallback(() => {
+    setSelectedTypes(new Set());
+    setSelectedTags(new Set());
+  }, []);
 
   const renderCard = useCallback(
-    (p, index, { eagerCount, showSelection, withGame = true }) => {
+    (p, index, eagerCount) => {
       const pref = getRegionPreferredEntry(p);
       const parts = pref.url.split("/").filter(Boolean);
       const id = parts[parts.length - 1];
@@ -2993,365 +2623,254 @@ function App() {
           url={pref.url}
           types={getEntryTypes(pref.name)}
           onSelect={selectPokemon}
-          selected={showSelection && selected ? String(selected.id) === String(id) : undefined}
+          selected={selected ? String(selected.id) === String(id) : false}
           dexNumber={dexDisplay}
           shiny={shiny}
-          selectedGame={withGame ? selectedGame : null}
-          selectedDex={withGame ? selectedDex : null}
+          selectedGame={selectedGame}
           detailsCache={detailsCache}
           eagerLoad={index < eagerCount}
         />
       );
     },
-    [getRegionPreferredEntry, getDexNumberForEntry, getEntryTypes, selectPokemon, selected, shiny, selectedGame, selectedDex]
+    [getRegionPreferredEntry, getDexNumberForEntry, getEntryTypes, selectPokemon, selected, shiny, selectedGame]
   );
 
-  const paginate = useCallback(
-    (entries) => {
-      if (!isMobile) return { entriesToRender: entries, startIndex: 0 };
-      const start = (currentPage - 1) * itemsPerPage;
-      return { entriesToRender: entries.slice(start, start + itemsPerPage), startIndex: start };
-    },
-    [isMobile, currentPage, itemsPerPage]
-  );
-
-  const renderListEntries = useCallback(
-    (entries) => {
-      if (!entries || entries.length === 0) return null;
-      const { entriesToRender, startIndex } = paginate(entries);
-      return (
-        <div className="list">
-          {entriesToRender.map((p, index) => renderCard(p, startIndex + index, { eagerCount: 6, showSelection: true }))}
-        </div>
-      );
-    },
-    [paginate, renderCard]
-  );
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    if (isMobile) {
-      setCurrentPage(1);
-    }
-  }, [isMobile, query, selectedTypes, selectedTags, selectedDex, selectedGame]);
-
-  const renderGridEntries = useCallback(
-    (entries, className = "grid") => {
-      if (!entries || entries.length === 0) return null;
-      const { entriesToRender, startIndex } = paginate(entries);
-      return (
-        <section className={className}>
-          {entriesToRender.map((p, index) => renderCard(p, startIndex + index, { eagerCount: 8, showSelection: false }))}
-        </section>
-      );
-    },
-    [paginate, renderCard]
-  );
-
-  // Calculate total entries for pagination and get flattened entries for mobile
-  // Include mega/gigantamax forms in the count
-  const getTotalEntries = useCallback(() => {
-    let count = 0;
+  // The Pokédex as headed sections: the game's own dex lists (Paldea, Kitakami, Blueberry…),
+  // then the Mega / Gigantamax forms the game has.
+  const dexGroups = useMemo(() => {
+    const groups = [];
+    let other = null;
     if (sectionGroups && sectionGroups.length > 0) {
-      count = sectionGroups.reduce((sum, group) => sum + (group.entries?.length || 0), 0);
-    } else {
-      count = regularFiltered.length;
-    }
-    // On mobile, include mega/gigantamax forms in pagination
-    if (isMobile) {
-      count += megaGigantamaxFiltered.length;
-    }
-    return count;
-  }, [sectionGroups, regularFiltered.length, isMobile, megaGigantamaxFiltered.length]);
-
-  // Flatten all entries for mobile pagination, including mega/gigantamax at the end
-  const getAllEntries = useCallback(() => {
-    let entries = [];
-    if (sectionGroups && sectionGroups.length > 0) {
-      entries = sectionGroups.flatMap(group => group.entries || []);
-    } else {
-      entries = regularFiltered;
-    }
-    // On mobile, append mega/gigantamax forms at the end
-    if (isMobile && megaGigantamaxFiltered.length > 0) {
-      entries = [...entries, ...megaGigantamaxFiltered];
-    }
-    return entries;
-  }, [sectionGroups, regularFiltered, isMobile, megaGigantamaxFiltered]);
-
-  const totalEntries = getTotalEntries();
-  const totalPages = isMobile ? Math.ceil(totalEntries / itemsPerPage) : 1;
-  const allEntries = getAllEntries();
-  
-  // On mobile, always use allEntries (includes mega/gigantamax). On desktop, use sections or regularFiltered.
-  const listPrimaryContent = isMobile
-    ? renderListEntries(allEntries)
-    : sectionGroups && sectionGroups.length > 0
-    ? sectionGroups
-        .map((group, index) => {
-          const content = renderListEntries(group.entries);
-          if (!content) return null;
-          return (
-            <div key={group.key || `section-${index}`} className="list-section">
-              {index > 0 && <div className="list-divider" role="separator" />}
-              {group.label && <h3 className="list-subheading">{group.label}</h3>}
-              {content}
-            </div>
-          );
-        })
-        .filter(Boolean)
-    : renderListEntries(regularFiltered);
-
-  const gridPrimaryContent = isMobile
-    ? renderGridEntries(allEntries)
-    : sectionGroups && sectionGroups.length > 0
-    ? sectionGroups
-        .map((group, index) => {
-          const content = renderGridEntries(group.entries);
-          if (!content) return null;
-          return (
-            <React.Fragment key={group.key || `section-${index}`}>
-              {group.label && <h2 className="grid-subheading">{group.label}</h2>}
-              {content}
-            </React.Fragment>
-          );
-        })
-        .filter(Boolean)
-    : renderGridEntries(regularFiltered);
-
-  // Pagination component
-  const renderPagination = useCallback(() => {
-    if (!isMobile || totalPages <= 1) return null;
-
-    const handlePrev = () => {
-      if (currentPage > 1) {
-        setCurrentPage(currentPage - 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    };
-
-    const handleNext = () => {
-      if (currentPage < totalPages) {
-        setCurrentPage(currentPage + 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    };
-
-    const handlePageClick = (page) => {
-      setCurrentPage(page);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    // Calculate which page numbers to show
-    const getPageNumbers = () => {
-      const pages = [];
-      const maxVisible = 5;
-      
-      if (totalPages <= maxVisible) {
-        for (let i = 1; i <= totalPages; i++) {
-          pages.push(i);
+      sectionGroups.forEach((group, index) => {
+        if (!group.entries?.length) return;
+        if (group.key === "ungrouped") {
+          other = { key: "other", label: "Other forms", entries: group.entries };
+          return;
         }
-      } else {
-        if (currentPage <= 3) {
-          for (let i = 1; i <= 4; i++) pages.push(i);
-          pages.push('ellipsis');
-          pages.push(totalPages);
-        } else if (currentPage >= totalPages - 2) {
-          pages.push(1);
-          pages.push('ellipsis');
-          for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
-        } else {
-          pages.push(1);
-          pages.push('ellipsis');
-          for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-          pages.push('ellipsis');
-          pages.push(totalPages);
-        }
-      }
-      return pages;
+        groups.push({ key: group.key || `section-${index}`, label: group.label || dexName, entries: group.entries });
+      });
+    } else if (regularFiltered.length > 0) {
+      groups.push({ key: "main", label: dexName, entries: regularFiltered });
+    }
+    if (other) groups.push(other);
+    if (megaGigantamaxFiltered.length > 0) {
+      const hasMega = megaGigantamaxFiltered.some((entry) => /(^|-)mega(-|$)/.test(entry.name));
+      const hasGmax = megaGigantamaxFiltered.some((entry) => /-gmax/.test(entry.name));
+      const label = hasMega && hasGmax ? "Mega & Gigantamax forms" : hasGmax ? "Gigantamax forms" : "Mega Evolutions";
+      groups.push({ key: "forms", label, entries: megaGigantamaxFiltered });
+    }
+    return groups;
+  }, [sectionGroups, regularFiltered, megaGigantamaxFiltered, dexName]);
+
+  // ◀ ▶ neighbours of the open entry, in the order this Pokédex lists them
+  const neighbours = useMemo(() => {
+    if (!selected) return { prev: null, next: null };
+    const flat = dexGroups.flatMap((group) => group.entries).map((entry) => getRegionPreferredEntry(entry));
+    const toStep = (entry) => {
+      if (!entry?.url) return null;
+      const parts = entry.url.split("/").filter(Boolean);
+      const id = parts[parts.length - 1];
+      return { id, name: entry.name, url: entry.url, dexNumber: getDexNumberForEntry(entry.name, Number(id)) };
     };
+    let index = flat.findIndex((entry) => entry.name === selected.name);
+    if (index < 0) {
+      index = flat.findIndex((entry) => {
+        const parts = String(entry.url || "").split("/").filter(Boolean);
+        return parts[parts.length - 1] === String(selected.id);
+      });
+    }
+    if (index < 0) return { prev: null, next: null };
+    return { prev: toStep(flat[index - 1]), next: toStep(flat[index + 1]) };
+  }, [selected, dexGroups, getRegionPreferredEntry, getDexNumberForEntry]);
 
-    const pageNumbers = getPageNumbers();
-    const startItem = (currentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(currentPage * itemsPerPage, totalEntries);
+  const stepTo = useCallback(
+    (entry) => {
+      if (!entry) return;
+      pendingCenterIdRef.current = String(entry.id);
+      selectPokemon(entry.id, entry.name, entry.url, { preferExact: true });
+    },
+    [selectPokemon]
+  );
 
-    return (
-      <div className="pagination-container">
-        <div className="pagination-info">
-          Showing {startItem}-{endItem} of {totalEntries}
-        </div>
-        <div className="pagination-controls">
-          <button
-            type="button"
-            className="pagination-btn"
-            onClick={handlePrev}
-            disabled={currentPage === 1}
-            aria-label="Previous page"
-          >
-            Previous
+  const resultCount = dexGroups.reduce((sum, group) => sum + group.entries.length, 0);
+  // Alternate, regional, Mega and Gigantamax forms have their own Pokémon ids (10000+)
+  const formCount = dexGroups.reduce(
+    (sum, group) =>
+      sum +
+      group.entries.filter((entry) => {
+        const parts = String(entry?.url || "").split("/").filter(Boolean);
+        return Number(parts[parts.length - 1]) >= 10000;
+      }).length,
+    0
+  );
+  const showSectionHeads = dexGroups.length > 1;
+  const stripSections = showSectionHeads
+    ? dexGroups.map((group) => ({ key: group.key, label: group.label.replace(/ Pokédex$/, ""), count: group.entries.length }))
+    : null;
+  const activeFilterCount = selectedTypes.size + selectedTags.size;
+  const isLoadingDex = !pokemonLoadError && filteredLists.loading;
+
+  const renderDex = (variant) => {
+    if (pokemonLoadError) {
+      return (
+        <div className="empty" role="alert">
+          <p className="empty__title">The Pokédex didn't load</p>
+          <p>{pokemonLoadError}</p>
+          <button type="button" className="btn" onClick={() => window.location.reload()}>
+            Try again
           </button>
-          <div className="pagination-pages">
-            {pageNumbers.map((page, index) => {
-              if (page === 'ellipsis') {
-                return <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>;
-              }
-              return (
-                <button
-                  key={page}
-                  type="button"
-                  className={`pagination-page ${currentPage === page ? 'active' : ''}`}
-                  onClick={() => handlePageClick(page)}
-                  aria-label={`Page ${page}`}
-                  aria-current={currentPage === page ? 'page' : undefined}
-                >
-                  {page}
-                </button>
-              );
-            })}
+        </div>
+      );
+    }
+    if (isLoadingDex) {
+      return (
+        <>
+          <p className="sr-only" role="status">
+            Loading the {dexName}…
+          </p>
+          <ol className={variant === "rows" ? "dex-rows" : "dex-grid"} aria-hidden="true">
+            {Array.from({ length: variant === "rows" ? 10 : 18 }, (_, index) => (
+              <li key={index} className="mon-cell">
+                <span className="mon mon--ghost">
+                  <span className="mon__no skeleton" />
+                  <span className="mon__sprite skeleton" />
+                  <span className="mon__name skeleton" />
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
+      );
+    }
+    if (resultCount === 0) {
+      return (
+        <div className="empty" role="status">
+          <p className="empty__title">No entries match</p>
+          <p>
+            {query.trim()
+              ? `Nothing called “${query.trim()}” in the ${dexName}${activeFilterCount ? " with these filters" : ""}.`
+              : `Nothing in the ${dexName} has that combination.`}
+          </p>
+          <div className="empty__actions">
+            {activeFilterCount ? (
+              <button type="button" className="btn" onClick={clearFilters}>
+                Clear filters
+              </button>
+            ) : null}
+            {selectedGame && query.trim() ? (
+              <button type="button" className="btn" onClick={() => pickGame(null)}>
+                Search the National Pokédex
+              </button>
+            ) : null}
           </div>
-          <button
-            type="button"
-            className="pagination-btn"
-            onClick={handleNext}
-            disabled={currentPage === totalPages}
-            aria-label="Next page"
-          >
-            Next
-          </button>
         </div>
-      </div>
-    );
-  }, [isMobile, currentPage, totalPages, totalEntries, itemsPerPage]);
+      );
+    }
+    return dexGroups.map((group, groupIndex) => (
+      <section
+        key={group.key}
+        id={`dex-${group.key}`}
+        className="dex-section"
+        aria-labelledby={showSectionHeads ? `dex-${group.key}-head` : undefined}
+        aria-label={showSectionHeads ? undefined : group.label}
+      >
+        {showSectionHeads ? (
+          <h2 className="dex-section__head" id={`dex-${group.key}-head`}>
+            <span className="dex-section__title">{group.label}</span>
+          </h2>
+        ) : null}
+        <ol className={variant === "rows" ? "dex-rows" : "dex-grid"}>
+          {group.entries.map((p, index) => renderCard(p, groupIndex === 0 ? index : Infinity, variant === "rows" ? 12 : 18))}
+        </ol>
+      </section>
+    ));
+  };
 
   return (
-    <div className="app-shell">
-      {showScrollTop ? (
-        <button
-          type="button"
-          className="scroll-top-fab"
-          aria-label="Scroll to top"
-          onClick={handleScrollToTop}
-          title="Scroll to top"
-        >
-          ↑ Top
-        </button>
-      ) : null}
-      <HeaderSection
-        title="Pokedex"
-        subtitle="Search and explore every Pokemon"
-        showFilters={showFilters}
-        setShowFilters={setShowFilters}
+    <main className={`dex${selected ? " dex--open" : ""}`}>
+      <DexStrip
+        selectedGame={selectedGame}
+        onPickGame={pickGame}
         query={query}
         setQuery={setQuery}
-        onReset={() => {
-          setSelectedTypes(new Set());
-          setSelectedTags(new Set());
-          setSelectedDex("national");
-          setSelectedGame(null);
-          setQuery("");
-        }}
-        FilterTabsComponent={FilterTabs}
-        filterTabsProps={{
-          availableTypes,
-          selectedTypes,
-          setSelectedTypes,
-          selectedTags,
-          setSelectedTags,
-          selectedDex,
-          setSelectedGame,
-          setSelectedDex,
-          clearSelection,
-          setShowFilters,
-        }}
+        availableTypes={availableTypes}
+        selectedTypes={selectedTypes}
+        setSelectedTypes={setSelectedTypes}
+        availableTags={availableTags}
+        selectedTags={selectedTags}
+        setSelectedTags={setSelectedTags}
+        generationCap={activeGenerationCap}
+        resultCount={resultCount}
+        formCount={formCount}
+        loading={isLoadingDex}
+        sections={stripSections}
       />
-
-      <main className="container">
-        {showFilters && showGameFilters && (
-          <GameFilters
-            showFilters={showFilters}
-            showGameFilters={showGameFilters}
-            selectedDex={selectedDex}
-            gameFiltersRef={gameFiltersRef}
-            availableGames={sortedAvailableGames}
-            selectedGame={selectedGame}
-            onGameClick={handleGameClick}
-            resolveLogoUrls={resolveLogoUrls}
-          />
-        )}
-        {shouldShowActiveFilters && (
-          <h2 className="active-filters-header">{renderActiveFilterTokens()}</h2>
-        )}
-        {selected ? (
-          <section className="content split">
-            <div className="list-panel">
-              <div className="list-scroll" ref={listScrollRef}>
-                {isMobile && hasPrimaryContent && renderPagination()}
-                {listPrimaryContent}
-                {!isMobile && megaGigantamaxFiltered.length > 0 && (
-                  <div className="list-special">
-                    {hasPrimaryContent && <div className="list-divider" role="separator" />}
-                    <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
-                    <div className="list">
-                      {megaGigantamaxFiltered.map((p, index) => renderCard(p, index, { eagerCount: 6, showSelection: true }))}
-                    </div>
-                  </div>
-                )}
-                {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
-                  <div className="list-empty" role="status">{emptyStateMessage}</div>
-                )}
-                {isMobile && hasPrimaryContent && renderPagination()}
-              </div>
-            </div>
-            <ErrorBoundary fallback={<button className="toggle-btn" onClick={clearSelection}>Close</button>}>
-            <DetailPanel
-              selected={selected}
-              onClose={clearSelection}
-              onSelectPokemon={selectPokemon}
-              onActivateType={(typename) => {
-                // Activate top-level type filter and close detail
-                const t = String(typename || "").toLowerCase();
-                if (!t) return;
-                setSelectedTypes(new Set([t]));
-                clearSelection();
-              }}
-              dexNumber={selectedDexNumber}
-              selectedDex={selectedDex}
-              selectedGame={selectedGame}
-              pokemonIdLookup={pokemonIdLookup}
-              shiny={shiny}
-              setShiny={setShiny}
-              animated={animated}
-              setAnimated={setAnimated}
-              isMobile={isMobile}
-            />
+      {selected ? (
+        <div className="dex__split">
+          <nav className="dex__list" ref={listScrollRef} aria-label={dexName}>
+            {renderDex("rows")}
+          </nav>
+          <div className="dex__entry">
+            <ErrorBoundary
+              fallback={
+                <div className="empty" role="alert">
+                  <p className="empty__title">This entry hit a snag</p>
+                  <button type="button" className="btn" onClick={clearSelection}>
+                    Back to the list
+                  </button>
+                </div>
+              }
+            >
+              <DetailPanel
+                selected={selected}
+                onClose={clearSelection}
+                onSelectPokemon={selectPokemon}
+                onActivateType={(typename) => {
+                  // Filter the Pokédex by this type and return to it
+                  const t = String(typename || "").toLowerCase();
+                  if (!t) return;
+                  setSelectedTypes(new Set([t]));
+                  clearSelection();
+                }}
+                dexNumber={selectedDexNumber}
+                selectedDex={selectedDex}
+                selectedGame={selectedGame}
+                pokemonIdLookup={pokemonIdLookup}
+                shiny={shiny}
+                setShiny={setShiny}
+                animated={animated}
+                setAnimated={setAnimated}
+                prevEntry={neighbours.prev}
+                nextEntry={neighbours.next}
+                onStep={stepTo}
+                dexName={dexName}
+              />
             </ErrorBoundary>
-          </section>
-        ) : (
-          <>
-            {isMobile && hasPrimaryContent && renderPagination()}
-            {gridPrimaryContent}
-            {!isMobile && megaGigantamaxFiltered.length > 0 && (
-              <>
-                <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
-                <section className="grid grid-special">
-                  {megaGigantamaxFiltered.map((p, index) => renderCard(p, index, { eagerCount: 8, showSelection: false }))}
-                </section>
-              </>
-            )}
-            {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
-              <section className="grid">
-                <div className="dex-loading" role="status">{emptyStateMessage}</div>
-              </section>
-            )}
-            {isMobile && hasPrimaryContent && renderPagination()}
-          </>
-        )}
-      </main>
-    </div>
+          </div>
+        </div>
+      ) : (
+        <div className="dex__body">{renderDex("grid")}</div>
+      )}
+      {showScrollTop && !selected ? (
+        <button type="button" className="btn btn--sm to-top" onClick={handleScrollToTop}>
+          <Icon name="up" />
+          Top
+        </button>
+      ) : null}
+    </main>
   );
 }
 
 const DEBUG_DETAIL_PANEL = import.meta.env.DEV && false;
+
+// Pages of an entry, like the device's INFO / AREA screens; the last one used is remembered
+const ENTRY_TABS = [
+  { key: "stats", label: "Stats" },
+  { key: "matchups", label: "Matchups" },
+  { key: "evolution", label: "Evolution" },
+  { key: "area", label: "Area" },
+  { key: "moves", label: "Moves" },
+];
 // Representative main-series version group per Smogon generation (for move stats)
 const SMOGON_GENERATION_VERSION_GROUP = new Map([
   ["gen1", "yellow"],
@@ -3463,7 +2982,10 @@ function DetailPanel({
   setShiny,
   animated = false,
   setAnimated,
-  isMobile = false,
+  prevEntry = null,
+  nextEntry = null,
+  onStep,
+  dexName = "",
 }) {
   const pokemonIdMap = useMemo(() => {
     if (pokemonIdLookup instanceof Map) return pokemonIdLookup;
@@ -3504,11 +3026,8 @@ function DetailPanel({
   const [gameAvailability, setGameAvailability] = useState([]);
   const [gameAvailabilityLoading, setGameAvailabilityLoading] = useState(false);
   const [gameAvailabilityError, setGameAvailabilityError] = useState(null);
-  const [activeGame, setActiveGame] = useState(null);
   const [selectedFlavorVersion, setSelectedFlavorVersion] = useState(null);
-  const [isFlavorModalOpen, setIsFlavorModalOpen] = useState(false);
   const [isEvolutionDetailModalOpen, setIsEvolutionDetailModalOpen] = useState(false);
-  const [isLearnsetModalOpen, setIsLearnsetModalOpen] = useState(false);
   const [evolutionDetailData, setEvolutionDetailData] = useState(null);
   const [currentPokemonForm, setCurrentPokemonForm] = useState(null);
   const [localFlavorEntries, setLocalFlavorEntries] = useState([]);
@@ -3563,55 +3082,12 @@ function DetailPanel({
         return false;
       });
 
-      if (match) return match;
+      // The chosen game or nothing: don't present another game's locations as this one's
+      return match || null;
     }
 
     return gameAvailability[gameAvailability.length - 1];
   }, [gameAvailability, selectedGame]);
-  const latestCatchLogos = useMemo(() => {
-    if (!latestCatchGame) return [];
-    return (latestCatchGame.logos || [])
-      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-      .filter(Boolean);
-  }, [latestCatchGame]);
-  const latestCatchLocationPreview = useMemo(() => {
-    if (!latestCatchGame) return "";
-    const areas = Array.isArray(latestCatchGame.areas) ? latestCatchGame.areas : [];
-    const entries = [];
-
-    areas.forEach((area) => {
-      const methods = Array.isArray(area?.methods) ? area.methods : [];
-      if (methods.length > 0) {
-        methods.forEach((method) => {
-          const description = String(method?.description || "").trim();
-          if (description) {
-            entries.push(description);
-            return;
-          }
-          const labelParts = [area?.label, method?.label]
-            .map((value) => (typeof value === "string" ? value.trim() : ""))
-            .filter(Boolean);
-          if (labelParts.length > 0) entries.push(labelParts.join(" - "));
-        });
-      } else {
-        const label = String(area?.label || "").trim();
-        if (label) entries.push(label);
-      }
-    });
-
-    const uniqueEntries = Array.from(new Set(entries.filter(Boolean)));
-    if (uniqueEntries.length === 0) {
-      const summary = String(latestCatchGame.summary || "").trim();
-      return summary;
-    }
-
-    const maxPreview = 3;
-    const previewEntries = uniqueEntries.slice(0, maxPreview);
-    const remaining = uniqueEntries.length - previewEntries.length;
-    return remaining > 0
-      ? `${previewEntries.join(" • ")} • +${remaining} more`
-      : previewEntries.join(" • ");
-  }, [latestCatchGame]);
   const targetEvolutionGeneration = useMemo(() => {
     if (selectedGame) {
       return GAME_GENERATION_LOOKUP.get(selectedGame) ?? null;
@@ -3633,6 +3109,8 @@ function DetailPanel({
       const cleaned = String(text || "")
         .replace(/­\s*/g, "") // PokeAPI marks hyphenated line breaks with soft hyphens
         .replace(/\s+/g, " ")
+        // Some sources split thousands across a line break: "4, 600 feet" -> "4,600 feet"
+        .replace(/(\d), (\d{3})\b/g, "$1,$2")
         .trim();
       if (!cleaned) return;
       const existing = byVersion.get(slug);
@@ -3717,38 +3195,10 @@ function DetailPanel({
     setSelectedFlavorVersion(flavorTextVersions[0]?.name || null);
   }, [flavorTextVersions, selectedGame]);
   
-  // Get the selected flavor text
-  const selectedFlavorText = useMemo(() => {
-    if (!selectedFlavorVersion) return null;
-    const entry = flavorTextVersions.find((v) => v.name === selectedFlavorVersion);
-    return entry?.text ?? null;
-  }, [flavorTextVersions, selectedFlavorVersion]);
-  
-  // Get logo for current version
-  const currentVersionLogo = useMemo(() => {
-    if (!selectedFlavorVersion) return null;
-    // Map version name to logo file
-    const logoFile = VERSION_LOGO_FILES.get(selectedFlavorVersion);
-    return logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
-  }, [selectedFlavorVersion]);
-  
-  const openFlavorModal = useCallback(() => {
-    setIsFlavorModalOpen(true);
-  }, []);
-  
-  const closeFlavorModal = useCallback(() => {
-    setIsFlavorModalOpen(false);
-  }, []);
-  
-  const selectFlavorVersion = useCallback((versionName) => {
-    setSelectedFlavorVersion(versionName);
-    closeFlavorModal();
-  }, [closeFlavorModal]);
-  
+  const selectFlavorVersion = setSelectedFlavorVersion;
+
   useEffect(() => {
     setNatureOverlayName(null);
-    setSelectedFlavorVersion(null);
-    setIsFlavorModalOpen(false);
   }, [id]);
   useEffect(() => {
     if (!hasRecommendedEvs) {
@@ -3759,7 +3209,6 @@ function DetailPanel({
   useEffect(() => {
     setGameAvailability([]);
     setGameAvailabilityError(null);
-    setActiveGame(null);
     setGameAvailabilityLoading(Boolean(url));
   }, [url]);
 
@@ -3771,7 +3220,6 @@ function DetailPanel({
   // Debug trace for development only (it used to be stored in state, re-rendering the whole
   // panel on every step without ever being shown).
   const addLog = DEBUG_DETAIL_PANEL ? (msg, data) => console.debug(`[detail] ${msg}`, data ?? "") : () => {};
-  const displayDexNumber = dexNumber || (id ? `#${id}` : "-");
 
   useEffect(() => {
     let cancelled = false;
@@ -3801,12 +3249,6 @@ function DetailPanel({
   const shouldShowLearnset = Boolean(details) && (
     hasLearnsetContent || (Array.isArray(details?.moves) && details.moves.length > 0)
   );
-
-  const handleShinyToggle = useCallback(() => {
-    if (typeof setShiny === "function") {
-      setShiny((prev) => !prev);
-    }
-  }, [setShiny]);
 
   const buildEvolutionTree = useCallback((evoPaths) => {
     if (!Array.isArray(evoPaths) || evoPaths.length === 0) return [];
@@ -4153,27 +3595,6 @@ function DetailPanel({
     return results;
   }, [evolutionTree]);
 
-  const hasMegaForms = megaForms.length > 0;
-  const hasGmaxForms = gmaxForms.length > 0;
-
-  // Handler to navigate directly to Mega form (first one if multiple)
-  const handleMegaClick = useCallback(() => {
-    if (megaForms.length === 0) return;
-    const firstMega = megaForms[0];
-    const formId = firstMega?.id != null ? String(firstMega.id) : null;
-    if (!formId) return;
-    onSelectPokemon?.(formId, firstMega.name, `https://pokeapi.co/api/v2/pokemon/${formId}`);
-  }, [megaForms, onSelectPokemon]);
-
-  // Handler to navigate directly to GMax form (first one if multiple)
-  const handleGmaxClick = useCallback(() => {
-    if (gmaxForms.length === 0) return;
-    const firstGmax = gmaxForms[0];
-    const formId = firstGmax?.id != null ? String(firstGmax.id) : null;
-    if (!formId) return;
-    onSelectPokemon?.(formId, firstGmax.name, `https://pokeapi.co/api/v2/pokemon/${formId}`);
-  }, [gmaxForms, onSelectPokemon]);
-
   // Preferred region for evolution tree based on the currently selected form name
   const selectedEvolutionRegion = useMemo(() => {
     const raw = selected?.name || null;
@@ -4376,7 +3797,7 @@ function DetailPanel({
           ) : null}
           {level > 0 && (
             <span className="evo-tree-arrow" aria-hidden="true">
-              &rarr;
+              <Icon name="right" />
             </span>
           )}
           <div className="evo-tree-pokemon-group">
@@ -4451,7 +3872,6 @@ function DetailPanel({
     setGameAvailability([]);
     setGameAvailabilityLoading(true);
     setGameAvailabilityError(null);
-    setActiveGame(null);
 
 
 
@@ -5262,15 +4682,6 @@ function DetailPanel({
     setAbilityLoading(false);
   }, []);
 
-  const handleCatchModalOpen = useCallback(() => {
-    if (!latestCatchGame) return;
-    setActiveGame(latestCatchGame);
-  }, [latestCatchGame]);
-
-  const closeGameModal = useCallback(() => {
-    setActiveGame(null);
-  }, []);
-
   useEffect(() => {
     if (!activeAbility) return;
     const abilityUrl = activeAbility.url;
@@ -5706,630 +5117,435 @@ function DetailPanel({
     };
   }, [name, targetEvolutionGeneration]);
 
-  // Get primary type and create gradient style
-  const heroGradientStyle = useMemo(() => {
-    // Primary type (slot 1) as of the selected game's generation
-    const primaryType = displayTypeNames[0];
-    if (!primaryType) {
-      return {};
+  const displayName = formatDisplayName(name);
+  const genus = useMemo(
+    () => (species?.genera || []).find((entry) => entry?.language?.name === "en")?.genus || null,
+    [species]
+  );
+  const inDex = Boolean(dexNumber) && dexNumber !== "-";
+  const nationalNumber = species?.id ?? (Number(id) < 10000 ? Number(id) : null);
+  const dexNoLabel = inDex
+    ? String(dexNumber).replace(/^#/, "No.")
+    : nationalNumber != null
+    ? `No.${String(nationalNumber).padStart(4, "0")}`
+    : "No.—";
+  const heightLabel = details?.height != null ? `${(details.height / 10).toFixed(1)} m` : "–";
+  const weightLabel = details?.weight != null ? `${(details.weight / 10).toFixed(1)} kg` : "–";
+  const abilities = details?.abilities || [];
+  const visibleAbilities = abilities.filter((a) => !a.is_hidden);
+  const hiddenAbilities = abilities.filter((a) => a.is_hidden);
+  const selectedGameLabel = selectedGame ? GAME_LOOKUP.get(selectedGame)?.label || null : null;
+  const smogonGenLabel = smogonGeneration ? `Gen ${String(smogonGeneration).replace(/\D/g, "")}` : null;
+
+  // Megas only where the game has them (none in Scarlet/Violet), Gigantamax only in Sword/Shield
+  const gameFeatures = selectedGame ? GAME_FEATURES.get(selectedGame) : null;
+  const battleForms = [
+    ...(gameFeatures && !gameFeatures.mega ? [] : megaForms),
+    ...(gameFeatures && !gameFeatures.gmax ? [] : gmaxForms),
+  ];
+  const doesNotEvolve = evolutionTree.length === 1 && !(evolutionTree[0]?.children?.length > 0);
+
+  const recommendedMoves = useMemo(
+    () =>
+      (Array.isArray(smogonMoves) ? smogonMoves : []).map((moveName) => {
+        const key = normalizeSpeciesName(moveName);
+        const info = moveDetailsMap.get(key) || moveDetailsMap.get(moveName) || null;
+        return { name: key || moveName, label: formatMoveName(key || moveName), type: info?.type || null };
+      }),
+    [smogonMoves, moveDetailsMap]
+  );
+
+  const [tab, setTab] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pref:entryTab");
+      return ENTRY_TABS.some((entry) => entry.key === saved) ? saved : "stats";
+    } catch {
+      return "stats";
     }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("pref:entryTab", tab);
+    } catch {}
+  }, [tab]);
 
-    const typeColor = getTypeColor(primaryType);
-    
-    // Create radial gradient from top-left corner (0% 0%) outward
-    // Using rgba for transparency
-    const rgb = typeColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
-    if (!rgb) return {};
-    
-    const r = parseInt(rgb[1], 16);
-    const g = parseInt(rgb[2], 16);
-    const b = parseInt(rgb[3], 16);
-    
-    return {
-      background: `radial-gradient(circle at 0% 0%, rgba(${r}, ${g}, ${b}, 0.25) 0%, rgba(${r}, ${g}, ${b}, 0.1) 40%, transparent 70%)`,
+  // Each entry starts at its top
+  useLayoutEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  }, [id]);
+
+  // ← → step through the Pokédex, Esc goes back to the list (unless a popup is open)
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))) return;
+      if (document.querySelector(".game-modal-backdrop, .ability-modal-backdrop, .ev-modal-backdrop, .popsheet")) return;
+      if (event.key === "ArrowLeft" && prevEntry) {
+        event.preventDefault();
+        onStep?.(prevEntry);
+      } else if (event.key === "ArrowRight" && nextEntry) {
+        event.preventDefault();
+        onStep?.(nextEntry);
+      } else if (event.key === "Escape") {
+        onClose?.();
+      }
     };
-  }, [displayTypeNames]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prevEntry, nextEntry, onStep, onClose]);
 
-  // Primary type icon for background logo in hero panel
-  const primaryTypeName = displayTypeNames[0] || null;
-  const heroTypeIconUrl = primaryTypeName ? getTypeIconUrl(primaryTypeName) : null;
+  // Swipe sideways on a phone to step, like the device's ◀ ▶
+  const touchRef = useRef(null);
+  const onTouchStart = (event) => {
+    const touch = event.touches?.[0];
+    if (!touch || event.touches.length > 1) return;
+    if (event.target instanceof Element && event.target.closest(".tabs, .moves-scroll, .evo-tree, select")) {
+      touchRef.current = null;
+      return;
+    }
+    touchRef.current = { x: touch.clientX, y: touch.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (event) => {
+    const start = touchRef.current;
+    touchRef.current = null;
+    const touch = event.changedTouches?.[0];
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > 45 || Date.now() - start.t > 700) return;
+    if (dx < 0 && nextEntry) onStep?.(nextEntry);
+    if (dx > 0 && prevEntry) onStep?.(prevEntry);
+  };
+
+  const onTabsKeyDown = (event) => {
+    const keys = ENTRY_TABS.map((entry) => entry.key);
+    const index = keys.indexOf(tab);
+    let next = null;
+    if (event.key === "ArrowRight") next = keys[(index + 1) % keys.length];
+    if (event.key === "ArrowLeft") next = keys[(index - 1 + keys.length) % keys.length];
+    if (event.key === "Home") next = keys[0];
+    if (event.key === "End") next = keys[keys.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    setTab(next);
+    document.getElementById(`entry-tab-${next}`)?.focus();
+  };
+
+  const renderAbility = (a) => (
+    <button
+      key={a.ability.name}
+      type="button"
+      className="linkbtn"
+      onClick={() => handleAbilityClick(a)}
+      aria-label={`${toTitleCase(a.ability.name)}: what this ability does`}
+    >
+      {toTitleCase(a.ability.name)}
+    </button>
+  );
+
+  const renderStep = (entry, direction) => {
+    const Glyph = direction === "prev" ? "left" : "right";
+    if (!entry) {
+      return (
+        <button type="button" className={`btn entry-step entry-step--${direction}`} disabled aria-label={direction === "prev" ? "No previous entry" : "No next entry"}>
+          <Icon name={Glyph} />
+        </button>
+      );
+    }
+    const label = formatDisplayName(entry.name);
+    const number = entry.dexNumber && entry.dexNumber !== "-" ? String(entry.dexNumber).replace(/^#/, "No.") : null;
+    return (
+      <button
+        type="button"
+        className={`btn entry-step entry-step--${direction}`}
+        onClick={() => onStep?.(entry)}
+        aria-label={`${direction === "prev" ? "Previous" : "Next"}: ${label}`}
+        title={`${direction === "prev" ? "Previous" : "Next"} (${direction === "prev" ? "←" : "→"})`}
+      >
+        {direction === "prev" ? <Icon name="left" /> : null}
+        <span className="entry-step__text">
+          {number ? <span className="entry-step__no">{number}</span> : null}
+          <span className="entry-step__name">{label}</span>
+        </span>
+        {direction === "next" ? <Icon name="right" /> : null}
+      </button>
+    );
+  };
 
   return (
-    <aside className="detail-panel">
-      <div className="detail-inner" style={heroGradientStyle}>
-        <button className="close" onClick={onClose} aria-label="Close">
-          <span className="close-icon" aria-hidden="true" />
+    <article className="entry" aria-labelledby="entry-title" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <header className="entry-head">
+        <button
+          type="button"
+          className="btn btn--quiet entry-head__back"
+          onClick={onClose}
+          aria-label={`Back to the ${dexName || "Pokédex"}`}
+        >
+          <Icon name="left" />
+          {(dexName || "Pokédex").replace(/ Pokédex$/, "") || "Pokédex"}
         </button>
-        <div className="detail-title detail-title-top">
-          {id ? <span className="dexno">{displayDexNumber}</span> : null}
-          <h2>{formatDisplayName(name)}</h2>
+        <div className="entry-head__step">
+          {renderStep(prevEntry, "prev")}
+          {renderStep(nextEntry, "next")}
         </div>
-        <div className="detail-hero">
-          <div className="hero-left">
-            <div className="detail-art-wrap">
-              {heroTypeIconUrl ? (
-                <img
-                  className="hero-type-bg"
-                  src={heroTypeIconUrl}
-                  alt=""
-                  aria-hidden="true"
-                  loading="lazy"
-                />
-              ) : null}
+        <button type="button" className="btn btn--quiet btn--icon entry-head__close" onClick={onClose} aria-label="Close entry (Esc)" title="Close (Esc)">
+          <Icon name="close" />
+        </button>
+      </header>
+
+      <div className="entry-top">
+        <div className="entry-screen">
+          <div className={`entry-screen__glass${animated ? " is-animated" : ""}`}>
+            {detailImg ? (
               <img
-                className={`detail-art ${animated ? "is-animated" : "is-static"}${isUnknownSprite ? " is-unknown" : ""}`}
+                key={detailImg}
+                className={`entry-screen__art${isUnknownSprite ? " is-unknown" : ""}`}
                 src={detailImg}
-                alt={name}
-                loading="lazy"
+                alt={`${displayName}${shiny ? ", shiny colours" : ""}`}
                 onError={handleDetailArtError}
               />
-            </div>
-            <div className="hero-controls">
-              <div className="toggle-group">
-                <button
-                  type="button"
-                  className={`ability-chip toggle-chip${animated ? " is-on" : ""}`}
-                  onClick={() => setAnimated((v) => !v)}
-                  onMouseUp={(e) => e.currentTarget.blur()}
-                  aria-pressed={animated}
-                  title={animated ? "Use HD static sprite" : "Use animated sprite"}
-                  aria-label={`Animation ${animated ? "on" : "off"}`}
-                >
-                  <span className="toggle-label">Animate</span>
-                </button>
-                <button
-                  type="button"
-                  className={`ability-chip toggle-chip${shiny ? " is-on" : ""}`}
-                  onClick={handleShinyToggle}
-                  onMouseUp={(e) => e.currentTarget.blur()}
-                  aria-pressed={shiny}
-                  title={shiny ? "Show default variant" : "Show shiny variant"}
-                  aria-label={`Shiny ${shiny ? "on" : "off"}`}
-                >
-                  <span className="toggle-label">Shiny</span>
-                </button>
-                {hasGenderVariants && (
-                  <button
-                    type="button"
-                    className={`ability-chip toggle-chip gender-toggle${female ? " is-on" : ""}`}
-                    onClick={() => setFemale((v) => !v)}
-                    onMouseUp={(e) => e.currentTarget.blur()}
-                    aria-pressed={female}
-                    title={female ? "Female selected. Click to switch to Male" : "Male selected. Click to switch to Female"}
-                    aria-label={female ? "Selected gender: Female" : "Selected gender: Male"}
-                  >
-                    <span
-                      className={`gender-symbol ${female ? "is-female" : "is-male"}`}
-                      aria-hidden="true"
-                    >
-                      {female ? "♀" : "♂"}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-            <section className="about single-col">
-              <h3 className="section-title">About</h3>
-              <div className="about-list">
-                <div className="about-row">
-                  <span className="label">Types</span>
-                  <div className="value">
-                    {displayTypeNames.map((typeName) => (
-                      <button
-                        type="button"
-                        key={typeName}
-                        className={`type-chip type-${typeName}`}
-                        title={`Filter by ${typeName}`}
-                        onClick={() => onActivateType?.(typeName)}
-                      >
-                        <img
-                          src={getTypeIconUrl(typeName)}
-                          alt=""
-                          aria-hidden="true"
-                          className="type-icon"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                        <span className="type-name">{typeName}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="about-row">
-                  <span className="label">Abilities</span>
-                  <div className="value">
-                    {(details?.abilities || [])
-                      .filter((a) => !a.is_hidden)
-                      .map((a) => (
-                        <button
-                          key={a.ability.name}
-                          type="button"
-                          className="ability-chip"
-                          onClick={() => handleAbilityClick(a)}
-                          aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
-                        >
-                          <span className="text-capitalize">{humanizeName(a.ability.name)}</span>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-                {(details?.abilities || []).some((a) => a.is_hidden) && (
-                  <div className="about-row">
-                    <span className="label">Hidden Ability</span>
-                    <div className="value">
-                      {(details?.abilities || [])
-                        .filter((a) => a.is_hidden)
-                        .map((a) => (
-                          <button
-                            key={a.ability.name}
-                            type="button"
-                            className="ability-chip is-hidden"
-                            onClick={() => handleAbilityClick(a)}
-                            aria-label={`View details for ${humanizeName(a.ability.name)} ability`}
-                          >
-                            <span className="text-capitalize">{humanizeName(a.ability.name)}</span>
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                )}
-                {specialTags.length > 0 && (
-                  <div className="about-row">
-                    <span className="label">Tags</span>
-                    <div className="value">
-                      {specialTags.map((tag) => (
-                        <span key={tag} className="special-tag">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="about-row">
-                  <span className="label">Rec Nature</span>
-                  <div className="value nature-value">
-                    {smogonLoading ? (
-                      <span className="nature-loading" aria-live="polite">
-                        <span className="nature-spinner" aria-hidden="true" />
-                        Loading
-                      </span>
-                    ) : smogonError ? (
-                      <span className="nature-placeholder" title={smogonError}>
-                        Unavailable
-                      </span>
-                    ) : smogonNature ? (
-                      <button
-                        type="button"
-                        className="nature-chip"
-                        onClick={handleNatureClick}
-                        aria-label={`View details for ${smogonNature} nature`}
-                      >
-                        <span className="text-capitalize">{smogonNature}</span>
-                      </button>
-                    ) : (
-                      <span className="nature-placeholder" title="No competitive data available">
-                        -
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="about-row">
-                  <span className="label">Rec Item</span>
-                  <div className="value nature-value">
-                    {smogonLoading ? (
-                      <span className="nature-loading" aria-live="polite">
-                        <span className="nature-spinner" aria-hidden="true" />
-                        Loading
-                      </span>
-                    ) : smogonError ? (
-                      <span className="nature-placeholder" title={smogonError}>
-                        Unavailable
-                      </span>
-                    ) : smogonItem ? (
-                      <button
-                        type="button"
-                        className="nature-chip"
-                        onClick={handleItemClick}
-                        aria-label={`View details for ${smogonItem}`}
-                      >
-                        <span className="text-capitalize">{smogonItem}</span>
-                      </button>
-                    ) : (
-                      <span className="nature-placeholder" title="No competitive data available">
-                        -
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </section>
-            <div className="weak-resist">
-              <div className="matchup-box weak-matchup">
-                <div className="matchup-title">Weak To</div>
-                <div className="types">
-                  {!matchupsReady ? (
-                    <span className="type-chip skeleton" />
-                  ) : weaknesses.length === 0 ? (
-                    <span className="nature-placeholder">None</span>
-                  ) : (
-                    weaknesses.map((w) => (
-                      <span key={w.type} className={`type-chip type-${w.type}`} title={`x${w.mult}`}>
-                        <img 
-                          src={getTypeIconUrl(w.type)} 
-                          alt={w.type} 
-                          className="type-icon"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                        <span className="type-name">
-                          {w.type}
-                          {w.mult >= 4 ? <span className="type-mult"> x4</span> : w.mult > 1 ? <span className="type-mult"> x2</span> : null}
-                        </span>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="matchup-box resist-matchup">
-                <div className="matchup-title">Resists</div>
-                <div className="types">
-                  {!matchupsReady ? (
-                    <span className="type-chip skeleton" />
-                  ) : resistances.length === 0 ? (
-                    <span className="nature-placeholder">None</span>
-                  ) : (
-                    resistances.map((r) => (
-                      <span key={r.type} className={`type-chip type-${r.type}`} title={`x${r.mult}`}>
-                        <img 
-                          src={getTypeIconUrl(r.type)} 
-                          alt={r.type} 
-                          className="type-icon"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                        <span className="type-name">
-                          {r.type}
-                          {r.mult === 0 ? <span className="type-mult"> x0</span> : r.mult <= 0.25 ? <span className="type-mult"> x0.25</span> : <span className="type-mult"> x0.5</span>}
-                        </span>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+            ) : (
+              <span className="entry-screen__ghost skeleton" aria-hidden="true" />
+            )}
           </div>
-          <div className="hero-right">
-            <section className="stats hero-stats">
-              <div className="stats-header">
-                <div className="stats-header-left">
-                  {Array.isArray(details?.stats) && details.stats.length > 0 && (
-                    <span className="stat-total-pill" title="Base stat total">
-                      <span className="stat-total-label">Stat Total</span>
-                      <span className="stat-total-value">
-                        {(details?.stats || []).reduce(
-                          (sum, s) => sum + (typeof s?.base_stat === "number" ? s.base_stat : 0),
-                          0,
-                        )}
-                      </span>
-                    </span>
-                  )}
-                </div>
-                {hasRecommendedEvs && (
-                  <div className="ev-info-cta">
-                    <button
-                      type="button"
-                      className="ev-info-button"
-                      onClick={openEvInfoModal}
-                    >
-                      Recommended EV Information
-                    </button>
-                  </div>
-                )}
+          <div className="entry-screen__controls">
+            <div className="seg" role="group" aria-label="Colours">
+              <button type="button" className="seg__btn" aria-pressed={!shiny} onClick={() => setShiny?.(false)}>
+                Normal
+              </button>
+              <button type="button" className="seg__btn" aria-pressed={shiny} onClick={() => setShiny?.(true)}>
+                <Icon name="sparkle" /> Shiny
+              </button>
+            </div>
+            <div className="seg" role="group" aria-label="Sprite style">
+              <button type="button" className="seg__btn" aria-pressed={!animated} onClick={() => setAnimated?.(false)}>
+                Art
+              </button>
+              <button type="button" className="seg__btn" aria-pressed={animated} onClick={() => setAnimated?.(true)}>
+                Animated
+              </button>
+            </div>
+            {hasGenderVariants ? (
+              <div className="seg" role="group" aria-label="Gender">
+                <button type="button" className="seg__btn" aria-pressed={!female} onClick={() => setFemale(false)}>
+                  Male
+                </button>
+                <button type="button" className="seg__btn" aria-pressed={female} onClick={() => setFemale(true)}>
+                  Female
+                </button>
               </div>
-              <div className="stats-list">
-                {(details?.stats || []).map((s) => {
-                  const statName = s?.stat?.name || "";
-                  const evKey = STAT_TO_EVS_KEY[statName];
-                  const recommendedEv =
-                    evKey && smogonEvs && typeof smogonEvs[evKey] === "number"
-                      ? smogonEvs[evKey]
-                      : null;
-                  const showRecommended = typeof recommendedEv === "number" && recommendedEv > 0;
-                  const statLabel = getStatLabel(statName, isMobile);
-                  return (
-                    <div className="stat-row" key={statName}>
-                      <div className="stat-label">{statLabel}</div>
-                      <div className="stat-bar-wrap">
-                        <div className="stat-bar">
-                          <div
-                            className="stat-fill"
-                            style={{ 
-                              width: `${Math.min(100, (s.base_stat / 180) * 100)}%`,
-                              background: getStatColor(s.base_stat)
-                            }}
-                            title={`${s.base_stat}`}
-                          />
-                        </div>
-                        <span className="stat-base">{s.base_stat}</span>
-                      </div>
-                      <div className="stat-value">
-                        {showRecommended ? (
-                          <span
-                            className="stat-recommend"
-                            title={`Recommended ${statLabel} EVs: ${recommendedEv}`}
-                          >
-                            <span className="stat-recommend-icon" aria-hidden="true" />
-                            <span className="stat-recommend-text">{recommendedEv}</span>
-                            <span className="stat-recommend-suffix" aria-hidden="true">
-                              EVs
-                            </span>
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-            {evoPaths.length > 0 && (
-              <section className="evo-section">
-                <div
-                  className={alternateFormsEvolutionTree.length > 0 ? "evo-tree-container" : ""}
-                  style={{ position: "relative" }}
-                >
-                  {(hasMegaForms || hasGmaxForms) && (
-                    <div className="evo-tree-actions">
-                      {hasMegaForms && (
-                        <button
-                          type="button"
-                          className="alt-forms-button mega"
-                          onClick={handleMegaClick}
-                          title="Mega"
-                        >
-                          mega
-                        </button>
-                      )}
-                      {hasGmaxForms && (
-                        <button
-                          type="button"
-                          className="alt-forms-button gmax"
-                          onClick={handleGmaxClick}
-                          title="Gigantamax"
-                        >
-                          gmax
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <div className={alternateFormsEvolutionTree.length > 0 ? "evo-tree-wrapper" : ""}>
-                    <div className="evo-tree">
-                      {evolutionTree.length > 0 ? (
-                        <ul className="evo-tree-roots">
-                          {evolutionTree.map((entry, idx) =>
-                            renderEvolutionBranch(entry, 0, null, `root-${idx}`)
-                          )}
-                        </ul>
-                      ) : (
-                        <div className="evo-empty">Evolution data unavailable.</div>
-                      )}
-                    </div>
-                    {alternateFormsEvolutionTree.length > 0 && (
-                      <div className="evo-tree evo-tree-alt">
-                        <ul className="evo-tree-roots">
-                          {alternateFormsEvolutionTree.map((entry, idx) =>
-                            renderEvolutionBranch(entry, 0, null, `alt-root-${idx}`, selectedEvolutionRegion, true)
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )}
-            <section className="catch-section single-col catch-section-inline">
-              {gameAvailabilityLoading ? (
-                <div className="catch-loading">Loading encounter data...</div>
-              ) : gameAvailabilityError ? (
-                <div className="catch-error">{gameAvailabilityError}</div>
-              ) : gameAvailability.length > 0 && latestCatchGame ? (
-                <button
-                  type="button"
-                  className="catch-pill catch-trigger-button"
-                  onClick={handleCatchModalOpen}
-                  aria-label={`View catch locations for ${name || "this Pokemon"} in ${latestCatchGame.label || "the latest game"}`}
-                >
-                  {latestCatchLogos.length > 0 && (
-                    <span className="catch-pill-logos" aria-hidden="true">
-                      {latestCatchLogos.map((src) => (
-                        <img key={src} src={src} alt="" className="catch-pill-logo" />
-                      ))}
-                    </span>
-                  )}
-                  <span className="catch-trigger-text">
-                    <span className="catch-trigger-primary">{latestCatchGame.label}</span>
-                    {latestCatchLocationPreview ? (
-                      <span className="catch-trigger-secondary">{latestCatchLocationPreview}</span>
-                    ) : null}
-                  </span>
-                  <span className="catch-trigger-count">catch locations</span>
-                </button>
-              ) : (
-                <div className="catch-empty">No wild encounter data for this Pokemon.</div>
-              )}
-            </section>
-            {flavorTextVersions.length > 0 && (
-              <section
-                className="catch-section single-col"
-                style={{ padding: "0 16px 0", marginTop: "-16px" }}
-              >
-                <button
-                  type="button"
-                  className="matchup-box pokedex-entry-box pokedex-entry-clickable"
-                  onClick={openFlavorModal}
-                  title={flavorTextVersions.length > 1 ? "View all Pokedex entries" : "View Pokedex entry"}
-                >
-                  <div className="matchup-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                    <span>Pokedex Entry</span>
-                    {flavorTextVersions.length > 1 && currentVersionLogo && (
-                      <img
-                        src={currentVersionLogo}
-                        alt=""
-                        width={28}
-                        height={28}
-                        className="pokedex-entry-logo"
-                        style={{ display: "block" }}
-                      />
-                    )}
-                  </div>
-                  {selectedFlavorText && (
-                    <div style={{ fontSize: "0.9rem", color: "#cbd5f5", lineHeight: "1.5", fontStyle: "italic" }}>
-                      {selectedFlavorText}
-                    </div>
-                  )}
-                </button>
-              </section>
-            )}
-            {shouldShowLearnset && (
-              <section className="learnset-panel">
-                <button
-                  type="button"
-                  className="learnset-summary-button"
-                  onClick={() => setIsLearnsetModalOpen(true)}
-                  aria-label="View learned moves"
-                >
-                  <div className="learnset-summary-content">
-                    <div className="learnset-summary-title-wrapper">
-                      <span className="learnset-summary-title">Learned Moves</span>
-                      <span className="learnset-summary-click-indicator" aria-hidden="true">→</span>
-                    </div>
-                    <div className="learnset-summary-stats">
-                      {smogonMoves && Array.isArray(smogonMoves) && smogonMoves.length > 0 ? (
-                        <>
-                          <div className="learnset-summary-top-moves-label">
-                            Recommended Moves
-                          </div>
-                          <div className="learnset-summary-top-moves-list">
-                            {smogonMoves.slice(0, 4).map((moveName, index) => {
-                              const normalizedMoveName = normalizeSpeciesName(moveName);
-                              const lookupKeys = [
-                                normalizedMoveName,
-                                moveName,
-                                typeof moveName === "string" ? moveName.toLowerCase() : null,
-                              ].filter(Boolean);
-                              let moveDetails = null;
-                              for (const key of lookupKeys) {
-                                if (moveDetailsMap.has(key)) {
-                                  moveDetails = moveDetailsMap.get(key);
-                                  break;
-                                }
-                              }
-                              const moveType = moveDetails?.type || "normal";
-                              const typeColor = getTypeColor(moveType);
-                              const pillStyle = typeColor
-                                ? {
-                                    background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
-                                    borderColor: `${typeColor}cc`,
-                                  }
-                                : undefined;
-                              const tooltipEntries = [
-                                moveDetails?.type ? { label: "Type", value: humanizeName(moveDetails.type) } : null,
-                                moveDetails?.power != null ? { label: "Power", value: moveDetails.power } : null,
-                                moveDetails?.accuracy != null ? { label: "Accuracy", value: `${moveDetails.accuracy}%` } : null,
-                                moveDetails?.pp != null ? { label: "PP", value: moveDetails.pp } : null,
-                                moveDetails?.damage_class
-                                  ? { label: "Class", value: humanizeName(moveDetails.damage_class) }
-                                  : null,
-                              ].filter(Boolean);
-                              return (
-                                <div key={`${normalizedMoveName || moveName}-${index}`} className="learnset-summary-top-move">
-                                  <div className="learnset-summary-pill-wrapper">
-                                    <div
-                                      className={`learnset-move-pill learnset-summary-pill type-${moveType}`}
-                                      style={pillStyle}
-                                      tabIndex={0}
-                                      aria-label={`Recommended move ${humanizeName(moveName)}`}
-                                    >
-                                      <div className="learnset-move-name-wrapper">
-                                        {moveDetails?.type && (
-                                          <img
-                                            src={getTypeIconUrl(moveType)}
-                                            alt={moveType}
-                                            className="learnset-move-type-icon"
-                                            onError={(e) => {
-                                              e.target.style.display = "none";
-                                            }}
-                                          />
-                                        )}
-                                        <span className="learnset-move-name">{humanizeName(moveName)}</span>
-                                      </div>
-                                      <span className="learnset-summary-move-power">
-                                        {moveDetails?.power != null ? moveDetails.power : "—"}
-                                      </span>
-                                    </div>
-                                    <div className="learnset-move-tooltip" role="tooltip">
-                                      <div className="learnset-move-tooltip-title">{humanizeName(moveName)}</div>
-                                      {tooltipEntries.length > 0 ? (
-                                        <div className="learnset-move-tooltip-grid">
-                                          {tooltipEntries.map((entry) => (
-                                            <div key={entry.label} className="learnset-move-tooltip-row">
-                                              <span className="learnset-move-tooltip-label">{entry.label}</span>
-                                              <span className="learnset-move-tooltip-value">{entry.value}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <div className="learnset-move-tooltip-empty">Details unavailable</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </>
-                      ) : smogonLoading ? (
-                        <div className="learnset-summary-loading">Loading recommended moves...</div>
-                      ) : (
-                        <div className="learnset-summary-loading">No recommended moves available</div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </section>
-            )}
+            ) : null}
           </div>
         </div>
-        {details && (
-          <>
 
-            {/* detail-body no longer used since about moved under sprite */}
-          </>
-        )}
+        <div className="entry-id">
+          <p className="entry-id__no">
+            {dexNoLabel}
+            {!inDex && selectedGame ? <span className="stamp stamp--red">Not in {dexName}</span> : null}
+          </p>
+          <h1 className="entry-id__name" id="entry-title">
+            {displayName}
+          </h1>
+          {genus ? <p className="entry-id__genus">{genus}</p> : <p className="entry-id__genus skeleton entry-id__genus--ghost" aria-hidden="true" />}
+          <div className="entry-id__types">
+            {displayTypeNames.map((typeName) => (
+              <TypeTag
+                key={typeName}
+                as="button"
+                type="button"
+                size="lg"
+                typeName={typeName}
+                title={`Show every ${typeName} type in the ${dexName || "Pokédex"}`}
+                onClick={() => onActivateType?.(typeName)}
+              />
+            ))}
+          </div>
+          {specialTags.length > 0 ? (
+            <p className="entry-id__stamps">
+              {specialTags.map((tag) => (
+                <span key={tag} className={`stamp${tag === "Legendary" || tag === "Mythical" ? " stamp--gold" : ""}`}>
+                  {tag}
+                </span>
+              ))}
+            </p>
+          ) : null}
+        </div>
+        <dl className="kv entry-facts">
+          <dt>Height</dt>
+          <dd className="num">{heightLabel}</dd>
+          <dt>Weight</dt>
+          <dd className="num">{weightLabel}</dd>
+          <dt>{visibleAbilities.length > 1 ? "Abilities" : "Ability"}</dt>
+          <dd className="entry-facts__list">{visibleAbilities.length ? visibleAbilities.map(renderAbility) : "–"}</dd>
+          {hiddenAbilities.length ? (
+            <>
+              <dt>Hidden</dt>
+              <dd className="entry-facts__list">{hiddenAbilities.map(renderAbility)}</dd>
+            </>
+          ) : null}
+        </dl>
       </div>
+
+      {flavorTextVersions.length > 0 ? (
+        <DexDialog versions={flavorTextVersions} selectedVersion={selectedFlavorVersion} onSelect={selectFlavorVersion} />
+      ) : null}
+
+      <div className="tabs entry-tabs" role="tablist" aria-label="Entry pages" onKeyDown={onTabsKeyDown}>
+        {ENTRY_TABS.map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            role="tab"
+            id={`entry-tab-${entry.key}`}
+            className="tab"
+            aria-selected={tab === entry.key}
+            aria-controls="entry-panel"
+            tabIndex={tab === entry.key ? 0 : -1}
+            onClick={() => setTab(entry.key)}
+          >
+            <Cursor />
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      <section className="entry-panel" id="entry-panel" role="tabpanel" aria-labelledby={`entry-tab-${tab}`} tabIndex={0}>
+        {tab === "stats" ? (
+          <div className="entry-stats">
+            <StatMeters stats={details?.stats} evs={smogonEvs} evKeyFor={STAT_TO_EVS_KEY} onShowEvs={hasRecommendedEvs ? openEvInfoModal : null} />
+            <section className="comp" aria-label="Competitive set">
+              <h3 className="label">Competitive set{smogonGenLabel ? ` · ${smogonGenLabel}` : ""}</h3>
+              {smogonLoading ? (
+                <p className="entry-muted">Loading Smogon sets…</p>
+              ) : smogonNature || smogonItem ? (
+                <dl className="kv">
+                  {smogonNature ? (
+                    <>
+                      <dt>Nature</dt>
+                      <dd>
+                        <button type="button" className="linkbtn" onClick={handleNatureClick}>
+                          {toTitleCase(smogonNature)}
+                        </button>
+                      </dd>
+                    </>
+                  ) : null}
+                  {smogonItem ? (
+                    <>
+                      <dt>Item</dt>
+                      <dd>
+                        <button type="button" className="linkbtn" onClick={handleItemClick}>
+                          {toTitleCase(smogonItem)}
+                        </button>
+                      </dd>
+                    </>
+                  ) : null}
+                </dl>
+              ) : (
+                <p className="entry-muted">{smogonError || "No competitive sets for this Pokémon."}</p>
+              )}
+            </section>
+          </div>
+        ) : null}
+
+        {tab === "matchups" ? (
+          <Matchups
+            weaknesses={weaknesses}
+            resistances={resistances}
+            ready={matchupsReady}
+            note={targetEvolutionGeneration ? `Using the Gen ${targetEvolutionGeneration} type chart and types for ${selectedGameLabel || dexName}.` : null}
+          />
+        ) : null}
+
+        {tab === "evolution" ? (
+          <div className="evo">
+            {evolutionTree.length > 0 ? (
+              <div className="evo-tree">
+                <ul className="evo-tree-roots">
+                  {evolutionTree.map((entry, idx) => renderEvolutionBranch(entry, 0, null, `root-${idx}`))}
+                </ul>
+              </div>
+            ) : species ? (
+              <p className="entry-muted">{displayName} does not evolve.</p>
+            ) : (
+              <p className="entry-muted">Loading the evolution line…</p>
+            )}
+            {doesNotEvolve ? <p className="entry-muted">{displayName} does not evolve.</p> : null}
+            {alternateFormsEvolutionTree.length > 0 ? (
+              <section className="evo-alt" aria-label="Other forms">
+                <h3 className="label">Other forms</h3>
+                <div className="evo-tree evo-tree-alt">
+                  <ul className="evo-tree-roots">
+                    {alternateFormsEvolutionTree.map((entry, idx) =>
+                      renderEvolutionBranch(entry, 0, null, `alt-root-${idx}`, selectedEvolutionRegion, true)
+                    )}
+                  </ul>
+                </div>
+              </section>
+            ) : null}
+            {battleForms.length > 0 ? (
+              <section className="evo-alt" aria-label="Battle forms">
+                <h3 className="label">Mega Evolution &amp; Gigantamax</h3>
+                <ul className="evo-forms">
+                  {battleForms.map((form) => (
+                    <li key={form.id}>
+                      <button
+                        type="button"
+                        className={`evo-tree-pokemon${String(form.id) === String(id) ? " is-current" : ""}`}
+                        aria-pressed={String(form.id) === String(id)}
+                        onClick={() => onSelectPokemon?.(String(form.id), form.name, `https://pokeapi.co/api/v2/pokemon/${form.id}`)}
+                      >
+                        <span className="evo-tree-icon">
+                          <SpriteImage id={form.id} alt="" width={48} height={48} loading="lazy" shiny={shiny} formName={form.name} />
+                        </span>
+                        <span className="evo-tree-name">{formatDisplayName(form.name)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+
+        {tab === "area" ? (
+          <AreaPanel
+            games={gameAvailability}
+            primary={latestCatchGame}
+            selectedGameLabel={selectedGameLabel}
+            loading={gameAvailabilityLoading}
+            error={gameAvailabilityError}
+            logoLookup={GAME_LOGO_LOOKUP}
+          />
+        ) : null}
+
+        {tab === "moves" ? (
+          shouldShowLearnset ? (
+            <MovesPanel
+              learnset={learnset}
+              meta={learnsetMeta}
+              moveDetailsMap={moveDetailsMap}
+              stabTypes={displayTypeNames}
+              recommended={recommendedMoves}
+              recommendedLabel={smogonGenLabel ? `Competitive set · ${smogonGenLabel}` : "Competitive set"}
+            />
+          ) : details ? (
+            <p className="entry-muted">No move data for this Pokémon.</p>
+          ) : (
+            <p className="entry-muted">Loading moves…</p>
+          )
+        ) : null}
+      </section>
+
       {natureOverlayName && smogonNature && (
-        <NatureOverlay
-          natureName={natureOverlayName}
-          recommendedNature={smogonNature}
-          onClose={closeNatureOverlay}
-        />
-      )}
-      {activeGame && (
-        <GameAvailabilityModal
-          games={gameAvailability}
-          activeGame={activeGame}
-          pokemonName={name}
-          onClose={closeGameModal}
-        />
+        <NatureOverlay natureName={natureOverlayName} recommendedNature={smogonNature} onClose={closeNatureOverlay} />
       )}
       {isEvModalOpen && hasRecommendedEvs && (
-        <RecommendedEvModal
-          evs={smogonEvs}
-          stats={details?.stats || []}
-          onClose={closeEvInfoModal}
-        />
+        <RecommendedEvModal evs={smogonEvs} stats={details?.stats || []} onClose={closeEvInfoModal} />
       )}
       {activeAbility && (
         <AbilityOverlay
@@ -6353,15 +5569,6 @@ function DetailPanel({
           onSelectItem={setActiveItemName}
         />
       )}
-      {isFlavorModalOpen && flavorTextVersions.length > 0 && (
-        <PokedexEntriesModal
-          versions={flavorTextVersions}
-          selectedVersion={selectedFlavorVersion}
-          onSelect={selectFlavorVersion}
-          onClose={closeFlavorModal}
-          pokemonName={name}
-        />
-      )}
       {isEvolutionDetailModalOpen && evolutionDetailData && (
         <EvolutionDetailModal
           data={evolutionDetailData}
@@ -6370,17 +5577,7 @@ function DetailPanel({
           onClose={() => setIsEvolutionDetailModalOpen(false)}
         />
       )}
-      {isLearnsetModalOpen && shouldShowLearnset && (
-        <LearnsetModal
-          learnset={learnset}
-          learnsetMeta={learnsetMeta}
-          pokemonName={name}
-          moveDetailsMap={moveDetailsMap}
-          pokemonTypes={details?.types}
-          onClose={() => setIsLearnsetModalOpen(false)}
-        />
-      )}
-    </aside>
+    </article>
   );
 }
 
@@ -6794,7 +5991,7 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
         onMouseDown={handleModalMouseDown}
       >
         <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close nature details">
-          X
+          <Icon name="close" />
         </button>
         <div className="ability-modal-left">
           <div className="ability-modal-header">
@@ -7314,7 +6511,9 @@ function ItemOverlay({ itemName, onClose, pokemonAlias, generationHint }) {
         onMouseDown={handleModalMouseDown}
         onContextMenu={handleModalContextMenu}
       >
-        <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close item details">X</button>
+        <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close item details">
+          <Icon name="close" />
+        </button>
         <div className="ability-modal-left">
           <div className="ability-modal-header">
             <h2 className="ability-modal-title" id={titleId}>
@@ -7372,316 +6571,6 @@ function ItemOverlay({ itemName, onClose, pokemonAlias, generationHint }) {
               )}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GameAvailabilityModal({ games, activeGame, pokemonName, onClose }) {
-  const gameList = Array.isArray(games) ? games : [];
-  const activeVersion = activeGame?.version ?? null;
-  const displayPokemonName = pokemonName ? formatDisplayName(pokemonName) : "";
-  const titleId = "game-modal-title";
-  const sortedGameList = useMemo(() => {
-    const copy = gameList.slice();
-    if (copy.length <= 1) return copy;
-
-    const toOrderValue = (value) => {
-      if (!value) return -1;
-      if (VERSION_ORDER_LOOKUP.has(value)) return VERSION_ORDER_LOOKUP.get(value);
-      const normalized = normalizeLocalKey(value);
-      if (normalized && VERSION_ORDER_LOOKUP.has(normalized)) {
-        return VERSION_ORDER_LOOKUP.get(normalized);
-      }
-      return -1;
-    };
-
-    const toGameOrder = (game) => {
-      if (!game) return -1;
-
-      const version = game.version;
-      if (version) {
-        const order = toOrderValue(version);
-        if (order >= 0) return order;
-      }
-
-      if (Array.isArray(game.versions) && game.versions.length > 0) {
-        const values = game.versions.map(toOrderValue).filter((value) => value >= 0);
-        if (values.length > 0) return Math.max(...values);
-      }
-
-      const labelOrder = toOrderValue(game.label);
-      if (labelOrder >= 0) return labelOrder;
-
-      return -1;
-    };
-
-    copy.sort((a, b) => {
-      const orderA = toGameOrder(a);
-      const orderB = toGameOrder(b);
-      if (orderA !== orderB) return orderB - orderA;
-
-      const labelA = String(a?.label ?? "").toLowerCase();
-      const labelB = String(b?.label ?? "").toLowerCase();
-      if (labelA && labelB) return labelA.localeCompare(labelB);
-      if (labelA) return -1;
-      if (labelB) return 1;
-      return 0;
-    });
-
-    return copy;
-  }, [gameList]);
-  const totalGames = sortedGameList.length;
-  const activeSectionRef = useRef(null);
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose?.();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!activeVersion) return;
-    if (!activeSectionRef.current) return;
-    try {
-      activeSectionRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
-    } catch {
-      activeSectionRef.current.scrollIntoView();
-    }
-  }, [activeVersion]);
-
-  const handleBackdropMouseDown = (event) => {
-    event.stopPropagation();
-    onClose?.();
-  };
-
-  const handleModalMouseDown = (event) => {
-    event.stopPropagation();
-  };
-
-  let summaryText;
-  if (totalGames === 0) {
-    summaryText = "No wild encounter data available.";
-  } else if (totalGames === 1) {
-    summaryText = `Encounter data available in ${sortedGameList[0]?.label ?? "this game"}.`;
-  } else {
-    summaryText = `Encounter data across ${totalGames} games.`;
-    if (activeGame?.label) {
-      summaryText += ` Latest: ${activeGame.label}.`;
-    }
-  }
-
-  return (
-    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
-      <div
-        className="game-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onMouseDown={handleModalMouseDown}
-      >
-        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close catch locations">
-          X
-        </button>
-        <header className="game-modal-header">
-          <h2 className="game-modal-title" id={titleId}>
-            {displayPokemonName && (
-              <>
-                <span className="game-modal-title-name">{displayPokemonName}</span>
-                <span className="game-modal-title-sep"> – </span>
-              </>
-            )}
-            <span className="game-modal-title-game">Encounter Locations</span>
-          </h2>
-          <p className="game-modal-subtitle">{summaryText}</p>
-        </header>
-        <div className="game-modal-body game-modal-body--single">
-          {totalGames > 0 ? (
-            <ul className="game-modal-area-list">
-              {sortedGameList.map((game, gameIndex) => {
-                const logos = Array.isArray(game?.logos)
-                  ? game.logos
-                      .map((logo) => GAME_LOGO_LOOKUP.get(logo))
-                      .filter(Boolean)
-                  : [];
-                const methodEntries = [];
-                const areas = Array.isArray(game?.areas) ? game.areas : [];
-                areas.forEach((area, areaIndex) => {
-                  const methods = Array.isArray(area?.methods) ? area.methods : [];
-                  methods.forEach((method, methodIndex) => {
-                    methodEntries.push({
-                      method: method || {},
-                      areaLabel: area?.label || "",
-                      key: `${game.version || game.label || gameIndex}-${areaIndex}-${methodIndex}`,
-                    });
-                  });
-                });
-                const isActive = activeVersion != null && game.version === activeVersion;
-
-                return (
-                  <li
-                    key={game.version || game.label || gameIndex}
-                    className={`game-modal-area game-modal-game-area${isActive ? " is-active" : ""}`}
-                    ref={isActive ? activeSectionRef : undefined}
-                  >
-                    {methodEntries.length > 0 ? (
-                      <ul className="game-modal-methods">
-                        {methodEntries.map(({ method, areaLabel, key }, methodIndex) => {
-                          const descriptors = Array.isArray(method?.descriptors) ? method.descriptors : [];
-                          const minLevel = method?.minLevel ?? method?.min_level ?? null;
-                          const maxLevel = method?.maxLevel ?? method?.max_level ?? null;
-                          const chance = method?.chance ?? null;
-                          const metaParts = [];
-                          if (minLevel != null || maxLevel != null) {
-                            if (minLevel != null && maxLevel != null) {
-                              metaParts.push(
-                                minLevel === maxLevel ? `Lv. ${minLevel}` : `Lv. ${minLevel}-${maxLevel}`
-                              );
-                            } else if (minLevel != null) {
-                              metaParts.push(`Lv. ${minLevel}+`);
-                            } else if (maxLevel != null) {
-                              metaParts.push(`Up to Lv. ${maxLevel}`);
-                            }
-                          }
-                          if (chance != null) {
-                            metaParts.push(`${chance}%`);
-                          }
-                          if (descriptors.length > 0) {
-                            metaParts.push(descriptors.join(", "));
-                          }
-                          const areaTitle =
-                            areaLabel &&
-                            areaLabel.trim() &&
-                            areaLabel.trim().toLowerCase() !== "locations"
-                              ? areaLabel.trim()
-                              : null;
-                          const rawLabel = String(method?.label || "").trim();
-                          const isGenericLabel = /^location\s+\d+$/i.test(rawLabel);
-                          const labelParts = [];
-                          if (areaTitle) labelParts.push(areaTitle);
-                          if (rawLabel && !isGenericLabel) labelParts.push(rawLabel);
-                          const displayLabel = labelParts.join(" • ");
-                          const descriptionText = String(method?.description || "").trim();
-                          const formattedDescription = (() => {
-                            if (!descriptionText) return [];
-
-                            const segments = [];
-                            let buffer = "";
-                            let parenDepth = 0;
-
-                            const commit = () => {
-                              const trimmed = buffer.trim();
-                              if (trimmed) {
-                                segments.push(trimmed);
-                              }
-                              buffer = "";
-                            };
-
-                            for (let idx = 0; idx < descriptionText.length; idx += 1) {
-                              const char = descriptionText[idx];
-
-                              if (char === "\r") {
-                                continue;
-                              }
-
-                              if (char === "(") {
-                                parenDepth += 1;
-                                buffer += char;
-                                continue;
-                              }
-
-                              if (char === ")") {
-                                parenDepth = Math.max(0, parenDepth - 1);
-                                buffer += char;
-                                continue;
-                              }
-
-                              if (char === "\n" || char === ";" || char === "•") {
-                                commit();
-                                continue;
-                              }
-
-                              if (char === ",") {
-                                if (parenDepth > 0) {
-                                  buffer += char;
-                                  continue;
-                                }
-                                commit();
-                                continue;
-                              }
-
-                              buffer += char;
-                            }
-
-                            commit();
-                            return segments;
-                          })();
-                          const showEmptyState =
-                            formattedDescription.length === 0 && !displayLabel && metaParts.length === 0;
-                          const isFirstMethod = methodIndex === 0;
-
-                          return (
-                            <li key={key} className="game-modal-method">
-                              {isFirstMethod && (
-                                <div className="game-modal-method-game">
-                                  {logos.length > 0 && (
-                                    <span className="game-modal-method-game-logos" aria-hidden="true">
-                                      {logos.map((src) => (
-                                        <img key={src} src={src} alt="" className="game-modal-logo" />
-                                      ))}
-                                    </span>
-                                  )}
-                                  <span className="game-modal-method-game-name">{game.label}</span>
-                                </div>
-                              )}
-                              {displayLabel && (
-                                <span className="game-modal-method-label">{displayLabel}</span>
-                              )}
-                              {metaParts.length > 0 && (
-                                <span className="game-modal-method-meta">{metaParts.join(" • ")}</span>
-                              )}
-                              {formattedDescription.length > 0 && (
-                                <ul className="game-modal-method-description">
-                                  {formattedDescription.map((line, lineIdx) => (
-                                    <li key={`${key}-desc-${lineIdx}`}>{line}</li>
-                                  ))}
-                                </ul>
-                              )}
-                              {showEmptyState && (
-                                <div className="game-modal-methods-empty">Encounter details unavailable.</div>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <div className="game-modal-methods-empty">
-                        <div className="game-modal-method-game">
-                          {logos.length > 0 && (
-                            <span className="game-modal-method-game-logos" aria-hidden="true">
-                              {logos.map((src) => (
-                                <img key={src} src={src} alt="" className="game-modal-logo" />
-                              ))}
-                            </span>
-                          )}
-                          <span className="game-modal-method-game-name">{game.label}</span>
-                        </div>
-                        <div>No encounter details available.</div>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="game-modal-empty">No wild encounter data available.</div>
-          )}
         </div>
       </div>
     </div>
@@ -7881,7 +6770,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
         onMouseDown={handleModalMouseDown}
       >
         <button type="button" className="ability-modal-close" onClick={onClose} aria-label="Close ability details">
-          X
+          <Icon name="close" />
         </button>
         <div className="ability-modal-left">
           <div className="ability-modal-header">
@@ -7963,7 +6852,7 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
           </div>
         </div>
         <div className="ability-modal-right">
-          <h3 className="ability-modal-subtitle">Also Learns</h3>
+          <h3 className="ability-modal-subtitle">Pokémon with this ability</h3>
           <div className="ability-learners-header">
             <input
               type="search"

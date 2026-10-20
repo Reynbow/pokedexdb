@@ -1,0 +1,311 @@
+/* Site shell: the device bar, phone tab bar and the sheets they open. */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__page {
+  flex: 1;
+  min-width: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--s-3);
+  top: -100px;
+  z-index: var(--z-modal);
+  padding: var(--s-2) var(--s-3);
+  background: var(--select);
+  color: var(--select-ink);
+  font-family: var(--font-pixel);
+  border-radius: var(--r-2);
+}
+.skip-link:focus {
+  top: var(--s-2);
+}
+
+/* ---------------------------------------------------------------- Device bar */
+
+.devicebar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-bar);
+  height: var(--bar-h);
+  background: var(--screen-0);
+  border-bottom: 2px solid var(--frame);
+  view-transition-name: devicebar;
+}
+
+.devicebar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  height: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--s-5);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  color: var(--ink);
+  text-decoration: none;
+}
+.wordmark:hover {
+  color: var(--ink);
+}
+.wordmark__lens {
+  width: 30px;
+  height: 21px;
+  shape-rendering: crispEdges;
+}
+.wordmark__text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-logo);
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.wordmark__db {
+  padding: 2px 5px 3px;
+  /* The pixel B reads as an 8 at this size */
+  font-family: var(--font-ui);
+  font-weight: 800;
+  background: var(--red);
+  border-radius: var(--r-1);
+  color: #fff;
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+}
+
+.devicebar__nav {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  gap: 2px;
+  min-width: 0;
+}
+
+.devicebar__link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s-3);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.devicebar__link:hover {
+  color: var(--ink);
+}
+.devicebar__link[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: var(--select);
+}
+
+.devicebar__search {
+  margin-left: auto;
+  width: 260px;
+  flex: none;
+}
+
+.devicebar__search-toggle {
+  display: none;
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------- Jump search */
+
+.jump {
+  position: relative;
+}
+.jump__input {
+  min-height: 36px;
+  padding-right: 32px;
+}
+.jump__kbd {
+  position: absolute;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--frame);
+  border-radius: var(--r-1);
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+.jump__input:focus + .jump__kbd {
+  display: none;
+}
+.jump__results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--s-1);
+  list-style: none;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.jump__option {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-2);
+  cursor: pointer;
+}
+.jump__option[aria-selected="true"] {
+  background: var(--select);
+  color: var(--select-ink);
+}
+.jump__option[aria-selected="true"] .dexno {
+  color: var(--select-ink);
+}
+.jump__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jump__none {
+  padding: var(--s-3);
+  color: var(--ink-2);
+}
+
+/* ---------------------------------------------------------------- Phone */
+
+.tabbar {
+  display: none;
+}
+
+.search-sheet {
+  top: var(--s-3);
+  left: var(--s-3);
+  right: var(--s-3);
+  padding: var(--s-3);
+}
+.search-sheet .jump__results {
+  position: static;
+  margin-top: var(--s-2);
+  box-shadow: none;
+  border-width: 1px;
+}
+
+.more-sheet {
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: calc(var(--tabbar-h) + var(--s-3) + env(safe-area-inset-bottom, 0px));
+  padding: var(--s-2);
+}
+.more-sheet__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.more-sheet__link {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--s-4);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-lg);
+  text-decoration: none;
+}
+.more-sheet__link[aria-current="page"] {
+  background: var(--select);
+  color: var(--select-ink);
+}
+
+@media (max-width: 1100px) {
+  .devicebar__link {
+    padding: 0 var(--s-2);
+    font-size: var(--text-sm);
+  }
+  .devicebar__search {
+    width: 200px;
+  }
+}
+
+@media (max-width: 900px) {
+  .devicebar__inner {
+    padding: 0 var(--s-4);
+  }
+  .devicebar__nav,
+  .devicebar__search {
+    display: none;
+  }
+  .devicebar__search-toggle {
+    display: inline-flex;
+  }
+  /* The Pokédex browse view has its own search in the context strip; an open entry doesn't */
+  .shell:has(.dex:not(.dex--open)) .devicebar__search-toggle {
+    display: none;
+  }
+
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-bar);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--screen-0);
+    border-top: 2px solid var(--frame);
+    view-transition-name: tabbar;
+  }
+  .tabbar__link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-top: 3px solid transparent;
+    margin-top: -2px;
+    color: var(--ink-3);
+    font-family: var(--font-pixel);
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+  }
+  .tabbar__link .icon {
+    width: 18px;
+    height: 18px;
+  }
+  /* The current section is the device menu's selection: inverse video */
+  .tabbar__link[aria-current="page"],
+  .tabbar__link[aria-expanded="true"] {
+    background: var(--select);
+    color: var(--select-ink);
+  }
+
+  .shell__page {
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  }
+}

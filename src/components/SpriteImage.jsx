@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getBasePath } from "../utils/url.js";
 
 const SPRITE_PLACEHOLDER =
-  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96' shape-rendering='crispEdges'><path fill='%2344536a' d='M40 30h16v4h4v12h-4v4h-4v6h-8v-8h4v-4h4v-8h-8v4h-8v-6h4zM44 60h8v8h-8z'/></svg>";
 
 const buildSpriteSources = (id, variant, options = {}) => {
   const { formName, speciesId, pokemonUrl, dexNumber, shiny = false, gameSpritePath = null } = options;

@@ -2,9 +2,12 @@
 import { StrictMode, Component, useEffect, useRef, useState, Suspense, lazy, startTransition } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
+import '@fontsource/dotgothic16/latin-400.css'
+import '@fontsource/dotgothic16/latin-ext-400.css'
 import './index.css'
-import './design-system.css'
+import './styles/components.css'
 import App from './App.jsx'
+import SiteShell from './shell/SiteShell.jsx'
 import { getLoadedPage, getPageLoader, preloadRoute, redirectLegacyHashRoute, resolveRouteKey } from './router.js'
 import { PAGE_ROUTE_BY_KEY } from './routeMeta.js'
 
@@ -16,7 +19,6 @@ const PAGES = {
   ev: lazy(getPageLoader('ev')),
   whosthat: lazy(getPageLoader('whosthat')),
   save: lazy(getPageLoader('save')),
-  home: lazy(getPageLoader('home')),
   ...(import.meta.env.DEV ? { test: lazy(getPageLoader('test')) } : {}),
 }
 
@@ -155,14 +157,19 @@ function RootRouter() {
     if (route?.title) document.title = route.title
   }, [routeKey])
 
-  if (!PAGES[routeKey]) return <App />
   // After in-app navigation the code is already loaded, so render it directly (React.lazy would
   // still suspend for a tick and flash the fallback inside the view transition).
-  const Page = getLoadedPage(routeKey) || PAGES[routeKey]
+  const Page = PAGES[routeKey] ? getLoadedPage(routeKey) || PAGES[routeKey] : null
   return (
-    <Suspense fallback={<LoadingFallback />}>
-      <Page />
-    </Suspense>
+    <SiteShell routeKey={routeKey}>
+      {Page ? (
+        <Suspense fallback={<LoadingFallback />}>
+          <Page />
+        </Suspense>
+      ) : (
+        <App />
+      )}
+    </SiteShell>
   )
 }
 

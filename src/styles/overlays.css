@@ -1,0 +1,319 @@
+/* Entry popups (ability, nature, item, EV plan, evolution method) on the device's window language.
+   These components keep their original markup; this sheet re-skins the old App.css look. */
+
+/* ---------------------------------------------------------------- Frame */
+
+.ability-modal-backdrop,
+.ev-modal-backdrop,
+.game-modal-backdrop {
+  z-index: var(--z-modal);
+  background: rgba(4, 6, 10, 0.72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.ability-modal,
+.ev-modal,
+.game-modal {
+  background: var(--screen-1);
+  border: 2px solid var(--frame-strong);
+  border-radius: var(--r-3);
+  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line), var(--shadow-pop);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.game-modal {
+  height: auto;
+  max-height: min(84vh, 680px);
+}
+.game-modal-header {
+  padding-right: var(--s-7);
+}
+
+.ability-modal-right,
+.game-modal-column-right {
+  background: transparent;
+  border-color: var(--line);
+}
+
+.ability-modal-title,
+.ev-modal-title,
+.game-modal-title {
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ability-modal-subtitle,
+.ev-modal-subtitle,
+.ability-learners-header,
+.ability-type-filter-header,
+.nature-section-title,
+.ev-item-category-title {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ability-modal-subtle,
+.game-modal-subtitle,
+.ability-flavor-version,
+.nature-section-description,
+.ev-modal-intro {
+  color: var(--ink-3);
+}
+.ability-effect,
+.effect-summary,
+.ability-flavor,
+.ev-modal-explanation-text {
+  color: var(--ink-2);
+}
+
+/* Close */
+.ability-modal-close,
+.ev-modal-close,
+.game-modal-close {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 var(--s-2);
+  background: var(--screen-2);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-2);
+  box-shadow: none;
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  transform: none;
+}
+.ability-modal-close:hover,
+.ability-modal-close:focus-visible,
+.ev-modal-close:hover,
+.ev-modal-close:focus-visible,
+.game-modal-close:hover,
+.game-modal-close:focus-visible {
+  background: var(--screen-3);
+  border-color: var(--frame-strong);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- Inner surfaces */
+
+.ability-modal-loading,
+.ability-modal-error,
+.ability-learners-loading,
+.ability-learners-error,
+.ability-learners-empty,
+.ability-type-filters-empty,
+.ability-learner,
+.nature-item,
+.nature-info-card,
+.nature-neutral-card,
+.nature-highlight,
+.ev-spread-row,
+.ev-item-row,
+.ev-modal-explanation,
+.ev-modal-empty,
+.game-modal-method,
+.game-modal-methods-empty,
+.game-modal-empty,
+.game-modal-game-button {
+  background: var(--screen-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  box-shadow: none;
+  color: var(--ink);
+}
+.ability-modal-error {
+  border-color: var(--error);
+}
+.ability-learner:hover,
+.ability-learner:focus-visible,
+.nature-item:hover,
+.nature-item:focus-visible,
+.game-modal-game-button:hover,
+.game-modal-game-button:focus-visible {
+  background: var(--screen-3);
+  border-color: var(--frame);
+  transform: none;
+}
+/* The current choice: inverse video */
+.nature-item.is-active,
+.game-modal-game-button.is-active {
+  background: var(--select);
+  border-color: var(--select);
+  box-shadow: none;
+  color: var(--select-ink);
+}
+.nature-item.is-active * {
+  color: var(--select-ink);
+}
+.nature-item.is-recommended,
+.nature-item.is-recommended:not(.is-active) {
+  background: var(--screen-2);
+  border-color: var(--frame-strong);
+}
+
+/* Marks: positive / negative / flavour as stamps */
+.nature-highlight-positive,
+.nature-item-chip-positive {
+  background: transparent;
+  border-color: var(--info);
+  color: var(--info);
+}
+.nature-highlight-negative,
+.nature-item-chip-negative {
+  background: transparent;
+  border-color: var(--error);
+  color: var(--error);
+}
+.nature-highlight-flavor-like {
+  background: transparent;
+  border-color: var(--warn);
+}
+.nature-highlight-flavor-hate {
+  background: transparent;
+  border-color: var(--frame-strong);
+}
+.nature-item-chip,
+.nature-item-chip-neutral,
+.nature-item-tag,
+.nature-chip,
+.ability-chip,
+.ability-tag,
+.ability-learner-tag,
+.ev-item-stat,
+.ev-item-icon {
+  background: var(--screen-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  box-shadow: none;
+  color: var(--ink-2);
+}
+.nature-item-tag,
+.ability-learner-tag,
+.ability-tag {
+  color: var(--warn);
+  border-color: currentColor;
+  font-family: var(--font-pixel);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.nature-chip:hover,
+.ability-chip:hover {
+  background: var(--screen-3);
+  border-color: var(--frame);
+  box-shadow: none;
+}
+
+.nature-spinner {
+  border-color: var(--line);
+  border-top-color: var(--select);
+}
+
+/* Fields and buttons */
+.ability-search-input {
+  min-height: 40px;
+  background: var(--screen-2);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-2);
+  box-shadow: none;
+  color: var(--ink);
+}
+.ability-search-input:focus {
+  background: var(--screen-2);
+  border-color: var(--select);
+  box-shadow: none;
+}
+.ability-retry-btn,
+.ability-type-clear {
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  background: var(--screen-2);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+}
+.ability-type-clear {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+}
+
+/* ---------------------------------------------------------------- Type pills: flat type colours */
+
+:is(.ability-modal, .ev-modal, .game-modal) :is(.type-chip, .ability-type-chip, .ability-learner-type) {
+  background: var(--type, var(--t-unknown));
+  border: 0;
+  border-radius: var(--r-1);
+  box-shadow: none;
+  color: #fff;
+  font-family: var(--font-pixel);
+  letter-spacing: 0.06em;
+  text-shadow: none;
+  text-transform: uppercase;
+}
+:is(.ability-modal, .ev-modal, .game-modal) .ability-type-chip:not(.is-active) {
+  background: var(--screen-2);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+:is(.ability-modal, .ev-modal, .game-modal) .ability-type-chip.is-active {
+  background: var(--type, var(--t-unknown));
+  color: #fff;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+:is(.ability-modal, .ev-modal, .game-modal) .ability-learner-type::after {
+  background: var(--screen-0);
+  border: 1px solid var(--frame);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink);
+}
+:is(.ability-modal, .ev-modal, .game-modal) .ability-learner-type::before {
+  background: var(--screen-0);
+}
+:is(.ability-modal, .ev-modal, .game-modal) .type-normal { --type: var(--t-normal); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-fire { --type: var(--t-fire); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-water { --type: var(--t-water); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-electric { --type: var(--t-electric); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-grass { --type: var(--t-grass); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-ice { --type: var(--t-ice); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-fighting { --type: var(--t-fighting); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-poison { --type: var(--t-poison); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-ground { --type: var(--t-ground); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-flying { --type: var(--t-flying); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-psychic { --type: var(--t-psychic); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-bug { --type: var(--t-bug); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-rock { --type: var(--t-rock); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-ghost { --type: var(--t-ghost); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-dragon { --type: var(--t-dragon); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-dark { --type: var(--t-dark); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-steel { --type: var(--t-steel); }
+:is(.ability-modal, .ev-modal, .game-modal) .type-fairy { --type: var(--t-fairy); }
+
+/* ---------------------------------------------------------------- Phone: bottom sheet */
+
+@media (max-width: 900px) {
+  .ability-modal-backdrop,
+  .ev-modal-backdrop,
+  .game-modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .ability-modal,
+  .ev-modal,
+  .game-modal {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: 88dvh;
+    border-bottom: 0;
+    border-radius: var(--r-3) var(--r-3) 0 0;
+    padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px));
+    animation: popsheet-up var(--dur-2) var(--ease-out);
+  }
+}

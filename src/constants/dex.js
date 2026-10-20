@@ -136,7 +136,7 @@ export const DEX_FILTERS = [
         apiNames: ["lumiose-city", "hyperspace"],
         logos: ["za.png"],
         sections: [
-          { key: "lumiose-city", apiNames: ["lumiose-city"] },
+          { key: "lumiose-city", label: "Lumiose Pokédex", apiNames: ["lumiose-city"] },
           { key: "hyperspace", label: "Hyperspace Lumiose (Mega Dimension)", apiNames: ["hyperspace"] },
         ],
       },

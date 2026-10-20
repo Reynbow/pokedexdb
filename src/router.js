@@ -10,7 +10,6 @@ const PAGE_LOADERS = {
   ev: () => import("./EvTrainingPage.jsx"),
   whosthat: () => import("./MinigamePage.jsx"),
   save: () => import("./SavPage.jsx"),
-  home: () => import("./HomePage.jsx"),
   // Developer-only API explorer, never shipped in production builds
   ...(import.meta.env.DEV ? { test: () => import("./TestPage.jsx") } : {}),
 };

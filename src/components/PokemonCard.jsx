@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Cursor } from "./Icon.jsx";
 import SpriteImage from "./SpriteImage.jsx";
 import { formatPokemonName } from "../utils/pokemonNames.js";
 import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "../constants/tags.js";
-import { GAME_LOGO_LOOKUP, VERSION_LOGO_FILES, VERSION_COLORS, GAME_GENERATION_LOOKUP } from "../constants/games.js";
+import { GAME_LOGO_LOOKUP, VERSION_LOGO_FILES } from "../constants/games.js";
+import { buildPokemonPath } from "../utils/url.js";
 import { getExclusiveVersionForSpecies } from "../constants/exclusives.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, LEGENDARY_NAMES, MYTHICAL_NAMES } from "../constants/species.js";
 
@@ -52,30 +54,6 @@ const stripMegaGmaxTokens = (rawName) => {
   const filtered = tokens.filter((t) => t !== "mega" && t !== "gmax");
   return filtered.join("-");
 };
-function hexToRgba(hex, alpha) {
-  try {
-    const m = String(hex || "").trim().toLowerCase();
-    if (!m.startsWith("#")) return hex;
-    let r, g, b;
-    if (m.length === 4) {
-      r = parseInt(m[1] + m[1], 16);
-      g = parseInt(m[2] + m[2], 16);
-      b = parseInt(m[3] + m[3], 16);
-    } else if (m.length === 7) {
-      r = parseInt(m.slice(1, 3), 16);
-      g = parseInt(m.slice(3, 5), 16);
-      b = parseInt(m.slice(5, 7), 16);
-    } else {
-      return hex;
-    }
-    const a = Number(alpha);
-    const clamped = Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 1;
-    return `rgba(${r}, ${g}, ${b}, ${clamped})`;
-  } catch {
-    return hex;
-  }
-}
-
 const formatDisplayName = formatPokemonName;
 
 const deriveSpecialTags = (name) => {
@@ -125,6 +103,17 @@ const getSpriteVariantForGame = (selectedGame) => {
   return { variant: null, gameSpritePath: null };
 };
 
+const isPlainLeftClick = (event) =>
+  event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+
+// Exclusive-version stamp text: "Let's Go Pikachu" reads as "Pikachu" next to the logo
+const shortVersionLabel = (versionKey) =>
+  toTitleCase(String(versionKey).replace(/^lets-go-/, "").replace(/-/g, " "));
+
+/**
+ * One Pokédex entry. The same markup is a grid tile on wide screens and a numbered row
+ * in the entry list and on phones; CSS decides (.dex-grid / .dex-rows).
+ */
 function PokemonCard({
   name,
   id,
@@ -136,7 +125,6 @@ function PokemonCard({
   detailsCache,
   shiny = false,
   selectedGame = null,
-  selectedDex = null,
   eagerLoad = false,
   displayNameOverride = null,
 }) {
@@ -145,7 +133,6 @@ function PokemonCard({
   const [fetchedTypes, setFetchedTypes] = useState(() => cache.get(String(id))?.types || []);
   // Types normally come from the static Pokémon index; only fetch for entries missing from it.
   const types = hasTypesProp ? typesProp : fetchedTypes;
-  const handleSelect = () => onSelect?.(id, name, url);
   const intersectionOptions = useMemo(() => ({ root: null, rootMargin: "600px 0px", threshold: 0.01 }), []);
   const [cardRef, inView] = useInView(intersectionOptions);
   const baseSpeciesId = useMemo(() => {
@@ -163,24 +150,14 @@ function PokemonCard({
         const meta = SPECIAL_TAG_META.get(tag);
         if (!meta) return null;
         const order = SPECIAL_FILTERS.indexOf(tag);
-        return {
-          key: tag,
-          tag,
-          short: meta.short,
-          className: meta.className,
-          order: order >= 0 ? order : 99,
-        };
+        return { key: tag, tag, short: meta.short, order: order >= 0 ? order : 99 };
       })
       .filter(Boolean)
-      .sort((a, b) => {
-        if (a.order !== b.order) return a.order - b.order;
-        return a.tag.localeCompare(b.tag);
-      });
+      .sort((a, b) => a.order - b.order || a.tag.localeCompare(b.tag));
   }, [name]);
 
   const { formAwareName, baseSpeciesName } = useMemo(() => {
     const stripped = stripMegaGmaxTokens(name || "").toLowerCase();
-    const formName = stripped; // keep regional forms for form-aware checks
     // Preserve Indeedee gender forms and Paldean Tauros breed forms
     if (/^indeedee-(male|female)$/.test(stripped)) {
       return { formAwareName: stripped, baseSpeciesName: stripped };
@@ -189,13 +166,13 @@ function PokemonCard({
       return { formAwareName: stripped, baseSpeciesName: stripped };
     }
     // Remove common regional/form tokens so exclusives can fall back to base species
-    const baseName = formName
+    const baseName = stripped
       .replace(/-(alola|galar|hisui|paldea|original|totem|starter|male|female|f|m)$/g, "")
       .replace(/-(mega|gmax)$/g, "");
-    return { formAwareName: formName, baseSpeciesName: baseName };
+    return { formAwareName: stripped, baseSpeciesName: baseName };
   }, [name]);
 
-  const exclusiveBadge = useMemo(() => {
+  const exclusive = useMemo(() => {
     if (!selectedGame) return null;
     // Try form-aware name first, then fall back to base species name
     const versionKey =
@@ -203,16 +180,14 @@ function PokemonCard({
       getExclusiveVersionForSpecies(selectedGame, baseSpeciesName);
     if (!versionKey) return null;
     const logoFile = VERSION_LOGO_FILES.get(versionKey);
-    const logoUrl = logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null;
-    if (!logoUrl) return null;
-    const label = toTitleCase(String(versionKey).replace(/-/g, " "));
-    const color = VERSION_COLORS.get(versionKey) || null;
-    return { logoUrl, label, color, versionKey };
+    return {
+      logoUrl: logoFile ? GAME_LOGO_LOOKUP.get(logoFile) : null,
+      label: toTitleCase(String(versionKey).replace(/-/g, " ")),
+      short: shortVersionLabel(versionKey),
+    };
   }, [selectedGame, formAwareName, baseSpeciesName]);
 
-  const { variant: spriteVariant, gameSpritePath } = useMemo(() => {
-    return getSpriteVariantForGame(selectedGame);
-  }, [selectedGame]);
+  const { variant: spriteVariant, gameSpritePath } = useMemo(() => getSpriteVariantForGame(selectedGame), [selectedGame]);
 
   useEffect(() => {
     let ignore = false;
@@ -238,203 +213,79 @@ function PokemonCard({
     };
   }, [id, url, inView, cache, hasTypesProp]);
 
-  // Removed auto-scrolling on selection to avoid distracting scroll animations.
+  const dexNo = dexNumber && dexNumber !== "-" ? String(dexNumber).replace(/^#/, "No.") : "No.—";
+  const displayName = formatDisplayName(displayNameOverride || name);
 
-  // Mouse-driven parallax for the sprite
-  const hoverRafIdRef = useRef(0);
-  const mousePositionRef = useRef({ x: 0, y: 0 });
-  const isHoveringRef = useRef(false);
-  const lastBoundsRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (hoverRafIdRef.current) {
-        cancelAnimationFrame(hoverRafIdRef.current);
-        hoverRafIdRef.current = 0;
-      }
-    };
-  }, []);
-
-  const resetParallax = () => {
-    const el = cardRef.current;
-    if (!el) return;
-    el.style.setProperty("--parallax-x", "0px");
-    el.style.setProperty("--parallax-y", "0px");
-  };
-
-  const scheduleParallaxUpdate = () => {
-    if (hoverRafIdRef.current) return;
-    hoverRafIdRef.current = requestAnimationFrame(() => {
-      hoverRafIdRef.current = 0;
-      const el = cardRef.current;
-      if (!el || !isHoveringRef.current) return;
-      const bounds = lastBoundsRef.current || el.getBoundingClientRect();
-      lastBoundsRef.current = bounds;
-      const { x, y } = mousePositionRef.current;
-      const centerX = bounds.left + bounds.width / 2;
-      const centerY = bounds.top + bounds.height / 2;
-      const relX = (x - centerX) / (bounds.width / 2);
-      const relY = (y - centerY) / (bounds.height / 2);
-      const clamp = (v) => Math.max(-1, Math.min(1, v));
-      const maxOffset = 4; // px
-      // Round to integers to prevent sub-pixel blur
-      const offsetX = Math.round(clamp(relX) * maxOffset);
-      const offsetY = Math.round(clamp(relY) * maxOffset);
-      el.style.setProperty("--parallax-x", `${offsetX}px`);
-      el.style.setProperty("--parallax-y", `${offsetY}px`);
-    });
-  };
-
-  const handleMouseEnter = () => {
-    isHoveringRef.current = true;
-    lastBoundsRef.current = cardRef.current?.getBoundingClientRect() || null;
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isHoveringRef.current) return;
-    mousePositionRef.current = { x: e.clientX, y: e.clientY };
-    scheduleParallaxUpdate();
-  };
-
-  const handleMouseLeave = () => {
-    isHoveringRef.current = false;
-    resetParallax();
-  };
-
-  const dexNo = dexNumber || `#${id}`;
-
-  const isSmallSpriteFilter = 
-    selectedGame === "x-y" || 
-    selectedDex === "kalos" || 
-    selectedGame === "ruby-sapphire-emerald" || 
-    selectedDex === "hoenn";
-  
   return (
-    <div
-      className={`card${selected ? " is-selected" : ""}${exclusiveBadge ? " has-exclusive" : ""}`}
-      title={name}
-      onClick={handleSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleSelect();
-        }
-      }}
-      onMouseEnter={handleMouseEnter}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      ref={cardRef}
-      aria-current={selected ? "true" : undefined}
-      data-id={id}
-      data-type={types && types.length > 0 ? types[0] : undefined}
-      data-game={selectedGame === "x-y" || selectedGame === "ruby-sapphire-emerald" ? selectedGame : undefined}
-      data-dex={selectedDex === "kalos" || selectedDex === "hoenn" ? selectedDex : undefined}
-    >
-      {exclusiveBadge ? (
-        <>
-          <div
-            className="card-exclusive-glow"
-            aria-hidden="true"
-            style={exclusiveBadge.color ? (() => {
-              const vk = exclusiveBadge.versionKey;
-              // For Black / Black 2, use a deep blue glow for visibility
-              const baseColor = (vk === "black" || vk === "black-2") ? "#1e3a8a" : exclusiveBadge.color;
-              const a1 = 0.42;
-              const a2 = 0.22;
-              return {
-                background: `radial-gradient(circle at 100% 0%, ${hexToRgba(baseColor, a1)} 0%, ${hexToRgba(baseColor, a2)} 26%, ${hexToRgba(baseColor, 0.0)} 56%)`
-              };
-            })() : undefined}
-          />
-          <div
-            className="card-exclusive"
-            title={`Exclusive to ${exclusiveBadge.label}`}
-            aria-label={`Exclusive to ${exclusiveBadge.label}`}
-          >
-            <img src={exclusiveBadge.logoUrl} alt={exclusiveBadge.label} />
-          </div>
-        </>
-      ) : null}
-      {specialTags.length > 0 && (
-        <div className="card-tags">
-          {specialTags.map((tag) => (
-            <span key={tag.key} className={`card-tag ${tag.className}`} title={tag.tag} aria-label={tag.tag}>
-              {tag.short}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="dexno">{dexNo}</div>
-      <div 
-        className="sprite-container" 
-        style={{ 
-          position: 'relative', 
-          width: isSmallSpriteFilter ? 96 : 144, 
-          height: isSmallSpriteFilter ? 96 : 144,
+    <li className="mon-cell">
+      <a
+        ref={cardRef}
+        href={buildPokemonPath(name)}
+        className={`mon${selected ? " is-selected" : ""}`}
+        aria-current={selected ? "page" : undefined}
+        data-id={id}
+        onClick={(event) => {
+          if (!isPlainLeftClick(event)) return;
+          event.preventDefault();
+          onSelect?.(id, name, url);
         }}
       >
-        {inView ? (
-          <SpriteImage
-            className="sprite"
-            id={id}
-            alt={name}
-            width={isSmallSpriteFilter ? 96 : 144}
-            height={isSmallSpriteFilter ? 96 : 144}
-            style={{
-              width: isSmallSpriteFilter ? 96 : 144,
-              height: isSmallSpriteFilter ? 96 : 144,
-              // Ensure integer scaling for all preview sprites
-              // CSS will handle image-rendering via .card .sprite rule
-            }}
-            loading={eagerLoad ? "eager" : "lazy"}
-            fetchPriority={eagerLoad ? "high" : undefined}
-            formName={name}
-            speciesId={baseSpeciesId}
-            pokemonUrl={url}
-            dexNumber={dexNumber}
-            shiny={shiny}
-            variant={spriteVariant}
-            gameSpritePath={gameSpritePath}
-          />
-        ) : (
-          <div 
-            className="sprite-placeholder" 
-            style={{ 
-              width: isSmallSpriteFilter ? 96 : 144, 
-              height: isSmallSpriteFilter ? 96 : 144, 
-              background: 'linear-gradient(90deg, #202631 0%, #2a2f3a 50%, #202631 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 1.5s infinite',
-              borderRadius: '8px'
-            }} 
-            aria-hidden="true"
-          />
-        )}
-      </div>
-      <div className="name">{formatDisplayName(displayNameOverride || name)}</div>
-      <div className="types">
-        {types.length === 0 ? (
-          <span className="type-chip skeleton" />
-        ) : (
-          types.map((t) => (
-            <span key={t} className={`type-chip type-${t}`}>
-              {t}
-            </span>
-          ))
-        )}
-      </div>
-    </div>
+        <Cursor className="mon__cursor" />
+        <span className="mon__no">{dexNo}</span>
+        <span className="mon__sprite" aria-hidden="true">
+          {inView ? (
+            <SpriteImage
+              className="mon__img"
+              id={id}
+              alt=""
+              width={96}
+              height={96}
+              loading={eagerLoad ? "eager" : "lazy"}
+              fetchPriority={eagerLoad ? "high" : undefined}
+              formName={name}
+              speciesId={baseSpeciesId}
+              pokemonUrl={url}
+              dexNumber={dexNumber}
+              shiny={shiny}
+              variant={spriteVariant}
+              gameSpritePath={gameSpritePath}
+            />
+          ) : null}
+        </span>
+        <span className="mon__name">{displayName}</span>
+        <span className="mon__types">
+          {types.length === 0 ? (
+            <span className="tag skeleton mon__tag-skeleton" />
+          ) : (
+            types.map((t) => (
+              <span key={t} className={`tag t-${t}`}>
+                {t}
+              </span>
+            ))
+          )}
+        </span>
+        {exclusive || specialTags.length > 0 ? (
+          <span className="mon__stamps">
+            {exclusive ? (
+              <span className="stamp stamp--red mon__excl" title={`Only in Pokémon ${exclusive.label}`}>
+                {exclusive.logoUrl ? <img src={exclusive.logoUrl} alt="" width="12" height="12" /> : null}
+                <span className="sr-only">Only in </span>
+                {exclusive.short}
+              </span>
+            ) : null}
+            {specialTags.map((tag) => (
+              <span
+                key={tag.key}
+                className={`stamp${tag.tag === "Legendary" || tag.tag === "Mythical" ? " stamp--gold" : ""}`}
+              >
+                <abbr title={tag.tag}>{tag.short}</abbr>
+              </span>
+            ))}
+          </span>
+        ) : null}
+      </a>
+    </li>
   );
 }
 
 export default React.memo(PokemonCard);
-
-
-
-
-
-
-
-
