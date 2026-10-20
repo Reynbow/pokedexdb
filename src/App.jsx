@@ -1,16 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import HeaderSection from "./sections/Header.jsx";
 import GameFilters from "./sections/GameFilters.jsx";
 import FilterTabs from "./sections/FilterTabs.jsx";
 import SpriteImage from "./components/SpriteImage.jsx";
-import PrefetchSprites from "./components/PrefetchSprites.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PokemonCard from "./components/PokemonCard.jsx";
 import "./App.css";
-import { findRecommendedNature, fetchSmogonStats, fetchSmogonSets, fetchSmogonImgsIndex, normalizeSpeciesName } from "./smogonApi";
+import { findRecommendedNature, fetchSmogonSets, fetchSmogonImgsIndex, normalizeSpeciesName } from "./smogonApi";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { getPokemonSlugFromPath, updatePokemonLocation, normalizePokemonSlug, getPokemonSlugFromLocation, getBasePath } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
+import { formatPokemonName } from "./utils/pokemonNames.js";
+import { formatMoveName } from "./utils/moveNames.js";
+import { DEFAULT_TITLE, SITE_NAME } from "./routeMeta.js";
+import { resolveRouteKey } from "./router.js";
 import { ULTRA_BEASTS, PARADOX_NAMES, BABY_NAMES, REGIONAL_TOKENS, LEGENDARY_NAMES, MYTHICAL_NAMES } from "./constants/species.js";
 import { ALL_TYPES, STAT_TO_EVS_KEY } from "./constants/types.js";
 import { NEUTRAL_NATURE_KEY, NATURE_STAT_ORDER, NATURE_STAT_LABELS, NATURE_SUMMARIES } from "./constants/natures.js";
@@ -35,8 +38,20 @@ import {
   GAME_FEATURES,
   REGION_FEATURES,
 } from "./constants/games.js";
+import {
+  loadPokemonList,
+  loadPokedexMaps,
+  loadTypeChart,
+  loadMoveData,
+  getTypesForGeneration,
+  getDetailTypesForGeneration,
+  getTypeChartForGeneration,
+  computeDefensiveMatchups,
+  getMoveForVersionGroup,
+} from "./data/staticData.js";
 
 // Extra custom Pokémon entries that don't exist in PokeAPI but should appear in the Pokédex
+// (only added when PokeAPI doesn't already list them)
 const EXTRA_POKEMON = [
   // Use base Zygarde's pokemon URL so selecting the card still loads details
   { name: "zygarde-mega", url: "https://pokeapi.co/api/v2/pokemon/718" },
@@ -84,6 +99,14 @@ const getRegionGeneration = (regionName) => {
 };
 
 const humanizeName = (s) => String(s || "").replace(/-/g, " ");
+
+// "Mr. Mime", "mr mime" and "mr-mime" all become "mrmime"; "Flabébé" becomes "flabebe".
+const normalizeSearchText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 
 // Type color mapping - using the primary (first) color from the gradient
 const getTypeColor = (typeName) => {
@@ -151,14 +174,16 @@ const deriveSpecialTags = (name) => {
   return tags;
 };
 
-const isRegionalFormName = (name) => {
-  const parts = String(name || "").toLowerCase().split("-");
-  return parts.some((part) => REGIONAL_TOKENS.has(part));
-};
-
 const isCapFormName = (name) => {
   const lower = String(name || "").toLowerCase();
   return /(?:^|[-_\s])cap(?:$|[-_\s])/.test(lower) || lower.endsWith("cap");
+};
+
+// "pikachu-alola-cap" is Pikachu wearing a cap, not an Alolan form.
+const isRegionalFormName = (name) => {
+  if (isCapFormName(name)) return false;
+  const parts = String(name || "").toLowerCase().split("-");
+  return parts.some((part) => REGIONAL_TOKENS.has(part));
 };
 
 const getIdFromUrl = (url) => {
@@ -182,62 +207,13 @@ const getEntryDisplayId = (entry) => {
   return getIdFromUrl(entry.url);
 };
 
-const getEntryDisplayNumber = (entry) => {
-  const idStr = getEntryDisplayId(entry);
-  if (idStr == null) return null;
-  const value = Number(idStr);
-  return Number.isNaN(value) ? null : value;
-};
-
-const getEntryBaseId = (entry) => {
-  const dataUrl = getEntryDataUrl(entry);
-  if (!dataUrl) return null;
-  return getIdFromUrl(dataUrl);
-};
-
 const toTitleCase = (value) => {
   const base = humanizeName(value);
   return base.replace(/\b\w/g, (char) => char.toUpperCase()).trim();
 };
 
-const stripMegaGmaxTokens = (rawName) => {
-  const lower = String(rawName || "").toLowerCase();
-  if (!lower) return "";
-  const tokens = lower.split("-");
-  const filtered = tokens.filter((t) => t !== "mega" && t !== "gmax");
-  return filtered.join("-");
-};
-
-const DISPLAY_NAME_OVERRIDES = new Map([
-  ["legends-za", "Legends: Z-A"],
-]);
-
-const REGIONAL_NAME_PREFIXES = new Map([
-  ["alola", "Alolan"],
-  ["alolan", "Alolan"],
-  ["galar", "Galarian"],
-  ["galarian", "Galarian"],
-  ["hisui", "Hisuian"],
-  ["hisuan", "Hisuian"],
-]);
-
-const formatDisplayName = (rawName) => {
-  const stripped = stripMegaGmaxTokens(rawName);
-  const key = String(stripped || "").toLowerCase();
-  if (DISPLAY_NAME_OVERRIDES.has(key)) {
-    return DISPLAY_NAME_OVERRIDES.get(key);
-  }
-
-  const parts = key.split("-");
-  const suffix = parts[parts.length - 1];
-  const prefix = REGIONAL_NAME_PREFIXES.get(suffix);
-  if (prefix && parts.length > 1) {
-    const baseName = parts.slice(0, -1).join("-");
-    return `${prefix} ${toTitleCase(baseName)}`;
-  }
-
-  return toTitleCase(stripped);
-};
+// Display names ("Mr. Mime", "Galarian Farfetch’d", "Legends: Z-A") come from utils/pokemonNames.js
+const formatDisplayName = formatPokemonName;
 
 const formatEncounterDescriptor = (name) => {
   if (!name) return null;
@@ -252,11 +228,18 @@ const formatTimeOfDay = (value) => {
   return TIME_OF_DAY_LABELS[normalized] || toTitleCase(normalized);
 };
 
+// Newest first. DLC version groups are separate in PokeAPI (moves taught only in DLC are
+// listed under them). FireRed/LeafGreen (Jan 2004) came out before Emerald (Sep 2004).
 const VERSION_GROUP_RELEASE_ORDER = [
+  "mega-dimension",
   "legends-za",
+  "the-indigo-disk",
+  "the-teal-mask",
   "scarlet-violet",
   "legends-arceus",
-  "brilliant-diamond-shining-pearl",
+  "brilliant-diamond-and-shining-pearl",
+  "the-crown-tundra",
+  "the-isle-of-armor",
   "sword-shield",
   "lets-go-pikachu-lets-go-eevee",
   "ultra-sun-ultra-moon",
@@ -268,8 +251,8 @@ const VERSION_GROUP_RELEASE_ORDER = [
   "heartgold-soulsilver",
   "platinum",
   "diamond-pearl",
-  "firered-leafgreen",
   "emerald",
+  "firered-leafgreen",
   "ruby-sapphire",
   "crystal",
   "gold-silver",
@@ -281,11 +264,57 @@ const VERSION_GROUP_ORDER_LOOKUP = new Map(
   VERSION_GROUP_RELEASE_ORDER.map((name, index) => [name, index])
 );
 
+// Hidden Machines per version group (HMs were removed in Gen 7)
+const HM_MOVES_BY_VERSION_GROUP = (() => {
+  const gen1 = ["cut", "fly", "surf", "strength", "flash"];
+  const gen2 = [...gen1, "whirlpool", "waterfall"];
+  const gen3 = ["cut", "fly", "surf", "strength", "flash", "rock-smash", "waterfall", "dive"];
+  const dppt = ["cut", "fly", "surf", "strength", "defog", "rock-smash", "waterfall", "rock-climb"];
+  const hgss = ["cut", "fly", "surf", "strength", "whirlpool", "rock-smash", "waterfall", "rock-climb"];
+  const gen5 = ["cut", "fly", "surf", "strength", "waterfall", "dive"];
+  const xy = ["cut", "fly", "surf", "strength", "waterfall"];
+  const oras = [...xy, "rock-smash", "dive"];
+  return new Map(
+    [
+      ["red-blue", gen1],
+      ["yellow", gen1],
+      ["gold-silver", gen2],
+      ["crystal", gen2],
+      ["ruby-sapphire", gen3],
+      ["emerald", gen3],
+      ["firered-leafgreen", gen3],
+      ["diamond-pearl", dppt],
+      ["platinum", dppt],
+      ["heartgold-soulsilver", hgss],
+      ["black-white", gen5],
+      ["black-2-white-2", gen5],
+      ["x-y", xy],
+      ["omega-ruby-alpha-sapphire", oras],
+    ].map(([group, moves]) => [group, new Set(moves)])
+  );
+})();
+
+// Release position of a version group, oldest = 0 (unknown -> null)
+const VERSION_GROUP_AGE = new Map(
+  VERSION_GROUP_RELEASE_ORDER.slice().reverse().map((name, index) => [name, index])
+);
+
+// Regional forms that actually appear in a game (games not listed show every regional form
+// that existed by then). BDSP has none; Legends: Arceus only has Hisuian forms.
+const GAME_REGIONAL_FORMS = new Map([
+  ["sun-moon", ["alola"]],
+  ["ultra-sun-ultra-moon", ["alola"]],
+  ["lets-go", ["alola"]],
+  ["sword-shield", ["alola", "galar"]],
+  ["brilliant-diamond-shining-pearl", []],
+  ["legends-arceus", ["hisui"]],
+]);
+
 const GAME_KEY_TO_VERSION_GROUPS = new Map([
-  ["scarlet-violet", ["scarlet-violet"]],
+  ["scarlet-violet", ["scarlet-violet", "the-teal-mask", "the-indigo-disk"]],
   ["legends-arceus", ["legends-arceus"]],
-  ["legends-za", ["legends-za"]],
-  ["sword-shield", ["sword-shield"]],
+  ["legends-za", ["legends-za", "mega-dimension"]],
+  ["sword-shield", ["sword-shield", "the-isle-of-armor", "the-crown-tundra"]],
   ["ultra-sun-ultra-moon", ["ultra-sun-ultra-moon"]],
   ["sun-moon", ["sun-moon"]],
   ["omega-ruby-alpha-sapphire", ["omega-ruby-alpha-sapphire"]],
@@ -295,7 +324,7 @@ const GAME_KEY_TO_VERSION_GROUPS = new Map([
   ["heartgold-soulsilver", ["heartgold-soulsilver"]],
   ["platinum", ["platinum"]],
   ["diamond-pearl", ["diamond-pearl"]],
-  ["brilliant-diamond-shining-pearl", ["brilliant-diamond-shining-pearl"]],
+  ["brilliant-diamond-shining-pearl", ["brilliant-diamond-and-shining-pearl"]],
   ["firered-leafgreen", ["firered-leafgreen"]],
   ["ruby-sapphire-emerald", ["emerald", "ruby-sapphire"]],
   ["gold-silver-crystal", ["crystal", "gold-silver"]],
@@ -304,13 +333,13 @@ const GAME_KEY_TO_VERSION_GROUPS = new Map([
 ]);
 
 const DEX_KEY_TO_VERSION_GROUPS = new Map([
-  ["paldea", ["scarlet-violet"]],
+  ["paldea", ["scarlet-violet", "the-teal-mask", "the-indigo-disk"]],
   ["hisui", ["legends-arceus"]],
-  ["galar", ["sword-shield"]],
+  ["galar", ["sword-shield", "the-isle-of-armor", "the-crown-tundra"]],
   ["alola", ["ultra-sun-ultra-moon", "sun-moon"]],
-  ["kalos", ["x-y"]],
+  ["kalos", ["x-y", "legends-za", "mega-dimension"]],
   ["unova", ["black-2-white-2", "black-white"]],
-  ["sinnoh", ["brilliant-diamond-shining-pearl", "platinum", "diamond-pearl"]],
+  ["sinnoh", ["brilliant-diamond-and-shining-pearl", "platinum", "diamond-pearl"]],
   ["hoenn", ["omega-ruby-alpha-sapphire", "emerald", "ruby-sapphire"]],
   ["johto", ["heartgold-soulsilver", "crystal", "gold-silver"]],
   ["kanto", ["lets-go-pikachu-lets-go-eevee", "firered-leafgreen", "yellow", "red-blue"]],
@@ -335,10 +364,15 @@ const VERSION_GROUP_LABEL_OVERRIDES = new Map([
   ["ultra-sun-ultra-moon", "Ultra Sun & Ultra Moon"],
   ["lets-go-pikachu-lets-go-eevee", "Let's Go Pikachu & Let's Go Eevee"],
   ["sword-shield", "Sword & Shield"],
-  ["brilliant-diamond-shining-pearl", "Brilliant Diamond & Shining Pearl"],
+  ["the-isle-of-armor", "The Isle of Armor"],
+  ["the-crown-tundra", "The Crown Tundra"],
+  ["brilliant-diamond-and-shining-pearl", "Brilliant Diamond & Shining Pearl"],
   ["legends-arceus", "Legends: Arceus"],
   ["scarlet-violet", "Scarlet & Violet"],
+  ["the-teal-mask", "The Teal Mask"],
+  ["the-indigo-disk", "The Indigo Disk"],
   ["legends-za", "Legends: Z-A"],
+  ["mega-dimension", "Mega Dimension"],
 ]);
 
 const buildVersionGroupPreference = (gameKey, dexKey) => {
@@ -401,7 +435,7 @@ const normalizeEncounterData = (entries) => {
         const logoFile = VERSION_LOGO_FILES.get(versionName);
         versionEntry = {
           version: versionName,
-          label: toTitleCase(versionName),
+          label: formatDisplayName(versionName),
           areas: new Map(),
           logos: logoFile ? [logoFile] : [],
         };
@@ -467,7 +501,7 @@ const normalizeEncounterData = (entries) => {
       if (!versionArea) {
         versionArea = {
           name: areaName,
-          label: toTitleCase(areaName),
+          label: toTitleCase(String(areaName).replace(/-area$/, "")),
           methods: new Map(),
         };
         versionEntry.areas.set(areaName, versionArea);
@@ -507,7 +541,10 @@ const normalizeEncounterData = (entries) => {
 
   const result = Array.from(versionMap.values()).map((versionEntry) => {
     const areas = Array.from(versionEntry.areas.values()).map((area) => {
-      const methods = Array.from(area.methods.values()).map(({ key, ...rest }) => rest);
+      const methods = Array.from(area.methods.values()).map((method) => {
+        const { key: _key, ...rest } = method;
+        return rest;
+      });
       methods.sort((a, b) => {
         const chanceA = a.chance ?? -1;
         const chanceB = b.chance ?? -1;
@@ -565,16 +602,13 @@ const normalizeEncounterData = (entries) => {
   return result;
 };
 
-const LOCAL_COMBINED_DATA_PATH = "/data/pokemon_all.json";
-
-const combinedDataCache = {
-  map: null,
-  promise: null,
-};
 
 const normalizeLocalKey = (value) => {
   if (value == null) return "";
   let normalized = String(value)
+    // Keep Nidoran♀ / Nidoran♂ apart (PokeAPI: nidoran-f / nidoran-m)
+    .replace(/♀/g, "-f")
+    .replace(/♂/g, "-m")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
@@ -734,6 +768,52 @@ const mapGameCodeToVersions = (code) => {
   return [slug];
 };
 
+// Versions a key in pokemon_all.json refers to. A single-version key ("Red", "Black 2") only
+// ever means that version — fanning it out to partner versions made e.g. Yellow show Red's
+// Pokédex text and version exclusives show both the wild location and "Trade" in both games.
+// Only combined keys ("sv", "Scarlet & Violet", "lets-go") map to several versions.
+const resolveLocalVersionKeys = (code) => {
+  const normalized = normalizeLocalKey(code);
+  if (!normalized) return [];
+  if (SPECIAL_VERSION_GROUPS.has(normalized)) {
+    return SPECIAL_VERSION_GROUPS.get(normalized) || [];
+  }
+  const slug = VERSION_ALIAS_LOOKUP.get(normalized);
+  return slug ? [slug] : [];
+};
+
+// The scraped data stores a row under the second version of a pair only when it differs from
+// the first (e.g. Blue only appears when Blue's text differs from Red's). These pairs fill a
+// missing partner from its first version. Third versions (Yellow, Crystal, Emerald, Platinum)
+// always have their own rows, and Gold/HeartGold rows are missing from the data entirely.
+const COLLAPSED_PARTNER_SOURCES = new Map([
+  ["blue", "red"],
+  ["silver", "gold"],
+  ["sapphire", "ruby"],
+  ["leafgreen", "firered"],
+  ["pearl", "diamond"],
+  ["soulsilver", "heartgold"],
+  ["white", "black"],
+  ["white-2", "black-2"],
+  ["y", "x"],
+  ["alpha-sapphire", "omega-ruby"],
+  ["moon", "sun"],
+  ["ultra-moon", "ultra-sun"],
+  ["lets-go-eevee", "lets-go-pikachu"],
+  ["shield", "sword"],
+  ["shining-pearl", "brilliant-diamond"],
+  ["violet", "scarlet"],
+]);
+
+/** Adds inferred partner entries (`inferred: true`) to a Map<version, value>. */
+const fillCollapsedPartners = (versionMap, cloneValue) => {
+  COLLAPSED_PARTNER_SOURCES.forEach((source, partner) => {
+    if (versionMap.has(partner) || !versionMap.has(source)) return;
+    const value = cloneValue(versionMap.get(source));
+    if (value) versionMap.set(partner, value);
+  });
+};
+
 const compareVersionEntries = (a, b) => {
   const orderA = VERSION_ORDER_LOOKUP.has(a?.version)
     ? VERSION_ORDER_LOOKUP.get(a.version)
@@ -747,80 +827,84 @@ const compareVersionEntries = (a, b) => {
   return labelA.localeCompare(labelB);
 };
 
-const loadCombinedDataMap = async () => {
-  if (combinedDataCache.map) return combinedDataCache.map;
-  if (!combinedDataCache.promise) {
-    combinedDataCache.promise = queuedFetch(LOCAL_COMBINED_DATA_PATH)
+// Pokédex entries and locations (public/data/pokemon_all.json) are served split by the first
+// letter of the Pokémon's name (/data/dex/<letter>.json, see scripts/dex-shards-plugin.mjs),
+// so opening a Pokémon downloads ~100 KB instead of the whole 2.6 MB file.
+const dexShardKey = (normalizedName) => String(normalizedName || "").charAt(0) || "_";
+const dexShardCache = new Map(); // shard key -> Promise<Map<normalizedName, record[]>>
+
+const buildCombinedDataMap = (json) => {
+  const map = new Map();
+
+  const register = (key, record) => {
+    const normalized = normalizeLocalKey(key);
+    if (!normalized || !record) return;
+    const bucket = map.get(normalized);
+    if (bucket) {
+      if (!bucket.includes(record)) bucket.push(record);
+    } else {
+      map.set(normalized, [record]);
+    }
+  };
+
+  const processRecord = (record, fallbackName) => {
+    if (!record || typeof record !== "object") return;
+    if (fallbackName) register(fallbackName, record);
+    if (typeof record.name === "string") register(record.name, record);
+    if (typeof record.slug === "string") register(record.slug, record);
+
+    if (Array.isArray(record.names)) {
+      record.names.forEach((value) => {
+        if (typeof value === "string") register(value, record);
+      });
+    }
+
+    if (Array.isArray(record.aliases)) {
+      record.aliases.forEach((value) => {
+        if (typeof value === "string") register(value, record);
+      });
+    }
+
+    if (record?.pokedex_entry?.name) register(record.pokedex_entry.name, record);
+
+    if (Array.isArray(record?.encounters)) {
+      record.encounters.forEach((encounter) => {
+        if (encounter?.name) register(encounter.name, record);
+      });
+    }
+  };
+
+  if (Array.isArray(json)) {
+    json.forEach((record) => {
+      const fallbackName = typeof record?.name === "string" ? record.name : null;
+      processRecord(record, fallbackName);
+    });
+  } else if (json && typeof json === "object") {
+    Object.entries(json).forEach(([name, record]) => {
+      processRecord(record, name);
+    });
+  }
+  return map;
+};
+
+const loadDexShard = (key) => {
+  if (!dexShardCache.has(key)) {
+    const url = `${getBasePath()}data/dex/${key}.json`;
+    const promise = queuedFetch(url)
       .then((response) => {
         if (!response?.ok) {
-          throw new Error(`Failed to load ${LOCAL_COMBINED_DATA_PATH}: ${response?.status ?? "unknown"}`);
+          throw new Error(`Failed to load ${url}: ${response?.status ?? "unknown"}`);
         }
         return response.json();
       })
-      .then((json) => {
-        const map = new Map();
-
-        const register = (key, record) => {
-          const normalized = normalizeLocalKey(key);
-          if (!normalized || !record) return;
-          const bucket = map.get(normalized);
-          if (bucket) {
-            if (!bucket.includes(record)) bucket.push(record);
-          } else {
-            map.set(normalized, [record]);
-          }
-        };
-
-        const processRecord = (record, fallbackName) => {
-          if (!record || typeof record !== "object") return;
-          if (fallbackName) register(fallbackName, record);
-          if (typeof record.name === "string") register(record.name, record);
-          if (typeof record.slug === "string") register(record.slug, record);
-
-          if (Array.isArray(record.names)) {
-            record.names.forEach((value) => {
-              if (typeof value === "string") register(value, record);
-            });
-          }
-
-          if (Array.isArray(record.aliases)) {
-            record.aliases.forEach((value) => {
-              if (typeof value === "string") register(value, record);
-            });
-          }
-
-          if (record?.pokedex_entry?.name) register(record.pokedex_entry.name, record);
-
-          if (Array.isArray(record?.encounters)) {
-            record.encounters.forEach((encounter) => {
-              if (encounter?.name) register(encounter.name, record);
-            });
-          }
-        };
-
-        if (Array.isArray(json)) {
-          json.forEach((record) => {
-            const fallbackName = typeof record?.name === "string" ? record.name : null;
-            processRecord(record, fallbackName);
-          });
-        } else if (json && typeof json === "object") {
-          Object.entries(json).forEach(([name, record]) => {
-            processRecord(record, name);
-          });
-        }
-
-        combinedDataCache.map = map;
-        return map;
-      })
+      .then(buildCombinedDataMap)
       .catch((error) => {
-        combinedDataCache.map = null;
+        dexShardCache.delete(key);
         throw error;
-      })
-      .finally(() => {
-        combinedDataCache.promise = null;
       });
+    dexShardCache.set(key, promise);
   }
-  return combinedDataCache.promise;
+  return dexShardCache.get(key);
 };
 
 const normalizedKeyMatches = (left, right) => {
@@ -832,16 +916,22 @@ const normalizedKeyMatches = (left, right) => {
 };
 
 const findCombinedRecords = async (nameCandidates = []) => {
-  const map = await loadCombinedDataMap();
-  if (!map || map.size === 0) return null;
-  const normalizedCandidates = (nameCandidates || []).map(normalizeLocalKey).filter(Boolean);
+  // Names only (numeric ids never match a record)
+  const normalizedCandidates = (nameCandidates || []).map(normalizeLocalKey).filter((value) => /^[a-z]/.test(value));
+  if (normalizedCandidates.length === 0) return null;
+  const shardKeys = Array.from(new Set(normalizedCandidates.map(dexShardKey)));
+  const maps = await Promise.all(shardKeys.map(loadDexShard));
   for (const candidate of normalizedCandidates) {
-    const bucket = map.get(candidate);
-    if (bucket && bucket.length > 0) return bucket;
+    for (const map of maps) {
+      const bucket = map.get(candidate);
+      if (bucket && bucket.length > 0) return bucket;
+    }
   }
-  for (const [key, bucket] of map.entries()) {
-    if (normalizedCandidates.some((candidate) => normalizedKeyMatches(key, candidate))) {
-      return bucket;
+  for (const map of maps) {
+    for (const [key, bucket] of map.entries()) {
+      if (normalizedCandidates.some((candidate) => normalizedKeyMatches(key, candidate))) {
+        return bucket;
+      }
     }
   }
   return null;
@@ -915,7 +1005,7 @@ async function loadLocalEncounterEntriesForPokemon(_pokemonId, ...nameCandidates
       const versions = Array.from(
         new Set(
           games
-            .flatMap((gameCode) => mapGameCodeToVersions(gameCode))
+            .flatMap((gameCode) => resolveLocalVersionKeys(gameCode))
             .filter(Boolean)
         )
       );
@@ -923,16 +1013,17 @@ async function loadLocalEncounterEntriesForPokemon(_pokemonId, ...nameCandidates
       if (versions.length === 0) continue;
 
       for (const version of versions) {
-        if (!versionMap.has(version)) versionMap.set(version, new Set());
-        versionMap.get(version).add(description);
+        if (!versionMap.has(version)) versionMap.set(version, { descriptions: new Set(), inferred: false });
+        versionMap.get(version).descriptions.add(description);
       }
     }
   }
 
   if (versionMap.size === 0) return [];
+  fillCollapsedPartners(versionMap, (value) => ({ descriptions: new Set(value.descriptions), inferred: true }));
 
   const normalized = [];
-  for (const [version, descriptions] of versionMap.entries()) {
+  for (const [version, { descriptions, inferred }] of versionMap.entries()) {
     const descriptionList = Array.from(descriptions);
     if (descriptionList.length === 0) continue;
     const logoFile = VERSION_LOGO_FILES.get(version);
@@ -963,6 +1054,7 @@ async function loadLocalEncounterEntriesForPokemon(_pokemonId, ...nameCandidates
       maxChance: 0,
       summary: count > 0 ? `${count} ${count === 1 ? "location" : "locations"}` : "No wild encounters",
       __local: true,
+      __inferred: inferred,
     });
   }
 
@@ -1000,7 +1092,7 @@ async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) 
     if (list.length === 0) return;
 
     list.forEach((gameCode) => {
-      const versions = mapGameCodeToVersions(gameCode);
+      const versions = resolveLocalVersionKeys(gameCode);
       const normalizedGame = normalizeLocalKey(gameCode);
       const targets = versions.length > 0 ? versions : normalizedGame ? [normalizedGame] : [];
       targets.forEach((version) => addVersionText(version, cleaned, language));
@@ -1046,11 +1138,13 @@ async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) 
   };
 
   records.forEach(processRecord);
+  fillCollapsedPartners(versionTextMap, (info) => ({ ...info, inferred: true }));
 
   return Array.from(versionTextMap.entries()).map(([version, info]) => ({
     version,
     text: info.text,
     language: info.language || "en",
+    inferred: Boolean(info.inferred),
   }));
 }
 
@@ -1507,7 +1601,7 @@ function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetai
                 {details?.damage_class ? (
                   <>
                     <img 
-                      src={`/moves/${details.damage_class}.png`} 
+                      src={`/move-categories/${details.damage_class}.png`} 
                       alt={details.damage_class}
                       className="learnset-damage-class-icon"
                       onError={(e) => {
@@ -1605,68 +1699,17 @@ function LearnsetModal({ learnset, learnsetMeta, pokemonName, onClose, moveDetai
   );
 }
 
-function AlternateFormsModal({ forms, onClose, onSelectPokemon, title, shiny = false }) {
-  const handleBackdropMouseDown = (event) => {
-    event.stopPropagation();
-    onClose();
-  };
-
-  const handleModalMouseDown = (event) => {
-    event.stopPropagation();
-  };
-
-  if (!Array.isArray(forms) || forms.length === 0) return null;
-
-  return (
-    <div className="game-modal-backdrop" role="presentation" onMouseDown={handleBackdropMouseDown}>
-      <div
-        className="game-modal"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={handleModalMouseDown}
-        style={{ width: "min(720px, 92vw)" }}
-      >
-        <button type="button" className="game-modal-close" onClick={onClose} aria-label="Close alternate forms">
-          X
-        </button>
-        <div className="game-modal-header">
-          <h2 className="game-modal-title">{title || "Alternate Forms"}</h2>
-          <p className="game-modal-subtitle">Select a form to view details</p>
-        </div>
-        <div className="game-modal-body" style={{ gridTemplateColumns: "1fr" }}>
-          <div className="game-modal-column game-modal-column-left" style={{ overflowY: "auto" }}>
-            <div className="forms-grid">
-              {forms.map((form) => {
-                const formId = form?.id != null ? String(form.id) : null;
-                if (!formId) return null;
-                const formName = form.displayName || formatDisplayName(form.name);
-                return (
-                  <button
-                    key={formId}
-                    type="button"
-                    className="form-card"
-                    onClick={() => {
-                      onSelectPokemon?.(formId, form.name, `https://pokeapi.co/api/v2/pokemon/${formId}`);
-                      onClose();
-                    }}
-                    title={formName}
-                  >
-                    <SpriteImage id={form.id} alt={form.name} width={72} height={72} loading="lazy" shiny={shiny} />
-                    <div className="form-name">{formName}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const [pokemon, setPokemon] = useState([]);
-  const [query, setQuery] = useState("");
+  const [pokemonLoadError, setPokemonLoadError] = useState(null);
+  // ?search= pre-fills the search box (used by the site's search-engine SearchAction)
+  const [query, setQuery] = useState(() => {
+    try {
+      return new URL(window.location.href).searchParams.get("search") || "";
+    } catch {
+      return "";
+    }
+  });
   const [showFilters, setShowFilters] = useState(true);
   const [selected, setSelected] = useState(null);
   const [selectedTypes, setSelectedTypes] = useState(() => new Set());
@@ -1689,7 +1732,6 @@ function App() {
   });
   const [dexIndexes, setDexIndexes] = useState(() => new Map());
   const [gameIndexes, setGameIndexes] = useState(() => new Map());
-  const typeIndexRef = useRef(new Map());
   const specialTagCacheRef = useRef(new Map());
   const gameFiltersRef = useRef(null);
   const pokedexCacheRef = useRef(new Map());
@@ -1974,8 +2016,8 @@ function App() {
       if (!bucket.has("default") && idNum < 10000) {
         bucket.set("default", entry);
       }
-      // Track regional variants
-      const tokens = lowerName.split("-");
+      // Track regional variants (Pikachu's region caps aren't regional forms)
+      const tokens = isCapFormName(lowerName) ? [] : lowerName.split("-");
       for (const token of tokens) {
         const canon = REGION_CANON_MAP.get(token);
         if (canon && !bucket.has(canon)) {
@@ -1997,30 +2039,104 @@ function App() {
     if (speciesId == null) return entry;
     const bucket = regionFormsBySpecies.get(speciesId);
     if (!bucket) return entry;
+    // Only swap a species' base form for the region's form. Other forms stay themselves
+    // (Alolan Meowth in the Galar dex must not turn into Galarian Meowth).
+    if (bucket.get("default")?.name !== entry.name) return entry;
     const regional = bucket.get(activeRegionKey);
     return regional || entry;
   }, [activeRegionKey, regionFormsBySpecies, resolveSpeciesId]);
 
-  // moved earlier
-
   useEffect(() => {
-    fetch("https://pokeapi.co/api/v2/pokemon?limit=100000&offset=0")
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data.results) ? data.results : [];
+    let cancelled = false;
+    // Served from the static snapshot (and cached for the session), so returning to the
+    // Pokédex from another page doesn't refetch anything.
+    loadPokemonList()
+      .then((list) => {
+        if (cancelled) return;
         // Filter out any Totem forms from the root list
-        const filtered = list.filter((entry) => !String(entry?.name || "").toLowerCase().includes("totem"));
+        const merged = list.filter((entry) => !String(entry?.name || "").toLowerCase().includes("totem"));
         // Append custom extras if not already present
-        const merged = filtered.slice();
-        const hasByName = (n) => merged.some((e) => String(e?.name || "").toLowerCase() === String(n || "").toLowerCase());
-    EXTRA_POKEMON.forEach((extra) => {
-      if (extra?.name && extra?.url && !hasByName(extra.name)) {
-        merged.push({ ...extra });
-      }
-    });
+        const names = new Set(merged.map((e) => String(e?.name || "").toLowerCase()));
+        EXTRA_POKEMON.forEach((extra) => {
+          if (extra?.name && extra?.url && !names.has(extra.name.toLowerCase())) {
+            merged.push({ ...extra });
+          }
+        });
         setPokemon(merged);
+        setPokemonLoadError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to load Pokémon list", error);
+        setPokemonLoadError("Couldn't load the Pokédex. Check your connection and refresh.");
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // Per-name type info for cards and type filtering (types change between generations,
+  // e.g. Clefairy was Normal before Gen 6 and Magnemite was pure Electric in Gen 1).
+  const typeRecordByName = useMemo(() => {
+    const map = new Map();
+    for (const entry of pokemon) {
+      if (entry?.name && Array.isArray(entry.types)) {
+        map.set(entry.name, entry);
+      }
+    }
+    return map;
+  }, [pokemon]);
+
+  const getEntryTypes = useCallback(
+    (name) => {
+      const record = typeRecordByName.get(name);
+      if (!record) return null;
+      return getTypesForGeneration(record.types, record.pastTypes, activeGenerationCap);
+    },
+    [typeRecordByName, activeGenerationCap]
+  );
+
+  // type -> Set of Pokémon names with that type in the active generation
+  const typeIndex = useMemo(() => {
+    const index = new Map(ALL_TYPES.map((t) => [t, new Set()]));
+    for (const [name, record] of typeRecordByName) {
+      for (const t of getTypesForGeneration(record.types, record.pastTypes, activeGenerationCap)) {
+        if (!index.has(t)) index.set(t, new Set());
+        index.get(t).add(name);
+      }
+    }
+    return index;
+  }, [typeRecordByName, activeGenerationCap]);
+
+  // Types that exist in the active generation (no Dark/Steel before Gen 2, no Fairy before Gen 6)
+  const [typeChart, setTypeChart] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadTypeChart()
+      .then((chart) => {
+        if (!cancelled) setTypeChart(chart);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const availableTypes = useMemo(() => {
+    const range = getTypeChartForGeneration(typeChart, activeGenerationCap);
+    if (!range) return ALL_TYPES;
+    const present = new Set(range.types);
+    return ALL_TYPES.filter((t) => present.has(t));
+  }, [typeChart, activeGenerationCap]);
+
+  // Drop type filters that don't exist in the newly selected generation
+  useEffect(() => {
+    setSelectedTypes((prev) => {
+      if (prev.size === 0) return prev;
+      const allowed = new Set(availableTypes);
+      const next = new Set([...prev].filter((t) => allowed.has(t)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [availableTypes]);
 
   const loadEntryMap = useCallback(
     async (apiNames = []) => {
@@ -2037,46 +2153,26 @@ function App() {
       }
       const promise = (async () => {
         try {
-          const sources = new Map();
-          for (const apiName of names) {
-            const response = await queuedFetch(`https://pokeapi.co/api/v2/pokedex/${apiName}`);
-            if (!response?.ok) {
-              throw new Error(`Failed to load pokedex/${apiName}: ${response?.status} ${response?.statusText}`);
-            }
-            const data = await response.json();
-            sources.set(apiName, data);
-          }
+          const dexMaps = await loadPokedexMaps();
+          // Games with several Pokédexes (X/Y's Central/Coastal/Mountain Kalos, Sword/Shield's
+          // DLC areas, Scarlet/Violet's Kitakami & Blueberry) number each list separately in-game,
+          // so every species keeps the number from the first list it appears in.
           const finalMap = new Map();
-          const seen = new Set();
-          let counter = 1;
-          const multipleLists = names.length > 1;
+          const order = new Map();
           for (const apiName of names) {
-            const data = sources.get(apiName);
-            if (!data) continue;
-            const entries = data.pokemon_entries || [];
-            for (const entry of entries) {
-              const idNum = getIdNumberFromUrl(entry.pokemon_species?.url);
-              if (idNum == null || seen.has(idNum)) continue;
-              seen.add(idNum);
-              let number;
-              if (multipleLists) {
-                number = counter++;
-              } else {
-                number = entry.entry_number;
-                counter = Math.max(counter, number + 1);
-              }
-              finalMap.set(idNum, number);
+            const dexMap = dexMaps[apiName];
+            if (!dexMap) {
+              throw new Error(`Unknown Pokédex "${apiName}" (re-run scripts/build-data-snapshot.mjs)`);
+            }
+            const sortedEntries = Array.from(dexMap.entries()).sort((a, b) => a[1] - b[1]);
+            for (const [speciesId, number] of sortedEntries) {
+              if (finalMap.has(speciesId)) continue;
+              finalMap.set(speciesId, number);
+              order.set(speciesId, order.size + 1);
             }
           }
-          // Custom injections for specific Pokédex lists
-          // Ensure Legends: Z-A (lumiose-city) includes Diancie and Mewtwo with desired numbering
-          const keySet = new Set(names.map((n) => String(n).toLowerCase()));
-          if (keySet.has("lumiose-city")) {
-            // Diancie (species 719) should be #231 in Legends: Z-A
-            finalMap.set(719, 231);
-            // Mewtwo (species 150) should be #232 in Legends: Z-A
-            finalMap.set(150, 232);
-          }
+          // Sorting uses list order (list 1 first, then list 2, ...), display uses `finalMap`.
+          Object.defineProperty(finalMap, "order", { value: order });
           pokedexCacheRef.current.set(cacheKey, finalMap);
           return finalMap;
         } finally {
@@ -2295,10 +2391,18 @@ function App() {
   // Handle back/forward navigation to sync selection
   useEffect(() => {
     const onPop = () => {
+      // Leaving the Pokédex for another page: keep the current view until the router swaps
+      // pages (clearing the selection here would render the whole grid for one frame).
+      if (resolveRouteKey() !== "pokemon") return;
       resolveSelectionFromLocation();
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    // In-app links (e.g. the "Pokémon" tab while a Pokémon is open) navigate via locationchange
+    window.addEventListener("locationchange", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("locationchange", onPop);
+    };
   }, [resolveSelectionFromLocation]);
 
   useEffect(() => {
@@ -2421,15 +2525,53 @@ function App() {
     }
   }, [activeRegionKey]);
 
+  // Per-Pokémon values the filters need, computed once per list instead of on every keystroke.
+  const pokemonMeta = useMemo(() => {
+    const list = [];
+    for (const entry of pokemon) {
+      const idStr = getIdFromUrl(entry?.url);
+      if (!idStr) continue;
+      const idNum = Number(idStr);
+      if (Number.isNaN(idNum)) continue;
+      const tags = getTagsForName(entry.name);
+      const isMega = tags.includes("Mega");
+      const isGmax = tags.includes("Gigantamax");
+      list.push({
+        entry,
+        idStr,
+        idNum,
+        tags,
+        isMega,
+        isGmax,
+        speciesId: resolveSpeciesId(entry.name, idNum < 10000 ? idNum : null),
+        isRegional: isRegionalFormName(entry.name),
+        regionCanon: isRegionalFormName(entry.name) ? getCanonicalRegionFromName(entry.name) : null,
+        introAge: entry.introducedIn ? VERSION_GROUP_AGE.get(entry.introducedIn) ?? null : null,
+        formGeneration: getFormGeneration(entry.name),
+        searchKeys: [normalizeSearchText(entry.name), normalizeSearchText(formatDisplayName(entry.name))],
+      });
+    }
+    return list;
+  }, [pokemon, resolveSpeciesId, getFormGeneration, getCanonicalRegionFromName]);
+
+  const pokemonMetaByName = useMemo(() => new Map(pokemonMeta.map((meta) => [meta.entry.name, meta])), [pokemonMeta]);
+
+  // Keep typing responsive: the (large) list re-filters with a deferred copy of the query.
+  const deferredQuery = useDeferredValue(query);
+
   const filteredLists = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const qDigits = q.replace(/[^0-9]/g, "");
+    const loadingResult = { primary: [], megaGigantamax: [], primarySectionGroups: null, loading: true };
+    const q = normalizeSearchText(deferredQuery);
+    const qDigits = String(deferredQuery || "").replace(/[^0-9]/g, "");
     const hasTypeFilter = selectedTypes.size > 0;
     const requiredTags = Array.from(selectedTags);
     const hasTagFilter = requiredTags.length > 0;
+    if (pokemonMeta.length === 0) {
+      return loadingResult;
+    }
     const dexData = selectedDex === "national" ? null : dexIndexes.get(selectedDex);
     if (selectedDex !== "national" && !dexData) {
-      return [];
+      return loadingResult;
     }
     const combinedMap = selectedDex === "national" ? null : dexData?.combined ?? null;
     const regionGameEntry =
@@ -2446,7 +2588,7 @@ function App() {
     }
     const nationalGameEntryMap = nationalGameEntry?.entryMap ?? null;
     if (selectedDex === "national" && selectedGame && !nationalGameEntryMap) {
-      return [];
+      return loadingResult;
     }
     const activeEntryMap =
       selectedDex === "national" ? nationalGameEntryMap : regionGameEntryMap ?? combinedMap;
@@ -2455,18 +2597,14 @@ function App() {
         ? nationalGameEntry?.sections ?? null
         : regionGameEntry?.sections ?? null;
     if (selectedDex !== "national" && !activeEntryMap) {
-      return [];
+      return loadingResult;
     }
 
     let typeIntersection = null;
     if (hasTypeFilter) {
       const sets = [];
       for (const t of selectedTypes) {
-        const set = typeIndexRef.current.get(t);
-        if (!set) {
-          return [];
-        }
-        sets.push(set);
+        sets.push(typeIndex.get(t) || new Set());
       }
       sets.sort((a, b) => a.size - b.size);
       typeIntersection = new Set(sets[0]);
@@ -2477,6 +2615,42 @@ function App() {
       }
     }
 
+    const matchesQuery = (meta) => {
+      if (!q && !qDigits) return true;
+      if (q && meta.searchKeys.some((key) => key.includes(q))) return true;
+      if (qDigits) {
+        const { idStr } = meta;
+        return idStr.includes(qDigits) || idStr.padStart(3, "0").includes(qDigits) || idStr.padStart(4, "0").includes(qDigits);
+      }
+      return false;
+    };
+    const matchesTags = (tags) => {
+      if (!hasTagFilter) return true;
+      return requiredTags.every((tag) => tags.includes(tag));
+    };
+    const matchesType = (meta) => {
+      if (!hasTypeFilter) return true;
+      if (typeIntersection.has(meta.entry.name)) return true;
+      // Fallback for custom extras that have no type data: use the base species' types.
+      if (typeRecordByName.has(meta.entry.name)) return false;
+      const baseNameForTypes = meta.speciesId != null ? pokemonIdLookup.get(meta.speciesId) : null;
+      return Boolean(baseNameForTypes && typeIntersection.has(baseNameForTypes));
+    };
+    const withinGeneration = (meta) =>
+      activeGenerationCap == null || meta.formGeneration == null || meta.formGeneration <= activeGenerationCap;
+
+    // Hide forms a game didn't have yet (Mega Swampert in X/Y, Origin Dialga in BDSP, the
+    // Legends: Z-A Megas in Sun/Moon) and regional forms the game doesn't include.
+    const gameVersionGroups = selectedGame ? GAME_KEY_TO_VERSION_GROUPS.get(selectedGame) || [] : [];
+    const gameMaxAge = gameVersionGroups.reduce((max, vg) => Math.max(max, VERSION_GROUP_AGE.get(vg) ?? -1), -1);
+    const allowedRegions = selectedGame ? GAME_REGIONAL_FORMS.get(selectedGame) : undefined;
+    const formAvailable = (meta) => {
+      if (meta.idNum < 10000) return true;
+      if (gameMaxAge >= 0 && meta.introAge != null && meta.introAge > gameMaxAge) return false;
+      if (allowedRegions && meta.regionCanon && !allowedRegions.includes(meta.regionCanon)) return false;
+      return true;
+    };
+
     const regularMatches = [];
     const alternateFormMatches = [];
     const megaGmaxMatches = [];
@@ -2485,6 +2659,7 @@ function App() {
     const speciesIdsToConsider = activeEntryMap
       ? Array.from(activeEntryMap.keys())
       : Array.from(regionFormsBySpecies.keys());
+    const speciesInScope = new Set(speciesIdsToConsider);
 
     // Primary list: one representative per species, preferring regional form when applicable
     for (const speciesId of speciesIdsToConsider) {
@@ -2492,228 +2667,73 @@ function App() {
       if (!bucket) continue;
       const representative = (activeRegionKey ? bucket.get(activeRegionKey) : null) || bucket.get("default") || null;
       if (!representative) continue;
+      let meta = pokemonMetaByName.get(representative.name);
+      if (meta && !formAvailable(meta)) {
+        // e.g. the region's own form doesn't exist in this game; fall back to the base form
+        meta = pokemonMetaByName.get(bucket.get("default")?.name);
+      }
+      if (!meta) continue;
+      if (hasTypeFilter && !typeIntersection.has(meta.entry.name)) continue;
+      if (!matchesTags(meta.tags)) continue;
+      if (!matchesQuery(meta)) continue;
+      regularMatches.push({ entry: meta.entry, idNum: meta.idNum, speciesId });
+    }
+    // A regional form shown as its species' main card (e.g. Galarian Ponyta in the Galar dex)
+    // must not be listed again among the alternate forms.
+    const representativeNames = new Set(regularMatches.map((match) => match.entry.name));
 
-      const idStr = getIdFromUrl(representative.url);
-      if (!idStr) continue;
-      const idNum = Number(idStr);
-      if (Number.isNaN(idNum)) continue;
+    const extraMegaSpecies = selectedGame ? EXTRA_MEGA_SPECIES_BY_GAME.get(selectedGame) || null : null;
+    const gameFeatures = selectedGame
+      ? GAME_FEATURES.get(selectedGame) || { mega: false, gmax: false }
+      : selectedDex && selectedDex !== "national"
+      ? REGION_FEATURES.get(selectedDex) || { mega: false, gmax: false }
+      : null; // National dex without a game selected: allow both
 
-      // Filters: type, tags, query
-      if (hasTypeFilter && (!typeIntersection || !typeIntersection.has(representative.name))) {
+    for (const meta of pokemonMeta) {
+      const { speciesId, isMega, isGmax } = meta;
+      if (!formAvailable(meta)) continue;
+      if (isMega || isGmax) {
+        // Tertiary list: Mega/Gigantamax forms that belong to included species
+        // (or are explicitly allowed for the selected game)
+        const inScope =
+          speciesId != null && (speciesInScope.has(speciesId) || (extraMegaSpecies && extraMegaSpecies.includes(speciesId)));
+        if (!inScope || !withinGeneration(meta)) continue;
+        // Gate by selected game/region feature support
+        if (gameFeatures && ((isMega && !gameFeatures.mega) || (isGmax && !gameFeatures.gmax))) continue;
+        if (!matchesType(meta) || !matchesTags(meta.tags) || !matchesQuery(meta)) continue;
+        megaGmaxMatches.push({ entry: meta.entry, idNum: meta.idNum, speciesId });
         continue;
       }
-      if (hasTagFilter) {
-        const repTags = getTagsForName(representative.name);
-        let hasAllTags = true;
-        for (const tag of requiredTags) {
-          if (!repTags.includes(tag)) {
-            hasAllTags = false;
-            break;
-          }
-        }
-        if (!hasAllTags) continue;
-      }
-      if (q || qDigits) {
-        let matchedQuery = false;
-        const lower = representative.name.toLowerCase();
-        if (q && lower.includes(q)) {
-          matchedQuery = true;
-        } else if (qDigits) {
-          const idPad3 = idStr.padStart(3, "0");
-          const idPad4 = idStr.padStart(4, "0");
-          if (idStr.includes(qDigits) || idPad3.includes(qDigits) || idPad4.includes(qDigits)) {
-            matchedQuery = true;
-          }
-        }
-        if (!matchedQuery) continue;
-      }
-
-      regularMatches.push({ entry: representative, idNum, speciesId });
-    }
-
-    // Secondary list: Alternate forms (non-Mega, non-Gigantamax) that belong to included species
-    for (const p of pokemon) {
-      const idStr = getIdFromUrl(p.url);
-      if (!idStr) continue;
-      const idNum = Number(idStr);
-      if (Number.isNaN(idNum)) continue;
-      const tags = getTagsForName(p.name);
-      const speciesId = resolveSpeciesId(p.name, idNum < 10000 ? idNum : null);
-      const isMega = tags.includes("Mega");
-      const isGmax = tags.includes("Gigantamax");
-      const isMegaOrGmax = isMega || isGmax;
-      if (isMegaOrGmax) continue; // Skip mega/gmax forms (they have their own section)
-      
-      // Check if this species' alternate forms should be hidden
-      if (speciesId != null && ALT_FORM_HIDE_FLAGS.has(speciesId)) {
-        continue;
-      }
-      
-      // Only include alternate forms (not default/base forms)
-      // Alternate forms typically have id >= 10000 OR are regional variants
-      const isRegional = isRegionalFormName(p.name);
-      const isAlternateForm = idNum >= 10000 || isRegional;
-      if (!isAlternateForm) continue; // Skip base/default forms (they're in the primary list)
-
-      if (activeGenerationCap != null) {
-        const formGeneration = getFormGeneration(p.name);
-        if (formGeneration != null && formGeneration > activeGenerationCap) {
-          continue;
-        }
-      }
-      
-      // Allow alternate form entries for species in-scope
-      const inScope =
-        speciesId != null &&
-        speciesIdsToConsider.includes(speciesId);
-      if (!inScope) continue;
-      
-      if (activeGenerationCap != null) {
-        const formGeneration = getFormGeneration(p.name);
-        if (formGeneration != null && formGeneration > activeGenerationCap) {
-          continue;
-        }
-      }
-
-      // Filters: type, tags, query
-      if (hasTypeFilter) {
-        let passesType =
-          !!typeIntersection && typeIntersection.has(p.name);
-        if (!passesType) {
-          // Fallback: check the base species canonical name instead
-          const baseNameForTypes =
-            speciesId != null ? pokemonIdLookup.get(speciesId) : null;
-          if (baseNameForTypes && typeIntersection.has(baseNameForTypes)) {
-            passesType = true;
-          }
-        }
-        if (!passesType) continue;
-      }
-      if (hasTagFilter) {
-        let hasAllTags = true;
-        for (const tag of requiredTags) {
-          if (!tags.includes(tag)) {
-            hasAllTags = false;
-            break;
-          }
-        }
-        if (!hasAllTags) continue;
-      }
-      if (q || qDigits) {
-        let matchedQuery = false;
-        const lower = p.name.toLowerCase();
-        if (q && lower.includes(q)) {
-          matchedQuery = true;
-        } else if (qDigits) {
-          const idPad3 = idStr.padStart(3, "0");
-          const idPad4 = idStr.padStart(4, "0");
-          if (idStr.includes(qDigits) || idPad3.includes(qDigits) || idPad4.includes(qDigits)) {
-            matchedQuery = true;
-          }
-        }
-        if (!matchedQuery) continue;
-      }
-      alternateFormMatches.push({ entry: p, idNum, speciesId });
-    }
-
-    // Tertiary list: Mega/Gigantamax forms that belong to included species
-    for (const p of pokemon) {
-      const idStr = getIdFromUrl(p.url);
-      if (!idStr) continue;
-      const idNum = Number(idStr);
-      if (Number.isNaN(idNum)) continue;
-      const tags = getTagsForName(p.name);
-      const speciesId = resolveSpeciesId(p.name, idNum < 10000 ? idNum : null);
-      const isMega = tags.includes("Mega");
-      const isGmax = tags.includes("Gigantamax");
-      const isMegaOrGmax = isMega || isGmax;
-      if (!isMegaOrGmax) continue;
-      // Allow mega/gmax entries for species either in-scope OR explicitly allowed for the selected game
-      const extraAllowed =
-        selectedGame && Array.isArray(EXTRA_MEGA_SPECIES_BY_GAME.get(selectedGame))
-          ? EXTRA_MEGA_SPECIES_BY_GAME.get(selectedGame)
-          : null;
-      const inScope =
-        speciesId != null &&
-        (speciesIdsToConsider.includes(speciesId) ||
-          (Array.isArray(extraAllowed) && extraAllowed.includes(speciesId)));
-      if (!inScope) continue;
-
-      if (activeGenerationCap != null) {
-        const formGeneration = getFormGeneration(p.name);
-        if (formGeneration != null && formGeneration > activeGenerationCap) {
-          continue;
-        }
-      }
-
-      // Gate by selected game/region feature support
-      if (selectedGame) {
-        const gf = GAME_FEATURES.get(selectedGame) || { mega: false, gmax: false };
-        if ((isMega && !gf.mega) || (isGmax && !gf.gmax)) continue;
-      } else if (selectedDex && selectedDex !== "national") {
-        const rf = REGION_FEATURES.get(selectedDex) || { mega: false, gmax: false };
-        if ((isMega && !rf.mega) || (isGmax && !rf.gmax)) continue;
-      } else {
-        // National dex without a game selected: allow both
-      }
-      if (hasTypeFilter) {
-        let passesType =
-          !!typeIntersection && typeIntersection.has(p.name);
-        if (!passesType) {
-          // Fallback for custom extras (e.g., zygarde-mega) that don't exist in PokeAPI type indexes:
-          // check the base species canonical name instead.
-          const baseNameForTypes =
-            speciesId != null ? pokemonIdLookup.get(speciesId) : null;
-          if (baseNameForTypes && typeIntersection.has(baseNameForTypes)) {
-            passesType = true;
-          }
-        }
-        if (!passesType) continue;
-      }
-      if (hasTagFilter) {
-        let hasAllTags = true;
-        for (const tag of requiredTags) {
-          if (!tags.includes(tag)) {
-            hasAllTags = false;
-            break;
-          }
-        }
-        if (!hasAllTags) continue;
-      }
-      if (q || qDigits) {
-        let matchedQuery = false;
-        const lower = p.name.toLowerCase();
-        if (q && lower.includes(q)) {
-          matchedQuery = true;
-        } else if (qDigits) {
-          const idPad3 = idStr.padStart(3, "0");
-          const idPad4 = idStr.padStart(4, "0");
-          if (idStr.includes(qDigits) || idPad3.includes(qDigits) || idPad4.includes(qDigits)) {
-            matchedQuery = true;
-          }
-        }
-        if (!matchedQuery) continue;
-      }
-      megaGmaxMatches.push({ entry: p, idNum, speciesId });
+      // Secondary list: alternate forms (non-Mega, non-Gigantamax) of included species.
+      // Alternate forms have id >= 10000 or are regional variants; base forms are in the primary list.
+      if (speciesId != null && ALT_FORM_HIDE_FLAGS.has(speciesId)) continue;
+      if (!(meta.idNum >= 10000 || meta.isRegional)) continue;
+      if (representativeNames.has(meta.entry.name)) continue;
+      if (speciesId == null || !speciesInScope.has(speciesId)) continue;
+      if (!withinGeneration(meta)) continue;
+      if (!matchesType(meta) || !matchesTags(meta.tags) || !matchesQuery(meta)) continue;
+      alternateFormMatches.push({ entry: meta.entry, idNum: meta.idNum, speciesId });
     }
 
     const sortMatches = (matches) => {
       if (matches.length === 0) return;
       if (activeEntryMap) {
+        const activeOrder = activeEntryMap.order || activeEntryMap;
+        const combinedOrder = combinedMap?.order || combinedMap;
         matches.sort((a, b) => {
           const speciesA = a.speciesId ?? (a.idNum < 10000 ? a.idNum : null);
           const speciesB = b.speciesId ?? (b.idNum < 10000 ? b.idNum : null);
           const lookupA = speciesA ?? a.idNum;
           const lookupB = speciesB ?? b.idNum;
-          const aEntry = activeEntryMap.get(lookupA);
-          const bEntry = activeEntryMap.get(lookupB);
+          const aEntry = activeOrder.get(lookupA);
+          const bEntry = activeOrder.get(lookupB);
           if (aEntry != null && bEntry != null && aEntry !== bEntry) {
             return aEntry - bEntry;
           }
           if (aEntry != null && bEntry == null) return -1;
           if (aEntry == null && bEntry != null) return 1;
-          const combinedA = combinedMap?.get(lookupA);
-          const combinedB = combinedMap?.get(lookupB);
+          const combinedA = combinedOrder?.get(lookupA);
+          const combinedB = combinedOrder?.get(lookupB);
           if (combinedA != null && combinedB != null && combinedA !== combinedB) {
             return combinedA - combinedB;
           }
@@ -2792,9 +2812,28 @@ function App() {
       primary: regularMatches.map((item) => item.entry),
       megaGigantamax: megaGmaxMatches.map((item) => item.entry),
       primarySectionGroups,
+      loading: false,
     };
-  }, [pokemon, query, selectedTypes, selectedTags, selectedDex, selectedGame, dexIndexes, gameIndexes, resolveSpeciesId]);
+  }, [
+    pokemonMeta,
+    pokemonMetaByName,
+    deferredQuery,
+    selectedTypes,
+    selectedTags,
+    selectedDex,
+    selectedGame,
+    dexIndexes,
+    gameIndexes,
+    typeIndex,
+    typeRecordByName,
+    pokemonIdLookup,
+    regionFormsBySpecies,
+    activeRegionKey,
+    activeGenerationCap,
+  ]);
 
+  const emptyStateMessage =
+    pokemonLoadError || (filteredLists.loading ? "Loading Pokédex…" : "No Pokémon found.");
   const regularFiltered = filteredLists.primary ?? [];
   const megaGigantamaxFiltered = filteredLists.megaGigantamax ?? [];
   const regularSectionGroups = filteredLists.primarySectionGroups ?? null;
@@ -2855,46 +2894,14 @@ function App() {
     return getDexNumberForEntry(selected.name, idNum);
   }, [selected, getDexNumberForEntry]);
 
-  // Ensure we have indexes for currently selected types so include filtering is accurate
+  // Browser tab title follows the open Pokémon (matches the static share pages' titles)
   useEffect(() => {
-    for (const t of selectedTypes) {
-      if (!typeIndexRef.current.get(t)) {
-        fetch(`https://pokeapi.co/api/v2/type/${t}`)
-          .then((r) => r.json())
-          .then((data) => {
-            const items = new Set((data.pokemon || []).map((x) => x.pokemon.name));
-            typeIndexRef.current.set(t, items);
-          })
-          .catch(() => {});
-      }
-    }
-  }, [selectedTypes]);
+    document.title = selected?.name
+      ? `${formatDisplayName(selected.name)} - Stats, Evolutions & Weaknesses | ${SITE_NAME}`
+      : DEFAULT_TITLE;
+  }, [selected?.name]);
 
-  // Prefetch all type indexes once so first selection works immediately
-  useEffect(() => {
-    let cancelled = false;
-    const load = async (t) => {
-      try {
-        const res = await fetch(`https://pokeapi.co/api/v2/type/${t}`);
-        const data = await res.json();
-        const items = new Set((data.pokemon || []).map((x) => x.pokemon.name));
-        if (!cancelled) {
-          typeIndexRef.current.set(t, items);
-          // Nudge a re-render so filtering recomputes when the cache fills
-          setSelectedTypes((prev) => new Set(prev));
-        }
-      } catch {}
-    };
-    ALL_TYPES.forEach((t) => {
-      if (!typeIndexRef.current.get(t)) {
-        load(t);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Type indexes come from the static snapshot (see typeIndex above); no per-type API calls.
 
   const selectedDexConfig = DEX_LOOKUP.get(selectedDex);
   const availableGames = selectedDex === "national" ? NATIONAL_GAME_OPTIONS : selectedDexConfig?.games || [];
@@ -2971,74 +2978,55 @@ function App() {
     </>
   );
 
-  const renderListEntries = useCallback((entries) => {
-    if (!entries || entries.length === 0) return null;
-    
-    // On mobile, paginate entries
-    let entriesToRender = entries;
-    let startIndex = 0;
-    let totalPages = 1;
-    
-    if (isMobile) {
-      totalPages = Math.ceil(entries.length / itemsPerPage);
+  const renderCard = useCallback(
+    (p, index, { eagerCount, showSelection, withGame = true }) => {
+      const pref = getRegionPreferredEntry(p);
+      const parts = pref.url.split("/").filter(Boolean);
+      const id = parts[parts.length - 1];
+      const idNum = Number(id);
+      const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
+      return (
+        <PokemonCard
+          key={pref.name}
+          id={id}
+          name={pref.name}
+          url={pref.url}
+          types={getEntryTypes(pref.name)}
+          onSelect={selectPokemon}
+          selected={showSelection && selected ? String(selected.id) === String(id) : undefined}
+          dexNumber={dexDisplay}
+          shiny={shiny}
+          selectedGame={withGame ? selectedGame : null}
+          selectedDex={withGame ? selectedDex : null}
+          detailsCache={detailsCache}
+          eagerLoad={index < eagerCount}
+        />
+      );
+    },
+    [getRegionPreferredEntry, getDexNumberForEntry, getEntryTypes, selectPokemon, selected, shiny, selectedGame, selectedDex]
+  );
+
+  const paginate = useCallback(
+    (entries) => {
+      if (!isMobile) return { entriesToRender: entries, startIndex: 0 };
       const start = (currentPage - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      entriesToRender = entries.slice(start, end);
-      startIndex = start;
-    }
-    
-    return (
-      <div className="list">
-        {entriesToRender.map((p, index) => {
-          const actualIndex = startIndex + index;
-          const pref = getRegionPreferredEntry(p);
-          const parts = pref.url.split("/").filter(Boolean);
-          const id = parts[parts.length - 1];
-          const idNum = Number(id);
-          const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
-          return (
-            <PokemonCard
-              key={pref.name}
-              id={id}
-              name={pref.name}
-              url={pref.url}
-              onSelect={() => selectPokemon(id, pref.name, pref.url)}
-              selected={selected ? String(selected.id) === String(id) : undefined}
-              dexNumber={dexDisplay}
-              shiny={shiny}
-              selectedGame={selectedGame}
-              selectedDex={selectedDex}
-              detailsCache={detailsCache}
-              eagerLoad={actualIndex < 6}
-            />
-          );
-        })}
-        {
-          (() => {
-            const eagerCount = 6;
-            const prefetchCount = 48;
-            const items = entries
-              .slice(eagerCount, eagerCount + prefetchCount)
-              .map((p) => {
-                const pref = getRegionPreferredEntry(p);
-                const parts = pref.url.split("/").filter(Boolean);
-                const id = parts[parts.length - 1];
-                const idNum = Number(id);
-                const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
-                return {
-                  id,
-                  name: pref.name,
-                  url: pref.url,
-                  dexNumber: dexDisplay,
-                  shiny,
-                };
-              });
-            return <PrefetchSprites items={items} limit={48} />;
-          })()
-        }
-      </div>
-    );
-  }, [isMobile, currentPage, itemsPerPage, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, selected, shiny, selectedGame, selectedDex, detailsCache]);
+      return { entriesToRender: entries.slice(start, start + itemsPerPage), startIndex: start };
+    },
+    [isMobile, currentPage, itemsPerPage]
+  );
+
+  const renderListEntries = useCallback(
+    (entries) => {
+      if (!entries || entries.length === 0) return null;
+      const { entriesToRender, startIndex } = paginate(entries);
+      return (
+        <div className="list">
+          {entriesToRender.map((p, index) => renderCard(p, startIndex + index, { eagerCount: 6, showSelection: true }))}
+        </div>
+      );
+    },
+    [paginate, renderCard]
+  );
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -3047,71 +3035,18 @@ function App() {
     }
   }, [isMobile, query, selectedTypes, selectedTags, selectedDex, selectedGame]);
 
-  const renderGridEntries = useCallback((entries, className = "grid") => {
-    if (!entries || entries.length === 0) return null;
-    
-    // On mobile, paginate entries
-    let entriesToRender = entries;
-    let startIndex = 0;
-    
-    if (isMobile) {
-      const start = (currentPage - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      entriesToRender = entries.slice(start, end);
-      startIndex = start;
-    }
-    
-    return (
-      <section className={className}>
-        {entriesToRender.map((p, index) => {
-          const actualIndex = startIndex + index;
-          const pref = getRegionPreferredEntry(p);
-          const parts = pref.url.split("/").filter(Boolean);
-          const id = parts[parts.length - 1];
-          const idNum = Number(id);
-          const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
-          return (
-            <PokemonCard
-              key={pref.name}
-              id={id}
-              name={pref.name}
-              url={pref.url}
-              onSelect={() => selectPokemon(id, pref.name, pref.url)}
-              dexNumber={dexDisplay}
-              shiny={shiny}
-              selectedGame={selectedGame}
-              selectedDex={selectedDex}
-              detailsCache={detailsCache}
-              eagerLoad={actualIndex < 8}
-            />
-          );
-        })}
-        {
-          (() => {
-            const eagerCount = 8;
-            const prefetchCount = 48;
-            const items = entries
-              .slice(eagerCount, eagerCount + prefetchCount)
-              .map((p) => {
-                const pref = getRegionPreferredEntry(p);
-                const parts = pref.url.split("/").filter(Boolean);
-                const id = parts[parts.length - 1];
-                const idNum = Number(id);
-                const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
-                return {
-                  id,
-                  name: pref.name,
-                  url: pref.url,
-                  dexNumber: dexDisplay,
-                  shiny,
-                };
-              });
-            return <PrefetchSprites items={items} limit={48} />;
-          })()
-        }
-      </section>
-    );
-  }, [isMobile, currentPage, itemsPerPage, getRegionPreferredEntry, getDexNumberForEntry, selectPokemon, shiny, selectedGame, selectedDex, detailsCache]);
+  const renderGridEntries = useCallback(
+    (entries, className = "grid") => {
+      if (!entries || entries.length === 0) return null;
+      const { entriesToRender, startIndex } = paginate(entries);
+      return (
+        <section className={className}>
+          {entriesToRender.map((p, index) => renderCard(p, startIndex + index, { eagerCount: 8, showSelection: false }))}
+        </section>
+      );
+    },
+    [paginate, renderCard]
+  );
 
   // Calculate total entries for pagination and get flattened entries for mobile
   // Include mega/gigantamax forms in the count
@@ -3326,9 +3261,9 @@ function App() {
         }}
         FilterTabsComponent={FilterTabs}
         filterTabsProps={{
+          availableTypes,
           selectedTypes,
           setSelectedTypes,
-          typeIndexRef,
           selectedTags,
           setSelectedTags,
           selectedDex,
@@ -3366,32 +3301,12 @@ function App() {
                     {hasPrimaryContent && <div className="list-divider" role="separator" />}
                     <h3 className="list-subheading">Mega &amp; Gigantamax Forms</h3>
                     <div className="list">
-                    {megaGigantamaxFiltered.map((p, index) => {
-                        const pref = getRegionPreferredEntry(p);
-                        const parts = pref.url.split("/").filter(Boolean);
-                        const id = parts[parts.length - 1];
-                        const idNum = Number(id);
-                        const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
-                        return (
-                          <PokemonCard
-                            key={pref.name}
-                            id={id}
-                            name={pref.name}
-                            url={pref.url}
-                            onSelect={() => selectPokemon(id, pref.name, pref.url)}
-                            selected={String(selected.id) === String(id)}
-                            dexNumber={dexDisplay}
-                            shiny={shiny}
-                            detailsCache={detailsCache}
-                            eagerLoad={index < 6}
-                          />
-                        );
-                      })}
+                      {megaGigantamaxFiltered.map((p, index) => renderCard(p, index, { eagerCount: 6, showSelection: true }))}
                     </div>
                   </div>
                 )}
                 {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
-                  <div className="list-empty">No Pokémon found.</div>
+                  <div className="list-empty" role="status">{emptyStateMessage}</div>
                 )}
                 {isMobile && hasPrimaryContent && renderPagination()}
               </div>
@@ -3405,15 +3320,6 @@ function App() {
                 // Activate top-level type filter and close detail
                 const t = String(typename || "").toLowerCase();
                 if (!t) return;
-                if (!typeIndexRef.current.get(t)) {
-                  fetch(`https://pokeapi.co/api/v2/type/${t}`)
-                    .then((r) => r.json())
-                    .then((data) => {
-                      const items = new Set((data.pokemon || []).map((x) => x.pokemon.name));
-                      typeIndexRef.current.set(t, items);
-                    })
-                    .catch(() => {});
-                }
                 setSelectedTypes(new Set([t]));
                 clearSelection();
               }}
@@ -3437,33 +3343,13 @@ function App() {
               <>
                 <h2 className="grid-subheading">Mega &amp; Gigantamax Forms</h2>
                 <section className="grid grid-special">
-                  {megaGigantamaxFiltered.map((p, index) => {
-                    const pref = getRegionPreferredEntry(p);
-                    const parts = pref.url.split("/").filter(Boolean);
-                    const id = parts[parts.length - 1];
-                    const idNum = Number(id);
-                    const dexDisplay = Number.isNaN(idNum) ? undefined : getDexNumberForEntry(pref.name, idNum);
-                    return (
-                      <PokemonCard
-                        key={pref.name}
-                        id={id}
-                        name={pref.name}
-                        url={pref.url}
-                        onSelect={() => selectPokemon(id, pref.name, pref.url)}
-                        dexNumber={dexDisplay}
-                        shiny={shiny}
-                        selectedGame={selectedGame}
-                        detailsCache={detailsCache}
-                        eagerLoad={index < 8}
-                      />
-                    );
-                  })}
+                  {megaGigantamaxFiltered.map((p, index) => renderCard(p, index, { eagerCount: 8, showSelection: false }))}
                 </section>
               </>
             )}
             {!hasPrimaryContent && megaGigantamaxFiltered.length === 0 && (
               <section className="grid">
-                <div className="dex-loading">No Pokémon found.</div>
+                <div className="dex-loading" role="status">{emptyStateMessage}</div>
               </section>
             )}
             {isMobile && hasPrimaryContent && renderPagination()}
@@ -3474,7 +3360,22 @@ function App() {
   );
 }
 
+const DEBUG_DETAIL_PANEL = import.meta.env.DEV && false;
+// Representative main-series version group per Smogon generation (for move stats)
+const SMOGON_GENERATION_VERSION_GROUP = new Map([
+  ["gen1", "yellow"],
+  ["gen2", "crystal"],
+  ["gen3", "emerald"],
+  ["gen4", "platinum"],
+  ["gen5", "black-2-white-2"],
+  ["gen6", "omega-ruby-alpha-sapphire"],
+  ["gen7", "ultra-sun-ultra-moon"],
+  ["gen8", "sword-shield"],
+  ["gen9", "scarlet-violet"],
+]);
 const detailsCache = new Map();
+// Full /pokemon/{id} responses, kept for the session so reopening a Pokémon is instant.
+const pokemonDetailsCache = new Map();
 const abilityCache = new Map();
 const natureDetailsCache = new Map();
 let cachedNatureList = null;
@@ -3593,15 +3494,15 @@ function DetailPanel({
   const [forms, setForms] = useState([]);
   const [evoPaths, setEvoPaths] = useState([]);
   const [evolutionChainData, setEvolutionChainData] = useState(null);
-  const [weaknesses, setWeaknesses] = useState([]); // [{type, mult}]
-  const [resistances, setResistances] = useState([]); // [{type, mult}]
-  const [debugLog, setDebugLog] = useState([]);
+  const [typeChart, setTypeChart] = useState(null);
+  const [moveData, setMoveData] = useState(null);
   const [smogonNature, setSmogonNature] = useState(null);
   const [smogonError, setSmogonError] = useState(null);
   const [smogonLoading, setSmogonLoading] = useState(false);
   const [smogonEvs, setSmogonEvs] = useState(null);
   const [smogonItem, setSmogonItem] = useState(null);
   const [smogonMoves, setSmogonMoves] = useState(null);
+  const [smogonGeneration, setSmogonGeneration] = useState(null); // e.g. "gen9"
   const [isEvModalOpen, setIsEvModalOpen] = useState(false);
   const [activeItemName, setActiveItemName] = useState(null);
   const [activeAbility, setActiveAbility] = useState(null);
@@ -3619,9 +3520,6 @@ function DetailPanel({
   const [isLearnsetModalOpen, setIsLearnsetModalOpen] = useState(false);
   const [evolutionDetailData, setEvolutionDetailData] = useState(null);
   const [currentPokemonForm, setCurrentPokemonForm] = useState(null);
-  const [isAltFormsModalOpen, setIsAltFormsModalOpen] = useState(false);
-  const [altFormsForModal, setAltFormsForModal] = useState([]);
-  const [altFormsModalTitle, setAltFormsModalTitle] = useState("");
   const [localFlavorEntries, setLocalFlavorEntries] = useState([]);
   const [learnset, setLearnset] = useState({ levelUp: [], machine: [], tm: [], hm: [] });
   const [learnsetMeta, setLearnsetMeta] = useState({
@@ -3633,9 +3531,6 @@ function DetailPanel({
     tmCount: 0,
     hmCount: 0,
   });
-  const [moveDetailsMap, setMoveDetailsMap] = useState(() => new Map()); // move name -> {type, power, accuracy, pp, damage_class}
-  const [moveUsageMap, setMoveUsageMap] = useState(() => new Map()); // move name -> usage percentage
-  const [moveUsageLoading, setMoveUsageLoading] = useState(false);
   
   const hasRecommendedEvs = useMemo(() => {
     if (!smogonEvs || typeof smogonEvs !== "object") return false;
@@ -3744,7 +3639,10 @@ function DetailPanel({
       if (!versionName || !text) return;
       const normalizedKey = normalizeLocalKey(versionName);
       const slug = VERSION_ALIAS_LOOKUP.get(normalizedKey) || versionName;
-      const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+      const cleaned = String(text || "")
+        .replace(/­\s*/g, "") // PokeAPI marks hyphenated line breaks with soft hyphens
+        .replace(/\s+/g, " ")
+        .trim();
       if (!cleaned) return;
       const existing = byVersion.get(slug);
       if (existing && existing.priority <= priority) {
@@ -3773,7 +3671,9 @@ function DetailPanel({
         const versionName = entry?.version;
         const lang = (entry?.language || "en").toLowerCase();
         if (lang && lang !== "en") continue;
-        pushEntry(versionName, entry?.text, 0);
+        // Local text for the version itself wins (it's PokeAPI's text with modern casing);
+        // text copied from a partner version only fills gaps PokeAPI doesn't cover.
+        pushEntry(versionName, entry?.text, entry?.inferred ? 2 : 0);
       }
     }
 
@@ -3782,8 +3682,8 @@ function DetailPanel({
       priority,
       index,
     }));
+    // Newest game first, regardless of which source the text came from
     result.sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
       if (a.index !== b.index) return b.index - a.index;
       return a.displayName.localeCompare(b.displayName);
     });
@@ -3877,11 +3777,35 @@ function DetailPanel({
       setNatureOverlayName(null);
     }
   }, [smogonNature]);
-  const addLog = (msg, data) => {
-    const line = `[${new Date().toISOString()}] ${msg}` + (data !== undefined ? ` :: ${typeof data === 'string' ? data : JSON.stringify(data)}` : '');
-    setDebugLog((d) => d.concat(line).slice(-200));
-  };
+  // Debug trace for development only (it used to be stored in state, re-rendering the whole
+  // panel on every step without ever being shown).
+  const addLog = DEBUG_DETAIL_PANEL ? (msg, data) => console.debug(`[detail] ${msg}`, data ?? "") : () => {};
   const displayDexNumber = dexNumber || (id ? `#${id}` : "-");
+
+  useEffect(() => {
+    let cancelled = false;
+    loadTypeChart()
+      .then((chart) => !cancelled && setTypeChart(chart))
+      .catch(() => {});
+    loadMoveData()
+      .then((data) => !cancelled && setMoveData(data))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Types and matchups as they were in the selected game's generation (latest when none):
+  // e.g. Clefairy is Normal before Gen 6 and Gen 1 uses its own type chart.
+  const displayTypeNames = useMemo(
+    () => getDetailTypesForGeneration(details, targetEvolutionGeneration),
+    [details, targetEvolutionGeneration]
+  );
+  const { weaknesses, resistances, matchupsReady } = useMemo(() => {
+    const range = getTypeChartForGeneration(typeChart, targetEvolutionGeneration);
+    if (!range || displayTypeNames.length === 0) return { weaknesses: [], resistances: [], matchupsReady: false };
+    return { ...computeDefensiveMatchups(range, displayTypeNames), matchupsReady: true };
+  }, [typeChart, targetEvolutionGeneration, displayTypeNames]);
   const hasLearnsetContent = (learnset.levelUp?.length || 0) > 0 || (learnset.machine?.length || 0) > 0;
   const shouldShowLearnset = Boolean(details) && (
     hasLearnsetContent || (Array.isArray(details?.moves) && details.moves.length > 0)
@@ -3893,7 +3817,7 @@ function DetailPanel({
     }
   }, [setShiny]);
 
-  const buildEvolutionTree = useCallback((evoPaths, filterToAlternateForms = false) => {
+  const buildEvolutionTree = useCallback((evoPaths) => {
     if (!Array.isArray(evoPaths) || evoPaths.length === 0) return [];
     const nodeMap = new Map();
     const rootSet = new Set();
@@ -3980,7 +3904,7 @@ function DetailPanel({
   }, [compareForms]);
 
   // Helper to check if evolution details suggest alternate form evolution
-  const isAlternateFormEvolution = useCallback((evolutionDetails, childSpeciesId, formsMap) => {
+  const isAlternateFormEvolution = useCallback((evolutionDetails) => {
     if (!Array.isArray(evolutionDetails) || evolutionDetails.length === 0) return false;
     
     // Check evolution details for form-specific indicators
@@ -4027,9 +3951,6 @@ function DetailPanel({
   const alternateFormsEvoPaths = useMemo(() => {
     if (!evolutionChainData || !Array.isArray(evoPaths) || evoPaths.length === 0) return evoPaths;
     
-    const { formsBySpeciesEntries } = evolutionChainData;
-    const formsMap = new Map(Array.isArray(formsBySpeciesEntries) ? formsBySpeciesEntries : []);
-    
     // Filter evolution paths to only include those relevant to alternate forms
     return evoPaths.map(path => {
       const filteredPath = [];
@@ -4038,11 +3959,10 @@ function DetailPanel({
         const nextNode = i < path.length - 1 ? path[i + 1] : null;
         
         if (nextNode && nextNode.toNext) {
-          const childSpeciesId = nextNode.id;
           const evolutionDetails = nextNode.toNext?.details ? [nextNode.toNext.details] : [];
           
           // Check if this evolution is for alternate forms
-          const isAltFormEvo = isAlternateFormEvolution(evolutionDetails, childSpeciesId, formsMap);
+          const isAltFormEvo = isAlternateFormEvolution(evolutionDetails);
           
           // Include if it's an alternate form evolution
           if (isAltFormEvo) {
@@ -4109,7 +4029,7 @@ function DetailPanel({
     }).filter(Boolean);
   }, [evoPaths, isStandardFormEvolution]);
 
-  const evolutionTree = useMemo(() => buildEvolutionTree(standardFormsEvoPaths, false), [standardFormsEvoPaths, buildEvolutionTree]);
+  const evolutionTree = useMemo(() => buildEvolutionTree(standardFormsEvoPaths), [standardFormsEvoPaths, buildEvolutionTree]);
 
   const hasStandaloneAlternateForms = useMemo(() => {
     if (!Array.isArray(evoPaths) || evoPaths.length === 0) return false;
@@ -4134,7 +4054,7 @@ function DetailPanel({
     if (!shouldBuildAltTree) return [];
     
     const pathsToUse = alternateFormsEvoPaths.length > 0 ? alternateFormsEvoPaths : evoPaths;
-    const baseTree = buildEvolutionTree(pathsToUse, false);
+    const baseTree = buildEvolutionTree(pathsToUse);
     if (!baseTree || baseTree.length === 0) return [];
     
     const buildAltFormTree = (entry) => {
@@ -4193,36 +4113,7 @@ function DetailPanel({
     return result;
   }, [alternateFormsEvoPaths, evoPaths, hasStandaloneAlternateForms, buildEvolutionTree, compareForms]);
 
-  // Collect all non-regional, non-default alternate forms across the entire evolution tree
-  // Excludes Mega and GMax forms (they have their own buttons)
-  const aggregatedAlternateForms = useMemo(() => {
-    const seen = new Set();
-    const results = [];
-    const pushForm = (f) => {
-      const fid = f?.id != null ? String(f.id) : null;
-      if (!fid || f.isDefault) return; // exclude default forms
-      const isRegional = Array.isArray(f?.tags) && f.tags.includes("Regional");
-      const isCap = isCapFormName(f?.name);
-      if (isRegional && !isCap) return; // exclude regionals except Pikachu cap variants
-      const isMega = Array.isArray(f?.tags) && f.tags.includes("Mega");
-      const isGmax = Array.isArray(f?.tags) && f.tags.includes("Gigantamax");
-      if (isMega || isGmax) return; // exclude Mega and GMax forms
-      if (seen.has(fid)) return;
-      seen.add(fid);
-      results.push(f);
-    };
-    const walkEntry = (entry) => {
-      if (!entry) return;
-      const forms = Array.isArray(entry.forms) ? entry.forms : [];
-      forms.forEach(pushForm);
-      const children = Array.isArray(entry.children) ? entry.children : [];
-      children.forEach((edge) => walkEntry(edge.child));
-    };
-    evolutionTree.forEach(walkEntry);
-    return results;
-  }, [evolutionTree]);
 
-  const hasAnyAlternateForms = aggregatedAlternateForms.length > 0;
 
   // Collect Mega and GMax forms separately from the evolution tree
   const megaForms = useMemo(() => {
@@ -4273,14 +4164,6 @@ function DetailPanel({
 
   const hasMegaForms = megaForms.length > 0;
   const hasGmaxForms = gmaxForms.length > 0;
-
-  const openAggregatedAltForms = useCallback(() => {
-    if (!aggregatedAlternateForms.length) return;
-    const titleBase = formatDisplayName(name || selected?.name || "");
-    setAltFormsModalTitle(`Alternate Forms — ${titleBase}`);
-    setAltFormsForModal(aggregatedAlternateForms);
-    setIsAltFormsModalOpen(true);
-  }, [aggregatedAlternateForms, name, selected]);
 
   // Handler to navigate directly to Mega form (first one if multiple)
   const handleMegaClick = useCallback(() => {
@@ -4412,8 +4295,6 @@ function DetailPanel({
     
     if (isAlternateTree) {
       // In alternate forms tree: if current selection is an alternate form of this species, show default form
-      const currentIdNum = Number(id);
-      const entryBaseId = entry.baseEntry?.id != null ? Number(entry.baseEntry.id) : null;
       
       // Check if current selection matches any alternate form in this entry
       const currentMatchesEntry = filteredVariantForms.some((form) => String(form?.id) === String(id));
@@ -4450,22 +4331,9 @@ function DetailPanel({
         : entry;
     }
     
-    const isCurrentNode = Boolean(promotedForm)
+    const isCurrentNode = promotedForm
       ? String(promotedForm.id) === String(id)
       : (primaryDisplayNode.id != null && String(primaryDisplayNode.id) === String(id));
-    const variantForms = promotedForm
-      ? [
-          ...filteredVariantForms.filter((f) => String(f?.id) !== String(promotedForm.id)),
-          // Only add default form to variant list if we're in standard tree
-          ...(isAlternateTree ? [] : [{
-            id: entry.id,
-            name: entry.name,
-            displayName: entry.displayName || formatDisplayName(entry.name),
-            isDefault: true,
-            tags: ["Default"],
-          }]),
-        ]
-      : filteredVariantForms;
     const children = Array.isArray(entry.children) ? entry.children : [];
     // Determine the preferred region to pass to children
     const nextPreferredRegion = promotedForm ? (regionFromActive || getCanonRegion(promotedForm.name)) : inheritedRegion;
@@ -4484,31 +4352,6 @@ function DetailPanel({
       }
     };
 
-    const inlineForms = (() => {
-      if (isAlternateTree) {
-        // In alternate tree: show other alternate forms (not default forms)
-        const byId = new Map();
-        variantForms.forEach((f) => {
-          const fid = f?.id != null ? String(f.id) : null;
-          if (!fid || byId.has(fid)) return;
-          byId.set(fid, f);
-        });
-        return Array.from(byId.values());
-      } else {
-        // In standard tree: show regional forms and default forms
-        const regionalForms = (variantForms || []).filter((f) =>
-          Array.isArray(f?.tags) && f.tags.includes("Regional") && !isCapFormName(f?.name)
-        );
-        const defaultForms = (variantForms || []).filter((f) => Boolean(f?.isDefault));
-        const byId = new Map();
-        [...regionalForms, ...defaultForms].forEach((f) => {
-          const fid = f?.id != null ? String(f.id) : null;
-          if (!fid || byId.has(fid)) return;
-          byId.set(fid, f);
-        });
-        return Array.from(byId.values());
-      }
-    })();
 
     return (
       <li key={`${keyPrefix}-${nodeKey}`} className="evo-tree-node">
@@ -4574,7 +4417,6 @@ function DetailPanel({
     setForms([]);
     setEvoPaths([]);
     setEvolutionChainData(null);
-    setWeaknesses([]);
     setLearnset({ levelUp: [], machine: [] });
     setLearnsetMeta({
       versionGroup: null,
@@ -4583,10 +4425,22 @@ function DetailPanel({
       levelCount: 0,
       machineCount: 0,
     });
+    const cachedDetails = pokemonDetailsCache.get(url);
+    if (cachedDetails) {
+      setDetails(cachedDetails);
+      return;
+    }
+    // Don't keep showing the previous Pokémon's stats under the new name while loading.
+    setDetails(null);
     addLog('Fetching details', { url });
     queuedFetch(url)
       .then((r) => r.json())
       .then((data) => {
+        pokemonDetailsCache.set(url, data);
+        // Responses can be several hundred KB each; keep only the most recent few.
+        if (pokemonDetailsCache.size > 24) {
+          pokemonDetailsCache.delete(pokemonDetailsCache.keys().next().value);
+        }
         if (ignore) return;
         addLog('Details loaded', { id: data?.id, name: data?.name });
         setDetails(data);
@@ -4597,7 +4451,8 @@ function DetailPanel({
     };
   }, [url]);
 
-  // After details are loaded, fetch species, evolution chain, and compute weaknesses
+  // After details are loaded, fetch species, evolution chain and encounters
+  // (weaknesses are derived locally from the type chart, see `weaknesses` above)
   useEffect(() => {
     if (!details) return;
     let ignore = false;
@@ -4607,41 +4462,7 @@ function DetailPanel({
     setGameAvailabilityError(null);
     setActiveGame(null);
 
-    // Compute defensive multipliers by aggregating damage relations across all types
-    const computeMultipliers = async () => {
-      try {
-        const typeUrls = (details.types || []).map((t) => t.type.url);
-        addLog('Loading type relations', { count: typeUrls.length });
-        const typeDatas = await Promise.all(typeUrls.map((tu) => queuedFetch(tu).then((r) => r.json())));
-        const mult = new Map(); // type -> multiplier
-        const inc = (arr, factor) => {
-          (arr || []).forEach((t) => {
-            const key = t.name;
-            const prev = mult.get(key) ?? 1;
-            mult.set(key, prev * factor);
-          });
-        };
-        for (const td of typeDatas) {
-          const dr = td.damage_relations || {};
-          inc(dr.double_damage_from, 2);
-          inc(dr.half_damage_from, 0.5);
-          inc(dr.no_damage_from, 0);
-        }
-        const weak = [];
-        const resist = [];
-        mult.forEach((v, k) => {
-          if (v > 1) weak.push({ type: k, mult: v });
-          else if (v < 1 || v === 0) resist.push({ type: k, mult: v });
-        });
-        weak.sort((a, b) => b.mult - a.mult || a.type.localeCompare(b.type));
-        resist.sort((a, b) => a.mult - b.mult || a.type.localeCompare(b.type));
-        if (!ignore) {
-          setWeaknesses(weak);
-          setResistances(resist);
-        }
-        addLog('Computed matchups', { weak: weak.length, resist: resist.length });
-      } catch {}
-    };
+
 
     const fetchEncounters = async () => {
       if (!details) return;
@@ -4656,11 +4477,38 @@ function DetailPanel({
           details?.species?.name
         );
         if (ignore) return;
-        const normalized = Array.isArray(localNormalized) ? localNormalized : [];
-        setGameAvailability(normalized);
+        const local = Array.isArray(localNormalized) ? localNormalized : [];
+        // The local data has gaps (no Gold / HeartGold rows at all, few Silver / SoulSilver rows).
+        // Fill versions it doesn't cover from PokeAPI's encounter data, which is exact for
+        // Gen 1-4 and part of Gen 5-6. Rows copied from a partner version rank below it.
+        let apiEntries = [];
+        const encountersUrl = details?.location_area_encounters;
+        if (encountersUrl) {
+          try {
+            const response = await queuedFetch(encountersUrl);
+            // Skip versions the site doesn't cover (Japan-only Red/Green/Blue, Colosseum, ...)
+            if (response?.ok) {
+              apiEntries = normalizeEncounterData(await response.json()).filter((entry) =>
+                VERSION_ORDER_LOOKUP.has(entry.version)
+              );
+            }
+          } catch {
+            apiEntries = [];
+          }
+        }
+        if (ignore) return;
+        const exactLocalVersions = new Set(local.filter((entry) => !entry.__inferred).map((entry) => entry.version));
+        const apiVersions = new Set(apiEntries.map((entry) => entry.version));
+        const merged = [
+          ...local.filter((entry) => !entry.__inferred || !apiVersions.has(entry.version)),
+          ...apiEntries.filter((entry) => !exactLocalVersions.has(entry.version)),
+        ]
+          .filter((entry, index, list) => list.findIndex((other) => other.version === entry.version) === index)
+          .sort(compareVersionEntries);
+        setGameAvailability(merged);
         setGameAvailabilityError(null);
         setGameAvailabilityLoading(false);
-        addLog('Encounters loaded (local)', { games: normalized.length });
+        addLog('Encounters loaded', { local: local.length, api: apiEntries.length, games: merged.length });
       } catch (error) {
         if (ignore) return;
         addLog('Encounter load failed (local)', { message: error?.message || String(error) });
@@ -4668,81 +4516,6 @@ function DetailPanel({
         setGameAvailabilityError("Unable to load encounter data.");
         setGameAvailabilityLoading(false);
       }
-    };
-
-    const humanize = (s) => String(s || "").replace(/-/g, " ");
-    const describeEvolution = (eds) => {
-      if (!eds || eds.length === 0) return null;
-      const ed = eds[0];
-      const trig = ed.trigger?.name;
-      const parts = [];
-      const gender = ed.gender;
-      if (trig === "level-up") {
-        if (ed.min_level != null) parts.push(`Lv. ${ed.min_level}`);
-        if (ed.min_happiness != null) parts.push(`Friendship ${ed.min_happiness}`);
-        if (ed.min_affection != null) parts.push(`Affection ${ed.min_affection}`);
-        if (ed.min_beauty != null) parts.push(`Beauty ${ed.min_beauty}`);
-        if (gender === 1) parts.push("Female");
-        else if (gender === 2) parts.push("Male");
-        if (ed.time_of_day) parts.push(ed.time_of_day === "day" ? "Daytime" : humanize(ed.time_of_day));
-        if (ed.needs_overworld_rain) parts.push("Raining");
-        if (ed.party_species?.name) parts.push(`With ${humanize(ed.party_species.name)}`);
-        if (ed.party_type?.name) parts.push(`With ${humanize(ed.party_type.name)} ally`);
-        if (ed.location?.name) parts.push(`At ${humanize(ed.location.name)}`);
-        if (ed.known_move?.name) parts.push(`Know ${humanize(ed.known_move.name)}`);
-        if (ed.known_move_type?.name) parts.push(`Know ${humanize(ed.known_move_type.name)} move`);
-        if (parts.length === 0) parts.push("Level up");
-        return { text: parts.join(" • "), details: ed };
-      }
-      if (trig === "use-item") {
-        if (ed.item?.name) {
-          const name = ed.item.name;
-          const isStone = name.includes("stone");
-          const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${name}.png`;
-          return {
-            text: `Use ${humanize(name)}`,
-            itemSprite: isStone ? sprite : undefined,
-            details: ed,
-          };
-        }
-        return { text: "Use item", details: ed };
-      }
-      if (trig === "trade") {
-        if (ed.trade_species?.name) parts.push(`for ${humanize(ed.trade_species.name)}`);
-        if (ed.held_item?.name) parts.push(`holding ${humanize(ed.held_item.name)}`);
-        return { text: parts.length ? `Trade ${parts.join(", ")}` : "Trade", details: ed };
-      }
-      if (trig === "shed") {
-        return { text: "Shed evolution", details: ed };
-      }
-      if (trig) return { text: humanize(trig), details: ed };
-      return null;
-    };
-
-    // Build evolution paths from chain, attaching condition to the edge to next node
-    const buildPaths = (node, prefix = [], formsMap) => {
-      const speciesId = getIdFromUrl(node.species?.url);
-      const rawForms = speciesId && formsMap ? formsMap.get(String(speciesId)) : null;
-      const formBranches = rawForms && rawForms.length ? rawForms.map((form) => ({ ...form })) : [];
-      const currentNode = {
-        name: node.species.name,
-        displayName: formatDisplayName(node.species.name),
-        id: speciesId,
-        forms: formBranches,
-      };
-      const current = [...prefix, currentNode];
-      if (!node.evolves_to || node.evolves_to.length === 0) return [current];
-      let paths = [];
-      for (const child of node.evolves_to) {
-        const cond = describeEvolution(child.evolution_details);
-        const withCond = current.slice();
-        withCond[withCond.length - 1] = {
-          ...withCond[withCond.length - 1],
-          toNext: cond,
-        };
-        paths = paths.concat(buildPaths(child, withCond, formsMap));
-      }
-      return paths;
     };
 
     const fetchEvolution = async () => {
@@ -4816,10 +4589,12 @@ function DetailPanel({
           const key = String(sidNum);
           const existing = formsBySpeciesId.get(key) || [];
           const existingIds = new Set(existing.map((f) => (f?.id != null ? String(f.id) : null)).filter(Boolean));
+          const existingNames = new Set(existing.map((f) => String(f?.name || "").toLowerCase()).filter(Boolean));
           const mergedForms = existing.slice();
           (Array.isArray(extras) ? extras : []).forEach((f) => {
             const fid = f?.id != null ? String(f.id) : null;
-            if (!fid || existingIds.has(fid)) return;
+            // PokeAPI now lists some of these itself (e.g. zygarde-mega); don't add a duplicate.
+            if (!fid || existingIds.has(fid) || existingNames.has(String(f?.name || "").toLowerCase())) return;
             mergedForms.push({
               id: f.id,
               name: f.name,
@@ -4846,7 +4621,6 @@ function DetailPanel({
       } catch {}
     };
 
-    computeMultipliers();
     fetchEvolution();
     fetchEncounters();
 
@@ -4894,6 +4668,21 @@ function DetailPanel({
 
     const moves = Array.isArray(details.moves) ? details.moves : [];
 
+    // With a game (or region) selected, show only what the Pokémon learns there when PokeAPI has
+    // that game's learnset, instead of mixing in moves it can only learn in other games.
+    const scopedGroups = new Set(
+      (selectedGame
+        ? GAME_KEY_TO_VERSION_GROUPS.get(selectedGame)
+        : selectedDex && selectedDex !== "national"
+        ? DEX_KEY_TO_VERSION_GROUPS.get(selectedDex)
+        : null) || []
+    );
+    const hasScopedData =
+      scopedGroups.size > 0 &&
+      moves.some((entry) =>
+        (entry?.version_group_details || []).some((info) => scopedGroups.has(normalizeGroup(info?.version_group?.name)))
+      );
+
     for (const entry of moves) {
       const moveName = entry?.move?.name;
       if (!moveName) continue;
@@ -4909,6 +4698,7 @@ function DetailPanel({
         const method = info?.move_learn_method?.name;
         const versionGroupName = normalizeGroup(info?.version_group?.name);
         if (!method || !versionGroupName) continue;
+        if (hasScopedData && !scopedGroups.has(versionGroupName)) continue;
         const score = preferenceIndex(versionGroupName);
 
         if (method === "level-up") {
@@ -4972,7 +4762,7 @@ function DetailPanel({
       })
       .map((item) => ({
         name: item.move,
-        label: toTitleCase(item.move),
+        label: formatMoveName(item.move),
         level: item.level,
         levelLabel: formatMoveLevelLabel(item.level),
         versionGroup: item.versionGroup,
@@ -4985,7 +4775,7 @@ function DetailPanel({
       })
       .map((item) => ({
         name: item.move,
-        label: toTitleCase(item.move),
+        label: formatMoveName(item.move),
         versionGroup: item.versionGroup,
       }));
 
@@ -4997,15 +4787,10 @@ function DetailPanel({
       return next.done ? null : next.value;
     })();
 
-    // Separate TM and HM moves
-    const hmMoves = machineList.filter((move) => {
-      const name = String(move.name || "").toLowerCase();
-      return name.startsWith("hm") || name.includes("-hm");
-    });
-    const tmMoves = machineList.filter((move) => {
-      const name = String(move.name || "").toLowerCase();
-      return !name.startsWith("hm") && !name.includes("-hm");
-    });
+    // Separate TM and HM moves (HMs are per game; Gen 7+ has none)
+    const isHmMove = (move) => HM_MOVES_BY_VERSION_GROUP.get(move.versionGroup)?.has(move.name) ?? false;
+    const hmMoves = machineList.filter(isHmMove);
+    const tmMoves = machineList.filter((move) => !isHmMove(move));
 
     setLearnset({ levelUp: levelUpList, machine: machineList, tm: tmMoves, hm: hmMoves });
     setLearnsetMeta({
@@ -5019,243 +4804,26 @@ function DetailPanel({
     });
   }, [details, selectedGame, selectedDex]);
 
-  // Fetch move details for learnset moves
-  useEffect(() => {
-    if (!shouldShowLearnset) {
-      setMoveDetailsMap(new Map());
-      return;
-    }
-
-    let cancelled = false;
-    const levelMoves = (learnset.levelUp || []).map((m) => m.name);
-    const machineMoves = (learnset.machine || []).map((m) => m.name);
-    const recommendedMoves = Array.isArray(smogonMoves)
-      ? smogonMoves
-          .map((move) => normalizeSpeciesName(move))
-          .filter(Boolean)
-      : [];
-    const allMoves = [...levelMoves, ...machineMoves, ...recommendedMoves];
-    const uniqueMoves = Array.from(new Set(allMoves));
-    const toFetch = uniqueMoves.filter((name) => !moveDetailsMap.has(name));
-    
-    if (toFetch.length === 0) return;
-
-    (async () => {
-      const chunks = [];
-      for (let i = 0; i < toFetch.length; i += 10) {
-        chunks.push(toFetch.slice(i, i + 10));
-      }
-      
-      for (const chunk of chunks) {
-        if (cancelled) return;
-        
-        const results = await Promise.all(
-          chunk.map(async (name) => {
-            try {
-              const response = await fetch(`https://pokeapi.co/api/v2/move/${name}`);
-              const data = await response.json();
-              return {
-                name,
-                type: data?.type?.name || null,
-                power: data?.power ?? null,
-                accuracy: data?.accuracy ?? null,
-                pp: data?.pp ?? null,
-                priority: data?.priority ?? 0,
-                damage_class: data?.damage_class?.name || null,
-              };
-            } catch {
-              return {
-                name,
-                type: null,
-                power: null,
-                accuracy: null,
-                pp: null,
-                priority: 0,
-                damage_class: null,
-              };
-            }
-          })
-        );
-
-        if (!cancelled) {
-          setMoveDetailsMap((prev) => {
-            const next = new Map(prev);
-            for (const result of results) {
-              next.set(result.name, result);
-            }
-            return next;
-          });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+  // Move details for the learnset, from the static move snapshot (previously one PokeAPI request
+  // per move, ~250 for a typical Pokémon). Values are those of the version group each move was
+  // listed under, so e.g. Bite shows as Normal-type in Red/Blue and Thunderbolt as 95 power in Gen 1-5.
+  const moveDetailsMap = useMemo(() => {
+    const map = new Map();
+    if (!moveData || !shouldShowLearnset) return map;
+    const add = (moveName, versionGroup) => {
+      if (!moveName || map.has(moveName)) return;
+      const detailsForMove = getMoveForVersionGroup(moveData, moveName, versionGroup);
+      if (detailsForMove) map.set(moveName, detailsForMove);
     };
-  }, [learnset, shouldShowLearnset, moveDetailsMap, smogonMoves]);
+    (learnset.levelUp || []).forEach((move) => add(move.name, move.versionGroup));
+    (learnset.machine || []).forEach((move) => add(move.name, move.versionGroup));
+    // Recommended moves come from a Smogon set of a specific generation: show that generation's values
+    const smogonVersionGroup = SMOGON_GENERATION_VERSION_GROUP.get(smogonGeneration) || null;
+    (Array.isArray(smogonMoves) ? smogonMoves : []).forEach((move) => add(normalizeSpeciesName(move), smogonVersionGroup));
+    return map;
+  }, [moveData, shouldShowLearnset, learnset, smogonMoves, smogonGeneration]);
 
-  // Fetch Smogon move usage statistics
-  useEffect(() => {
-    if (!shouldShowLearnset || !name || !species) {
-      setMoveUsageMap(new Map());
-      setMoveUsageLoading(false);
-      return;
-    }
 
-    let cancelled = false;
-    const generationHint = species?.generation?.name || null;
-    const normalizedName = normalizeSpeciesName(name);
-
-    (async () => {
-      if (!normalizedName) {
-        setMoveUsageLoading(false);
-        return;
-      }
-
-      setMoveUsageLoading(true);
-      addLog("Fetching Smogon move usage", { name, normalizedName, generationHint });
-
-      // Try common formats based on generation
-      const formats = [];
-      if (generationHint) {
-        const genMatch = /generation-(\d+)/i.exec(generationHint);
-        const genNum = genMatch ? genMatch[1] : '9';
-        formats.push(`gen${genNum}ou`, `gen${genNum}uu`, `gen${genNum}ru`, `gen${genNum}nu`, `gen${genNum}pu`);
-      } else {
-        // Default to gen 9 formats
-        formats.push('gen9ou', 'gen9uu', 'gen9ru', 'gen9nu', 'gen9pu');
-      }
-
-      for (const format of formats) {
-        if (cancelled) return;
-        
-        try {
-          addLog(`Trying format: ${format}`, {});
-          const statsData = await fetchSmogonStats(format);
-          if (cancelled) return;
-
-          const pokemonStats = statsData?.pokemon || {};
-          // Find the Pokemon entry (handle different naming conventions)
-          let pokemonEntry = null;
-          let pokemonKey = null;
-          
-          // First try exact match
-          for (const [key, value] of Object.entries(pokemonStats)) {
-            const normalizedKey = normalizeSpeciesName(key);
-            if (normalizedKey === normalizedName) {
-              pokemonEntry = value;
-              pokemonKey = key;
-              break;
-            }
-          }
-
-          // If not found, try without form suffixes (e.g., "pikachu" matches "pikachu-alola")
-          if (!pokemonEntry) {
-            for (const [key, value] of Object.entries(pokemonStats)) {
-              const normalizedKey = normalizeSpeciesName(key);
-              // Check if normalizedName is a prefix of normalizedKey or vice versa
-              if (normalizedKey.startsWith(normalizedName + '-') || normalizedName.startsWith(normalizedKey + '-')) {
-                pokemonEntry = value;
-                pokemonKey = key;
-                break;
-              }
-            }
-          }
-
-          if (pokemonEntry) {
-            addLog(`Found Pokemon entry: ${pokemonKey}`, { 
-              hasMoves: !!pokemonEntry.Moves,
-              hasMovesLower: !!pokemonEntry.moves,
-              keys: Object.keys(pokemonEntry).slice(0, 10) // First 10 keys for debugging
-            });
-            
-            // Try both "Moves" and "moves" (case-sensitive)
-            const movesData = pokemonEntry.Moves || pokemonEntry.moves;
-            
-            if (movesData) {
-              // Extract move usage data
-              const usageMap = new Map();
-              const moves = movesData;
-              
-              if (typeof moves === 'object' && moves !== null) {
-                let processedCount = 0;
-                for (const [moveName, moveData] of Object.entries(moves)) {
-                  if (cancelled) return;
-                  processedCount++;
-                  
-                  // Move usage can be in different formats:
-                  // - Direct number: { "move-name": 45.2 }
-                  // - Object with usage: { "move-name": { usage: 45.2 } }
-                  // - String percentage: { "move-name": "45.2%" }
-                  let usage = null;
-                  if (typeof moveData === 'number') {
-                    usage = moveData;
-                  } else if (typeof moveData === 'object' && moveData !== null) {
-                    // Try common property names for usage
-                    usage = moveData.usage ?? moveData[''] ?? moveData.percent ?? moveData.Usage ?? null;
-                    if (usage == null) {
-                      // Sometimes it's the first numeric value
-                      const values = Object.values(moveData);
-                      const numValue = values.find(v => typeof v === 'number');
-                      if (numValue != null) usage = numValue;
-                    }
-                  } else if (typeof moveData === 'string') {
-                    // Extract number from string like "45.2%" or "45.2"
-                    const cleaned = moveData.replace(/%/g, '').trim();
-                    const numMatch = parseFloat(cleaned);
-                    usage = isNaN(numMatch) ? null : numMatch;
-                  }
-
-                  if (usage != null && typeof usage === 'number' && usage > 0) {
-                    // Normalize move name to match learnset format (kebab-case)
-                    const normalizedMove = normalizeSpeciesName(moveName);
-                    usageMap.set(normalizedMove, usage);
-                    // Also store with original name in case it matches directly
-                    if (normalizedMove !== moveName.toLowerCase()) {
-                      usageMap.set(moveName.toLowerCase(), usage);
-                    }
-                  }
-                }
-                
-                addLog(`Processed ${processedCount} moves, found ${usageMap.size} with usage > 0`, { format, pokemonKey });
-
-                if (!cancelled && usageMap.size > 0) {
-                  addLog(`Loaded ${usageMap.size} moves with usage data`, { format, pokemonKey, sampleMoves: Array.from(usageMap.keys()).slice(0, 5) });
-                  setMoveUsageMap(usageMap);
-                  setMoveUsageLoading(false);
-                  return; // Successfully found data, exit
-                } else if (!cancelled) {
-                  addLog(`No moves with usage data found`, { format, pokemonKey, processedCount });
-                }
-              } else {
-                addLog(`Moves data is not an object`, { format, pokemonKey, type: typeof movesData });
-              }
-            } else {
-              addLog(`Pokemon entry found but no Moves/moves property`, { format, pokemonKey, keys: Object.keys(pokemonEntry) });
-            }
-          } else {
-            addLog(`Pokemon not found in format ${format}`, { normalizedName, totalPokemon: Object.keys(pokemonStats).length });
-          }
-        } catch (error) {
-          addLog(`Error fetching format ${format}`, { error: String(error) });
-          // Try next format
-          continue;
-        }
-      }
-
-      // If no data found in any format, clear the map
-      if (!cancelled) {
-        addLog(`No usage data found for ${name}`, { formats: formats.join(', ') });
-        setMoveUsageMap(new Map());
-        setMoveUsageLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      setMoveUsageLoading(false);
-    };
-  }, [name, species, shouldShowLearnset]);
 
   // Load local pokedex entries (flavor text) for SV/ZA and prefer them when present
   useEffect(() => {
@@ -6078,9 +5646,12 @@ function DetailPanel({
     setSmogonMoves(null);
     setSmogonError(null);
     setSmogonLoading(false);
+    setSmogonGeneration(null);
     if (!alias) return;
     let cancelled = false;
-    const generationHint = species?.generation?.name || null;
+    // Sets for the selected game's generation (e.g. RBY sets when viewing Red/Blue/Yellow);
+    // newest generation first otherwise.
+    const generationHint = targetEvolutionGeneration ? `gen${targetEvolutionGeneration}` : null;
 
     const run = async () => {
       setSmogonLoading(true);
@@ -6100,6 +5671,7 @@ function DetailPanel({
         setSmogonEvs(evs);
         setSmogonItem(result?.item || null);
         setSmogonMoves(result?.moves || null);
+        setSmogonGeneration(result?.generation || null);
         if (hasNature || evs) {
           setSmogonError(null);
           addLog("Smogon recommendations", {
@@ -6141,24 +5713,17 @@ function DetailPanel({
     return () => {
       cancelled = true;
     };
-  }, [name, species?.generation?.name]);
+  }, [name, targetEvolutionGeneration]);
 
   // Get primary type and create gradient style
   const heroGradientStyle = useMemo(() => {
-    if (!details?.types || details.types.length === 0) {
+    // Primary type (slot 1) as of the selected game's generation
+    const primaryType = displayTypeNames[0];
+    if (!primaryType) {
       return {};
     }
-    
-    // Get primary type (slot 1 or first type)
-    const primaryType = details.types
-      .slice()
-      .sort((a, b) => a.slot - b.slot)[0];
-    
-    if (!primaryType?.type?.name) {
-      return {};
-    }
-    
-    const typeColor = getTypeColor(primaryType.type.name);
+
+    const typeColor = getTypeColor(primaryType);
     
     // Create radial gradient from top-left corner (0% 0%) outward
     // Using rgba for transparency
@@ -6172,26 +5737,11 @@ function DetailPanel({
     return {
       background: `radial-gradient(circle at 0% 0%, rgba(${r}, ${g}, ${b}, 0.25) 0%, rgba(${r}, ${g}, ${b}, 0.1) 40%, transparent 70%)`,
     };
-  }, [details?.types]);
+  }, [displayTypeNames]);
 
   // Primary type icon for background logo in hero panel
-  const primaryTypeName = useMemo(() => {
-    if (!details?.types || details.types.length === 0) return null;
-    const primary = details.types
-      .slice()
-      .sort((a, b) => a.slot - b.slot)[0];
-    return primary?.type?.name || null;
-  }, [details?.types]);
-
+  const primaryTypeName = displayTypeNames[0] || null;
   const heroTypeIconUrl = primaryTypeName ? getTypeIconUrl(primaryTypeName) : null;
-  const pokemonTypeNames = useMemo(() => {
-    if (!details?.types || details.types.length === 0) return [];
-    return details.types
-      .slice()
-      .sort((a, b) => a.slot - b.slot)
-      .map((entry) => entry?.type?.name)
-      .filter(Boolean);
-  }, [details?.types]);
 
   return (
     <aside className="detail-panel">
@@ -6273,28 +5823,26 @@ function DetailPanel({
                 <div className="about-row">
                   <span className="label">Types</span>
                   <div className="value">
-                    {(details?.types || [])
-                      .slice()
-                      .sort((a, b) => a.slot - b.slot)
-                      .map((t) => (
-                        <span
-                          key={t.type.name}
-                          className={`type-chip type-${t.type.name}`}
-                          role="button"
-                          title={`Filter by ${t.type.name}`}
-                          onClick={() => onActivateType?.(t.type.name)}
-                        >
-                          <img 
-                            src={getTypeIconUrl(t.type.name)} 
-                            alt={t.type.name} 
-                            className="type-icon"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                          <span className="type-name">{t.type.name}</span>
-                        </span>
-                      ))}
+                    {displayTypeNames.map((typeName) => (
+                      <button
+                        type="button"
+                        key={typeName}
+                        className={`type-chip type-${typeName}`}
+                        title={`Filter by ${typeName}`}
+                        onClick={() => onActivateType?.(typeName)}
+                      >
+                        <img
+                          src={getTypeIconUrl(typeName)}
+                          alt=""
+                          aria-hidden="true"
+                          className="type-icon"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <span className="type-name">{typeName}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <div className="about-row">
@@ -6409,8 +5957,10 @@ function DetailPanel({
               <div className="matchup-box weak-matchup">
                 <div className="matchup-title">Weak To</div>
                 <div className="types">
-                  {weaknesses.length === 0 ? (
+                  {!matchupsReady ? (
                     <span className="type-chip skeleton" />
+                  ) : weaknesses.length === 0 ? (
+                    <span className="nature-placeholder">None</span>
                   ) : (
                     weaknesses.map((w) => (
                       <span key={w.type} className={`type-chip type-${w.type}`} title={`x${w.mult}`}>
@@ -6434,8 +5984,10 @@ function DetailPanel({
               <div className="matchup-box resist-matchup">
                 <div className="matchup-title">Resists</div>
                 <div className="types">
-                  {resistances.length === 0 ? (
+                  {!matchupsReady ? (
                     <span className="type-chip skeleton" />
+                  ) : resistances.length === 0 ? (
+                    <span className="nature-placeholder">None</span>
                   ) : (
                     resistances.map((r) => (
                       <span key={r.type} className={`type-chip type-${r.type}`} title={`x${r.mult}`}>
@@ -6806,7 +6358,7 @@ function DetailPanel({
           itemName={activeItemName}
           onClose={closeItemOverlay}
           pokemonAlias={name}
-          generationHint={species?.generation?.name}
+          generationHint={targetEvolutionGeneration ? `gen${targetEvolutionGeneration}` : null}
           onSelectItem={setActiveItemName}
         />
       )}
@@ -6825,15 +6377,6 @@ function DetailPanel({
           currentForm={currentPokemonForm}
           pokemonName={name}
           onClose={() => setIsEvolutionDetailModalOpen(false)}
-        />
-      )}
-      {isAltFormsModalOpen && altFormsForModal.length > 0 && (
-        <AlternateFormsModal
-          forms={altFormsForModal}
-          onClose={() => setIsAltFormsModalOpen(false)}
-          onSelectPokemon={onSelectPokemon}
-          title={altFormsModalTitle}
-          shiny={shiny}
         />
       )}
       {isLearnsetModalOpen && shouldShowLearnset && (
@@ -6916,7 +6459,8 @@ function RecommendedEvModal({ evs, stats, onClose }) {
         return {
           name: variant.name,
           stat: statLabel,
-          description: `+8 ${statLabel} EVs per battle while held (halves Speed in battle)`,
+          // Power Items gave +4 in Gen 4-6 and +8 from Gen 7
+          description: `+8 ${statLabel} EVs per battle while held (+4 in Gen 4–6; halves Speed in battle)`,
           icon: variant.icon,
           category: "Held Items",
           order: variant.order ?? 0,
@@ -7456,7 +7000,7 @@ function NatureOverlay({ natureName, recommendedNature, onClose }) {
   );
 }
 
-function ItemOverlay({ itemName, onClose, pokemonAlias, generationHint, onSelectItem }) {
+function ItemOverlay({ itemName, onClose, pokemonAlias, generationHint }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -8176,81 +7720,28 @@ function AbilityOverlay({ ability, data, loading, error, onClose, onRetry, onSel
     setLearnerTypes(new Map());
   }, [ability?.url]);
 
-  const upsertLearnerTypes = useCallback((key, types) => {
-    if (!types || types.length === 0) return;
-    const normalized = types.filter(Boolean);
-    if (normalized.length === 0) return;
-    setLearnerTypes((prev) => {
-      const existing = prev.get(key);
-      if (existing && existing.length === normalized.length && existing.every((val, idx) => val === normalized[idx])) {
-        return prev;
-      }
-      const next = new Map(prev);
-      next.set(key, normalized);
-      return next;
-    });
-  }, []);
-
+  // Learner types come from the static Pokémon index (this used to fetch up to 140 full
+  // /pokemon/{id} payloads, several hundred KB each, per ability).
   useEffect(() => {
     if (!data?.pokemon || data.pokemon.length === 0) return;
     let ignore = false;
-    const entries = data.pokemon.slice(0, 140);
-
-    const loadTypes = async () => {
-      for (const entry of entries) {
-        if (ignore) break;
-        const poke = entry?.pokemon;
-        if (!poke?.url) continue;
-        const id = getIdNumberFromUrl(poke.url);
-        if (id == null) continue;
-        const key = String(id);
-
-        if (ignore) break;
-        const cached = detailsCache.get(key);
-        if (cached?.types && cached.types.length > 0) {
-          upsertLearnerTypes(key, cached.types.slice());
-          continue;
+    loadPokemonList()
+      .then((list) => {
+        if (ignore) return;
+        const typesById = new Map(list.map((entry) => [String(entry.id), entry.types || []]));
+        const next = new Map();
+        for (const entry of data.pokemon) {
+          const id = getIdNumberFromUrl(entry?.pokemon?.url);
+          const types = id != null ? typesById.get(String(id)) : null;
+          if (types && types.length > 0) next.set(String(id), types);
         }
-
-        let storedTypes = null;
-        try {
-          const stored = localStorage.getItem(`types:${key}`);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              storedTypes = parsed.filter(Boolean);
-            }
-          }
-        } catch {}
-        if (storedTypes && storedTypes.length > 0) {
-          detailsCache.set(key, { ...(detailsCache.get(key) || {}), types: storedTypes });
-          upsertLearnerTypes(key, storedTypes);
-          continue;
-        }
-
-        try {
-          const response = await queuedFetch(poke.url);
-          if (!response?.ok) continue;
-          const json = await response.json();
-          if (ignore) break;
-          const types = (json?.types || [])
-            .slice()
-            .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
-            .map((t) => t?.type?.name)
-            .filter(Boolean);
-          if (types.length > 0) {
-            const existing = detailsCache.get(key) || {};
-            detailsCache.set(key, { ...existing, types });
-            try { localStorage.setItem(`types:${key}`, JSON.stringify(types)); } catch {}
-            upsertLearnerTypes(key, types);
-          }
-        } catch {}
-      }
+        setLearnerTypes(next);
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
     };
-
-    loadTypes();
-    return () => { ignore = true; };
-  }, [data, upsertLearnerTypes]);
+  }, [data]);
 
   const effectEntry = useMemo(() => {
     if (!data?.effect_entries) return null;

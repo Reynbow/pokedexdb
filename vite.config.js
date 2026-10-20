@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import dexShards from './scripts/dex-shards-plugin.mjs'
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [react(), dexShards()],
   build: {
     // Enable minification (default is esbuild, which is faster)
     minify: 'esbuild', // Use esbuild for faster builds (default)
@@ -19,9 +20,13 @@ export default defineConfig({
     // Optimize chunk splitting
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split vendor dependencies
-          'react-vendor': ['react', 'react-dom'],
+        // React + ReactDOM in their own long-lived chunk (the object form only caught the tiny
+        // `react` entry; ReactDOM's client build stayed in the main bundle)
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+            return 'react-vendor'
+          }
+          return undefined
         },
         // Optimize chunk names
         chunkFileNames: 'assets/js/[name]-[hash].js',

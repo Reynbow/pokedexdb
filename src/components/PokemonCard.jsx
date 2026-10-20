@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import SpriteImage from "./SpriteImage.jsx";
+import { formatPokemonName } from "../utils/pokemonNames.js";
 import { SPECIAL_FILTERS, SPECIAL_TAG_META } from "../constants/tags.js";
 import { GAME_LOGO_LOOKUP, VERSION_LOGO_FILES, VERSION_COLORS, GAME_GENERATION_LOOKUP } from "../constants/games.js";
 import { getExclusiveVersionForSpecies } from "../constants/exclusives.js";
@@ -24,10 +25,12 @@ function useInView(options) {
     const opts = optionsRef.current || { root: null, rootMargin: "1000px 0px", threshold: 0.01 };
     const obs = new IntersectionObserver(
       (entries) => {
-        // Handle all entries (though typically just one)
-        entries.forEach((entry) => {
-          setInView(entry.isIntersecting);
-        });
+        // Latch once visible: unmounting the sprite again on scroll-away would make it
+        // reload (and re-walk its fallback chain) every time the card comes back.
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setInView(true);
+          obs.disconnect();
+        }
       },
       opts
     );
@@ -73,50 +76,7 @@ function hexToRgba(hex, alpha) {
   }
 }
 
-function getLuminance(hex) {
-  try {
-    const m = String(hex || "").trim().toLowerCase();
-    if (!m.startsWith("#")) return 1;
-    let r, g, b;
-    if (m.length === 4) {
-      r = parseInt(m[1] + m[1], 16);
-      g = parseInt(m[2] + m[2], 16);
-      b = parseInt(m[3] + m[3], 16);
-    } else if (m.length === 7) {
-      r = parseInt(m.slice(1, 3), 16);
-      g = parseInt(m.slice(3, 5), 16);
-      b = parseInt(m.slice(5, 7), 16);
-    } else {
-      return 1;
-    }
-    return (r + g + b) / (255 * 3);
-  } catch {
-    return 1;
-  }
-}
-const REGIONAL_NAME_PREFIXES = new Map([
-  ["alola", "Alolan"],
-  ["alolan", "Alolan"],
-  ["galar", "Galarian"],
-  ["galarian", "Galarian"],
-  ["hisui", "Hisuian"],
-  ["hisuan", "Hisuian"],
-  ["paldea", "Paldean"],
-  ["paldean", "Paldean"],
-]);
-
-const formatDisplayName = (rawName) => {
-  const stripped = stripMegaGmaxTokens(rawName);
-  const key = String(stripped || "").toLowerCase();
-  const parts = key.split("-");
-  const suffix = parts[parts.length - 1];
-  const prefix = REGIONAL_NAME_PREFIXES.get(suffix);
-  if (prefix && parts.length > 1) {
-    const baseName = parts.slice(0, -1).join("-");
-    return `${prefix} ${toTitleCase(baseName)}`;
-  }
-  return toTitleCase(stripped);
-};
+const formatDisplayName = formatPokemonName;
 
 const deriveSpecialTags = (name) => {
   const lower = String(name || "").toLowerCase();
@@ -144,7 +104,7 @@ const GAME_SPRITE_PATHS = new Map([
   ["black-white", "generation-v/black-white/"],
   ["black-2-white-2", "generation-v/black-white/"],
   ["x-y", "generation-vi/x-y/"],
-  ["omega-ruby-alpha-sapphire", "generation-vii/ultra-sun-ultra-moon/"],
+  ["omega-ruby-alpha-sapphire", "generation-vi/omegaruby-alphasapphire/"],
   ["sun-moon", "generation-vii/ultra-sun-ultra-moon/"],
   ["ultra-sun-ultra-moon", "generation-vii/ultra-sun-ultra-moon/"],
 ]);
@@ -169,6 +129,7 @@ function PokemonCard({
   name,
   id,
   url,
+  types: typesProp = null,
   onSelect,
   selected,
   dexNumber,
@@ -180,7 +141,11 @@ function PokemonCard({
   displayNameOverride = null,
 }) {
   const cache = detailsCache || localDetailsCache;
-  const [types, setTypes] = useState(cache.get(String(id))?.types || []);
+  const hasTypesProp = Array.isArray(typesProp) && typesProp.length > 0;
+  const [fetchedTypes, setFetchedTypes] = useState(() => cache.get(String(id))?.types || []);
+  // Types normally come from the static Pokémon index; only fetch for entries missing from it.
+  const types = hasTypesProp ? typesProp : fetchedTypes;
+  const handleSelect = () => onSelect?.(id, name, url);
   const intersectionOptions = useMemo(() => ({ root: null, rootMargin: "600px 0px", threshold: 0.01 }), []);
   const [cardRef, inView] = useInView(intersectionOptions);
   const baseSpeciesId = useMemo(() => {
@@ -220,7 +185,7 @@ function PokemonCard({
     if (/^indeedee-(male|female)$/.test(stripped)) {
       return { formAwareName: stripped, baseSpeciesName: stripped };
     }
-    if (/^tauros-paldea-(combat|blaze|aqua)$/.test(stripped)) {
+    if (/^tauros-paldea-(combat|blaze|aqua)-breed$/.test(stripped)) {
       return { formAwareName: stripped, baseSpeciesName: stripped };
     }
     // Remove common regional/form tokens so exclusives can fall back to base species
@@ -243,7 +208,7 @@ function PokemonCard({
     const label = toTitleCase(String(versionKey).replace(/-/g, " "));
     const color = VERSION_COLORS.get(versionKey) || null;
     return { logoUrl, label, color, versionKey };
-  }, [selectedGame, baseSpeciesName]);
+  }, [selectedGame, formAwareName, baseSpeciesName]);
 
   const { variant: spriteVariant, gameSpritePath } = useMemo(() => {
     return getSpriteVariantForGame(selectedGame);
@@ -251,22 +216,12 @@ function PokemonCard({
 
   useEffect(() => {
     let ignore = false;
-    if (!inView) return;
+    if (!inView || hasTypesProp) return;
     const key = String(id);
     if (cache.has(key)) {
-      setTypes(cache.get(key).types);
+      setFetchedTypes(cache.get(key).types);
       return;
     }
-    try {
-      const cached = localStorage.getItem(`types:${key}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        cache.set(key, { types: parsed });
-        setTypes(parsed);
-        return;
-      }
-    } catch {}
-
     fetch(url)
       .then((r) => r.json())
       .then((data) => {
@@ -275,16 +230,13 @@ function PokemonCard({
           .sort((a, b) => a.slot - b.slot)
           .map((x) => x.type.name);
         cache.set(key, { types: t });
-        try {
-          localStorage.setItem(`types:${key}`, JSON.stringify(t));
-        } catch {}
-        setTypes(t);
+        setFetchedTypes(t);
       })
       .catch(() => {});
     return () => {
       ignore = true;
     };
-  }, [id, url, inView, cache]);
+  }, [id, url, inView, cache, hasTypesProp]);
 
   // Removed auto-scrolling on selection to avoid distracting scroll animations.
 
@@ -361,10 +313,15 @@ function PokemonCard({
     <div
       className={`card${selected ? " is-selected" : ""}${exclusiveBadge ? " has-exclusive" : ""}`}
       title={name}
-      onClick={onSelect}
+      onClick={handleSelect}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleSelect();
+        }
+      }}
       onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -432,7 +389,7 @@ function PokemonCard({
               // CSS will handle image-rendering via .card .sprite rule
             }}
             loading={eagerLoad ? "eager" : "lazy"}
-            fetchpriority={eagerLoad ? "high" : undefined}
+            fetchPriority={eagerLoad ? "high" : undefined}
             formName={name}
             speciesId={baseSpeciesId}
             pokemonUrl={url}

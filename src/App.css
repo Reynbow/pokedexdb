@@ -291,6 +291,13 @@
   flex-wrap: wrap;
 }
 
+/* Section tabs are links styled as chips (buttons are border-box by default, links aren't) */
+.category-toggle-row a.filter-chip {
+  box-sizing: border-box;
+  line-height: normal;
+  text-decoration: none;
+}
+
 .items-filter-row {
   display: flex;
   gap: 8px;
@@ -860,6 +867,16 @@
   gap: 6px;
 }
 
+button.type-chip {
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.type-chip:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 .type-chip .type-icon {
   width: 18px;
   height: 18px;
@@ -1139,6 +1156,7 @@
   /* Hide specific category buttons in mobile view */
   .category-toggle-row.is-mobile .filter-chip[data-category="moves"],
   .category-toggle-row.is-mobile .filter-chip[data-category="abilities"],
+  .category-toggle-row.is-mobile .filter-chip[data-category="items"],
   .category-toggle-row.is-mobile .filter-chip[data-category="ev"] {
     display: none;
   }
@@ -1246,6 +1264,13 @@
   text-align: center;
   color: #cbd5e1;
   font-style: italic;
+}
+
+/* The National Dex renders ~1,300 cards: let the browser skip layout/paint for off-screen ones
+   (cards are fixed-size squares and already clip their content, so nothing changes visually). */
+.grid > .card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--card-size) auto var(--card-size);
 }
 
 .grid {
@@ -9448,3 +9473,186 @@
     display: block;
   }
 }
+
+/* ItemsPage */
+.detail-hero.items-detail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
+}
+.items-detail-body .about { margin-bottom: 0; }
+.items-detail-body .detail-art { transform: none; }
+.items-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.items-summary .item-art-wrap { flex: 0 0 auto; box-sizing: border-box; }
+.items-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+}
+.items-facts dt { color: #a1a1aa; font-weight: 600; }
+.items-facts dd { margin: 0; }
+.items-section-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.items-section-head .list-subheading { margin: 0; text-align: left; }
+.items-section-text { margin: 0 0 6px; line-height: 1.5; }
+.items-scope-label { font-weight: 600; color: #cbd5f5; }
+.items-list-sentinel { height: 1px; flex: 0 0 1px; }
+.items-detail-empty { margin: auto; }
+/* end ItemsPage */
+
+/* MovesPage / AbilitiesPage */
+/* Names arrive pre-formatted ("U-turn", "Light of Ruin", "Mr. Mime"), so skip CSS capitalisation. */
+.item-name.proper-name,
+.detail-title h2.proper-name,
+.learners-poke-button .label.proper-name {
+  text-transform: none;
+}
+.learners-count {
+  margin-left: 6px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.learners-more {
+  display: flex;
+  padding-top: 4px;
+}
+.learners-more-button {
+  width: 100%;
+  cursor: pointer;
+}
+.learners-hidden-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(139, 92, 246, 0.16);
+  color: #ddd6fe;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.moves-inline-status {
+  margin: 0 0 16px;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+.move-history-games {
+  display: block;
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.move-history-note {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+/* end MovesPage / AbilitiesPage */
+
+/* SavPage: Pokedex panel toggle (keyboard / touch access) */
+.sav-result-row__dex-toggle {
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+.sav-result-row__dex-toggle:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.sav-result-row.is-dex-open .sav-result-row__yellow-hover-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(0, -4px);
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  /* backdrop-filter would make the card the containing block of the fixed panel below. */
+  .sav-results-card {
+    backdrop-filter: none;
+  }
+
+  /* On small screens the opened panel is pinned above the bottom navigation. */
+  .sav-results-list .sav-result-row.is-dex-open .sav-result-row__locations .sav-result-row__yellow-hover-panel {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    top: auto;
+    bottom: 84px;
+    width: auto;
+    max-width: 480px;
+    margin: 0 auto;
+    transform: none;
+    z-index: 2100;
+  }
+}
+
+.sav-evolution__chain {
+  flex-wrap: wrap;
+}
+/* end SavPage */
+
+/* EvTrainingPage */
+.ev-map-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: zoom-in;
+}
+.ev-map-button:focus-visible {
+  outline: 2px solid #7c8cff;
+  outline-offset: 2px;
+}
+.ev-map-close:focus-visible {
+  outline: 2px solid #7c8cff;
+  outline-offset: 2px;
+}
+.ev-split-badges {
+  margin-bottom: 4px;
+}
+.ev-split.ev-split-badges > .ev-badge:last-child {
+  justify-self: end;
+}
+.ev-item-note {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 0 0 6px 12px;
+}
+.vitamin-columns.ev-item-cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 641px) {
+  .vitamin-columns.ev-item-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* end EvTrainingPage */

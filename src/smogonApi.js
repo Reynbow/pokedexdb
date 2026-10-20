@@ -1,4 +1,5 @@
-const SMOGON_API_BASE = "https://data.pkmn.cc";
+// data.pkmn.cc 301-redirects every request here; going direct saves a round trip per file.
+const SMOGON_API_BASE = "https://pkmn.github.io/smogon/data";
 
 export const SMOGON_SET_GENERATIONS = ["gen9", "gen8", "gen7", "gen6", "gen5", "gen4", "gen3", "gen2", "gen1"];
 
@@ -28,6 +29,8 @@ const stripDiacritics = (value) => {
 export const normalizeSpeciesName = (value) =>
   stripDiacritics(String(value || ""))
     .toLowerCase()
+    // "Farfetch’d" -> "farfetchd" (PokeAPI slug), not "farfetch-d"
+    .replace(/['’.]/g, "")
     .replace(/[♀]/g, "-f")
     .replace(/[♂]/g, "-m")
     .replace(/&/g, "and")
@@ -324,12 +327,13 @@ const buildSetIndex = (generation, dataset) => {
   return index;
 };
 
-const findSpeciesKey = (generation, dataset, normalizedAlias) => {
+const findSpeciesKey = (generation, dataset, normalizedAlias, { exactOnly = false } = {}) => {
   if (!normalizedAlias) return null;
   const index = buildSetIndex(generation, dataset);
   if (index.has(normalizedAlias)) {
     return index.get(normalizedAlias);
   }
+  if (exactOnly) return null;
   let candidate = normalizedAlias;
   while (candidate.includes("-")) {
     candidate = candidate.slice(0, candidate.lastIndexOf("-"));
@@ -400,11 +404,14 @@ export const fetchSmogonFormatsIndex = () =>
 export const fetchSmogonImgsIndex = () =>
   fetchJson(`${SMOGON_API_BASE}/imgs/index.json`);
 
+const ROMAN_GENERATIONS = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9 };
+
+// Accepts "gen3", "3" or PokeAPI's "generation-iii"
 const buildGenerationOrder = (generationHint) => {
   if (!generationHint) return [...SMOGON_SET_GENERATIONS];
-  const normalized = String(generationHint || "")
-    .toLowerCase()
-    .replace("generation-", "gen");
+  const raw = String(generationHint || "").toLowerCase();
+  const roman = raw.match(/^generation-([ivx]+)$/);
+  const normalized = roman ? `gen${ROMAN_GENERATIONS[roman[1]]}` : /^\d+$/.test(raw) ? `gen${raw}` : raw;
   if (!SMOGON_SET_GENERATIONS.includes(normalized)) {
     return [...SMOGON_SET_GENERATIONS];
   }
@@ -431,11 +438,17 @@ export const findRecommendedNature = async (alias, options = {}) => {
   const generationOrder = buildGenerationOrder(options.generationHint);
   const searched = [];
   let lastError = null;
-  for (const generation of generationOrder) {
-    searched.push(generation);
+  // Exact name in any generation first, then the base-species fallback ("slowbro-galar" must
+  // not get plain Slowbro's set just because the newest generation lists only Slowbro).
+  const attempts = [
+    ...generationOrder.map((generation) => ({ generation, exactOnly: true })),
+    ...generationOrder.map((generation) => ({ generation, exactOnly: false })),
+  ];
+  for (const { generation, exactOnly } of attempts) {
+    if (!searched.includes(generation)) searched.push(generation);
     try {
       const dataset = await fetchSmogonSets(generation);
-      const speciesKey = findSpeciesKey(generation, dataset, normalizedAlias);
+      const speciesKey = findSpeciesKey(generation, dataset, normalizedAlias, { exactOnly });
       if (!speciesKey) {
         continue;
       }

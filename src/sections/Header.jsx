@@ -2,8 +2,6 @@ import React, { memo } from "react";
 import CategoryToggle from "../CategoryToggle.jsx";
 
 function HeaderSection({
-  title = "Pokedex",
-  subtitle = "Search and explore every Pokemon",
   showFilters,
   setShowFilters,
   query,
@@ -35,6 +33,7 @@ function HeaderSection({
           ) : null}
           <input
             className="search"
+            aria-label="Search Pokémon by name or number"
             placeholder="Search Pokemon"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

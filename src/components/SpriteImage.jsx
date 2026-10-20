@@ -5,7 +5,7 @@ import { getBasePath } from "../utils/url.js";
 const SPRITE_PLACEHOLDER =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='12' fill='%23202631'/><text x='50%' y='52%' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='12' fill='%23cbd5f5'>No Sprite</text></svg>";
 
-export const buildSpriteSources = (id, variant, options = {}) => {
+const buildSpriteSources = (id, variant, options = {}) => {
   const { formName, speciesId, pokemonUrl, dexNumber, shiny = false, gameSpritePath = null } = options;
   const clean = String(id ?? "").trim();
   const lowerName = String(formName || "").toLowerCase();
@@ -202,16 +202,24 @@ export default function SpriteImage({
     () => buildSpriteSources(id, variant, { formName, speciesId, pokemonUrl, dexNumber, shiny, gameSpritePath }),
     [id, variant, formName, speciesId, pokemonUrl, dexNumber, shiny, gameSpritePath]
   );
+  // Compare by content: props like dexNumber rebuild the array without changing any URL.
+  const sourcesKey = sources.join("\n");
   const [index, setIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [prevSourcesKey, setPrevSourcesKey] = useState(sourcesKey);
   const imgRef = useRef(null);
 
-  const src = sources[Math.min(index, sources.length - 1)];
-
-  useEffect(() => {
+  // Restart the fallback chain whenever the candidate URLs change (new Pokémon, shiny, game).
+  // Only show the loading state if the image actually changes; an unchanged src fires no load
+  // event, so it would otherwise stay invisible.
+  if (prevSourcesKey !== sourcesKey) {
+    const currentSrc = prevSourcesKey.split("\n")[index];
+    setPrevSourcesKey(sourcesKey);
     setIndex(0);
-    setIsLoading(true);
-  }, [id, shiny]);
+    if (sources[0] !== currentSrc) setIsLoading(true);
+  }
+
+  const src = sources[Math.min(index, sources.length - 1)];
 
   // Check if image is already loaded (cached) after src changes
   useEffect(() => {
@@ -219,21 +227,19 @@ export default function SpriteImage({
     if (img && img.complete && img.naturalHeight !== 0) {
       setIsLoading(false);
     }
-  }, [src]);
+  }, [src, sourcesKey]);
 
   const handleError = (event) => {
-    setIndex((prev) => {
-      const next = prev + 1;
-      if (next < sources.length) {
-        setIsLoading(true);
-        return next;
-      }
-      setIsLoading(false);
-      if (onError) {
-        onError(event);
-      }
-      return prev;
-    });
+    const next = index + 1;
+    if (next < sources.length) {
+      setIndex(next);
+      setIsLoading(true);
+      return;
+    }
+    setIsLoading(false);
+    if (onError) {
+      onError(event);
+    }
   };
 
   const handleLoad = (event) => {
@@ -261,6 +267,7 @@ export default function SpriteImage({
       onError={handleError}
       onLoad={handleLoad}
       loading={loading}
+      decoding={rest.decoding ?? "async"}
       style={imgStyle}
     />
   );

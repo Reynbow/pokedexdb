@@ -10,7 +10,6 @@ export default class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, info) {
     this.setState({ info });
-    // eslint-disable-next-line no-console
     console.error("DetailPanel crashed:", error, info);
   }
   render() {
@@ -18,10 +17,12 @@ export default class ErrorBoundary extends React.Component {
       return (
         <div style={{ padding: 16 }}>
           <h2>Something went wrong loading details.</h2>
-          <pre style={{ whiteSpace: "pre-wrap" }}>
-            {String(this.state.error)}
-            {this.state.info ? "\n" + (this.state.info.componentStack || "") : ""}
-          </pre>
+          {import.meta.env.DEV ? (
+            <pre style={{ whiteSpace: "pre-wrap" }}>
+              {String(this.state.error)}
+              {this.state.info ? "\n" + (this.state.info.componentStack || "") : ""}
+            </pre>
+          ) : null}
           {this.props.fallback}
         </div>
       );
