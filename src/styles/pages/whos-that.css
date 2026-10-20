@@ -1,0 +1,621 @@
+/* Who's That Pokémon?: the Game Boy encounter screen. The silhouette sits on a lit screen,
+   the prompt, results and the guess live in the text box, clues fill in as guesses are spent. */
+
+.wt {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--s-5) var(--s-5) var(--s-7);
+}
+
+/* ---------------------------------------------------------------- Head + day stepper */
+
+.wt-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-5);
+  margin-bottom: var(--s-4);
+}
+.wt-head__text {
+  display: grid;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.wt-title {
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+.wt-intro {
+  max-width: 60ch;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.wt-days {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.wt-days__step.btn--icon {
+  width: 44px;
+  min-height: 44px;
+}
+.wt-days__date {
+  display: grid;
+  justify-items: center;
+  min-width: 9.5rem;
+  margin: 0;
+  line-height: 1.25;
+  text-align: center;
+}
+.wt-days__day {
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.wt-days__today {
+  min-height: 36px;
+}
+
+/* ---------------------------------------------------------------- Layout */
+
+.wt-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "screen"
+    "dialog"
+    "clues"
+    "score";
+  gap: var(--s-3);
+}
+.wt-screen {
+  grid-area: screen;
+}
+.wt-dialog {
+  grid-area: dialog;
+}
+.wt-clues {
+  grid-area: clues;
+}
+.wt-score {
+  grid-area: score;
+}
+
+/* ---------------------------------------------------------------- Screen */
+
+.wt-screen {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4) var(--s-4);
+}
+.wt-screen__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.wt-screen__step {
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* One pip per guess */
+.wt-pips {
+  display: inline-flex;
+  gap: 6px;
+}
+.wt-pip {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--frame);
+  border-radius: 1px;
+}
+.wt-pip--used {
+  background: var(--ink-3);
+  border-color: var(--ink-3);
+}
+.wt-pip--current {
+  border-color: var(--select);
+}
+.wt-pip--hit {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+/* The screen: off (dark) while loading, lit once the mystery Pokémon is in */
+.wt-stage {
+  --wt-stage-h: 196px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: var(--wt-stage-h);
+  overflow: hidden;
+  background: var(--screen-2);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-3);
+  box-shadow: inset 0 0 0 2px var(--screen-2), inset 0 0 0 3px var(--line);
+  transition: background-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.wt-stage.is-on {
+  background: var(--frame-strong);
+  box-shadow: inset 0 0 0 2px var(--frame-strong), inset 0 0 0 3px var(--frame);
+}
+
+.wt-art {
+  display: block;
+  width: calc(var(--wt-stage-h) - 20px);
+  height: calc(var(--wt-stage-h) - 20px);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  /* The reveal: the silhouette fills in with colour */
+  transition: filter 700ms var(--ease-out);
+}
+.wt-stage.is-silhouette .wt-art {
+  filter: brightness(0);
+}
+.wt-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+
+.wt-stage .wt-stage__ghost {
+  width: 52%;
+  height: 72%;
+  background: var(--screen-3);
+  border-radius: var(--r-3);
+}
+.wt-stage .wt-stage__error {
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+}
+.wt-stage__error .empty__title {
+  font-size: var(--text-md);
+}
+
+/* Name slots: letters appear in place as guesses match them */
+.wt-name {
+  display: flex;
+  justify-content: center;
+  min-height: 2.25rem;
+  margin: 0;
+}
+.wt-name__slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+.wt-name__ch {
+  display: inline-grid;
+  place-items: end center;
+  width: 1.35rem;
+  height: 2.125rem;
+  padding-bottom: 3px;
+  border-bottom: 3px solid var(--frame);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.wt-name__ch--blank {
+  border-bottom-color: var(--frame-strong);
+}
+.wt-name__ch--mark {
+  width: 0.75rem;
+  border-bottom-color: transparent;
+}
+.wt-name__ch--space {
+  width: 0.6rem;
+  border-bottom-color: transparent;
+}
+.wt-name .wt-name__ghost {
+  display: block;
+  width: 12rem;
+  height: 1.75rem;
+}
+
+.wt-screen__status {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- Dialog + guess */
+
+.wt-dialog {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4) var(--s-4);
+}
+.wt-dialog__text {
+  min-height: 3.2em;
+  max-width: 62ch;
+}
+.wt-dialog__stamp {
+  margin-right: var(--s-2);
+  vertical-align: 2px;
+}
+.dialog__caret.wt-dialog__caret {
+  position: static;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: var(--s-2);
+  vertical-align: -1px;
+}
+
+.wt-guess {
+  display: flex;
+  gap: var(--s-2);
+}
+.wt-guess__input.field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  /* 16px keeps phones from zooming in on focus */
+  font-size: 1rem;
+}
+.wt-guess__input.field__input:disabled {
+  cursor: not-allowed;
+  background: var(--screen-1);
+  border-color: var(--line);
+  color: var(--ink-3);
+}
+.wt-guess__btn.btn {
+  flex: none;
+  min-width: 6.5rem;
+  min-height: 48px;
+  padding: 0 var(--s-5);
+  font-size: var(--text-lg);
+}
+
+/* ---------------------------------------------------------------- Clues */
+
+.wt-clues__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3) var(--s-4);
+  margin: 0;
+}
+.wt-clue {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+.wt-clue__label {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.wt-clue__value {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+.wt-clue.is-locked .wt-clue__value {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  letter-spacing: 0.12em;
+}
+.wt-clue__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ---------------------------------------------------------------- Score */
+
+.wt-score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-1) 0;
+}
+.wt-score__list {
+  display: flex;
+  gap: var(--s-5);
+  margin: 0;
+}
+.wt-score__item {
+  display: grid;
+  gap: 2px;
+}
+.wt-score__item dt {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.wt-score__item dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.wt-score__num {
+  font-size: var(--text-xl);
+}
+.wt-score__of {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.wt-score__history {
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------- History */
+
+.wt-history {
+  margin-top: var(--s-5);
+}
+.wt-history__count {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.03em;
+}
+.wt-history__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wt-day {
+  display: grid;
+  grid-template-columns: 10px 44px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "cursor sprite name outcome"
+    "cursor sprite date outcome";
+  align-items: center;
+  column-gap: var(--s-3);
+  min-height: 58px;
+  padding: 6px var(--s-3) 6px var(--s-2);
+  border-radius: var(--r-2);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 58px;
+}
+.wt-day__cursor {
+  grid-area: cursor;
+  visibility: hidden;
+  color: var(--select);
+}
+.wt-day__sprite {
+  grid-area: sprite;
+  display: block;
+  width: 44px;
+  height: 44px;
+  background: var(--screen-2);
+  border-radius: var(--r-2);
+}
+.wt-day__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.wt-day__name {
+  grid-area: name;
+  align-self: end;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wt-day__no {
+  margin-left: var(--s-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.wt-day__date {
+  grid-area: date;
+  align-self: start;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.wt-day__outcome {
+  grid-area: outcome;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: var(--s-2);
+}
+.wt-day__outcome .stamp {
+  cursor: default;
+}
+.wt-day__pending {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.wt-day.is-unplayed .wt-day__name {
+  color: var(--ink-3);
+  letter-spacing: 0.12em;
+}
+.wt-day.is-unplayed .wt-day__sprite {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* Inverse video: the day on screen */
+.wt-day.is-current {
+  background: var(--select);
+  color: var(--select-ink);
+}
+.wt-day.is-current .wt-day__cursor {
+  visibility: visible;
+  color: var(--select-ink);
+}
+.wt-day.is-current .wt-day__name,
+.wt-day.is-current .wt-day__no,
+.wt-day.is-current .wt-day__date,
+.wt-day.is-current .wt-day__pending,
+.wt-day.is-current .stamp {
+  color: var(--select-ink);
+}
+.wt-day.is-current .wt-day__sprite {
+  background: var(--select-wash);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- Confetti */
+
+.wt-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wt-confetti__bit {
+  position: absolute;
+  top: -8px;
+  width: 6px;
+  height: 6px;
+  animation-name: wt-confetti-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.4, 1);
+  animation-fill-mode: both;
+}
+.wt-confetti__bit--0 {
+  background: var(--warn);
+}
+.wt-confetti__bit--1 {
+  background: var(--ink);
+}
+.wt-confetti__bit--2 {
+  background: var(--lens);
+}
+.wt-confetti__bit--3 {
+  background: var(--screen-0);
+}
+@keyframes wt-confetti-fall {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(var(--confetti-x, 0px), calc(var(--wt-stage-h) + 16px), 0);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- Breakpoints */
+
+@media (min-width: 601px) {
+  .wt-stage {
+    --wt-stage-h: 280px;
+  }
+}
+
+@media (min-width: 900px) {
+  .wt-game {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "screen dialog"
+      "screen clues"
+      "screen score";
+    align-items: start;
+    gap: var(--s-4) var(--s-5);
+  }
+  .wt-stage {
+    --wt-stage-h: 360px;
+  }
+  .wt-clues__list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .wt {
+    padding: var(--s-4) var(--s-4) var(--s-6);
+  }
+  .wt-head {
+    margin-bottom: var(--s-3);
+  }
+  .wt-title {
+    font-size: var(--text-xl);
+  }
+  .wt-days {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .wt-days__date {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .wt-days__today {
+    flex: 1 0 100%;
+  }
+  .wt-screen {
+    gap: var(--s-2);
+    padding: var(--s-3);
+  }
+  .wt-name__ch {
+    width: 1.2rem;
+    height: 1.875rem;
+    font-size: var(--text-lg);
+  }
+  .wt-dialog {
+    font-size: 1rem;
+  }
+  .wt-score__list {
+    gap: var(--s-4);
+  }
+  .wt-day__pending {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wt-confetti {
+    display: none;
+  }
+  .wt-art,
+  .wt-stage {
+    transition: none;
+  }
+  .dialog__caret.wt-dialog__caret {
+    animation: none;
+  }
+}

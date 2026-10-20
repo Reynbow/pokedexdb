@@ -1,7 +1,9 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
-import "./App.css";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import "./styles/pages/save.css";
 import SpriteImage from "./components/SpriteImage.jsx";
-import CategoryToggle from "./CategoryToggle.jsx";
+import Icon, { Cursor } from "./components/Icon.jsx";
+import Sheet from "./components/Sheet.jsx";
+import { DexDialog, TypeTag } from "./pokedex/EntryParts.jsx";
 import { buildPokemonPath, getBasePath } from "./utils/url.js";
 import { normalizeSpeciesSlug } from "./utils/lazarusSave.js";
 import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
@@ -161,12 +163,9 @@ const DEFAULT_METHOD_LABEL = "Grass";
 const LOCATION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const LAZARUS_PC_CODE_LOCATION = "Cheat Code";
 const EMPTY_LIST = Object.freeze([]);
-const PARTY_SPRITE_STYLE = {
-  width: "192px",
-  height: "192px",
-  imageRendering: "pixelated",
-  transform: "scaleX(-1)",
-};
+// Only Gen 1 saves can be loaded, so party slots (and the Yellow Pokédex) use Yellow sprites.
+const YELLOW_SPRITE_PATH = "generation-i/yellow/transparent/";
+const NO_OP = () => {};
 
 function resolveStaticDataUrl(filename) {
   return `${getBasePath()}${filename}`;
@@ -1108,6 +1107,116 @@ function parseSavFile(arrayBuffer) {
   };
 }
 
+/* ------------------------------------------------------------------ View helpers */
+
+const formatDexNo = (id) => (id != null ? `No.${String(id).padStart(3, "0")}` : "No.---");
+
+// Gen 1 HP bar tiers: full above half, warning above a fifth, danger below.
+const hpTier = (percent) => (percent > 50 ? "" : percent > 20 ? " meter--mid" : " meter--low");
+
+// Base stat tiers, matching the Pokédex stat meters.
+const statTier = (value) => (value >= 100 ? "" : value >= 60 ? " meter--mid" : " meter--low");
+
+// The badges shown with a location. Yellow Legacy shows a method only when it isn't plain grass,
+// then level, odds and notes; Lazarus shows method, level, notes and odds.
+function describeLocationParts(locationEntry, showingYellow) {
+  const parts = [];
+  if (showingYellow) {
+    if (locationEntry.methodLabel && locationEntry.methodLabel !== DEFAULT_METHOD_LABEL) {
+      parts.push({ kind: "method", text: locationEntry.methodLabel });
+    }
+    if (locationEntry.levelSummary) parts.push({ kind: "level", text: locationEntry.levelSummary });
+    if (locationEntry.chanceSummary) parts.push({ kind: "chance", text: locationEntry.chanceSummary });
+    if (locationEntry.notes) parts.push({ kind: "note", text: locationEntry.notes });
+  } else {
+    if (locationEntry.methodLabel) parts.push({ kind: "method", text: locationEntry.methodLabel });
+    if (locationEntry.levelSummary) parts.push({ kind: "level", text: locationEntry.levelSummary });
+    if (locationEntry.notes) parts.push({ kind: "note", text: locationEntry.notes });
+    if (locationEntry.chanceSummary) parts.push({ kind: "chance", text: locationEntry.chanceSummary });
+  }
+  return parts;
+}
+
+function LocationParts({ parts }) {
+  return parts.map((part, index) =>
+    part.kind === "note" ? (
+      <span key={index} className="sv-loc__note">
+        {part.text}
+      </span>
+    ) : (
+      <span key={index} className={`stamp sv-loc__badge sv-loc__badge--${part.kind}`}>
+        {part.text}
+      </span>
+    )
+  );
+}
+
+// Name, links, reference record and sprite settings for one Pokédex entry (row and detail).
+function buildEntryView(entry, { showingYellow, yellowReference, yellowReferenceReady }) {
+  const pokemonName = entry.displayName;
+  const pokemonSlug = entry.slug || normalizeSpeciesSlug(entry.name);
+  const referenceRecord = showingYellow
+    ? yellowReferenceReady
+      ? yellowReference.get(pokemonSlug)
+      : null
+    : entry.record;
+  const pokedexUrl = pokemonSlug ? buildPokemonPath(pokemonSlug) : null;
+  const spriteNationalId = showingYellow ? entry.id : entry.nationalId ?? null;
+  const entrySlugForSprite = entry.slug || pokemonSlug;
+  const spriteOverride =
+    !showingYellow && entrySlugForSprite ? LAZARUS_SPRITE_OVERRIDES.get(entrySlugForSprite) : null;
+  // For non-override sprites, use National Dex ID (numeric) for proper sprite lookup
+  const defaultResultIdentifier = showingYellow ? entry.id : spriteNationalId ?? entry.id;
+  const spriteIdentifier = showingYellow ? entry.id : spriteOverride ?? defaultResultIdentifier;
+  const spriteProps = showingYellow
+    ? { gameSpritePath: YELLOW_SPRITE_PATH }
+    : {
+        // Use entry.id for form-specific sprites, fallback to nationalId for base forms
+        speciesId: spriteNationalId ?? undefined,
+        formName: pokemonSlug || entry.name,
+      };
+  return { pokemonName, pokemonSlug, referenceRecord, pokedexUrl, spriteIdentifier, spriteProps };
+}
+
+// A Game Boy cartridge, drawn on the same 12×12 pixel grid as Icon.jsx.
+const CART_PIXELS = [
+  ".########...",
+  ".#......##..",
+  ".#.......##.",
+  ".#.######.#.",
+  ".#.#....#.#.",
+  ".#.#....#.#.",
+  ".#.#....#.#.",
+  ".#.######.#.",
+  ".#........#.",
+  ".#.#.#.#..#.",
+  ".##########.",
+  "............",
+];
+const CART_RECTS = CART_PIXELS.flatMap((row, y) => {
+  const rects = [];
+  let x = 0;
+  while (x < row.length) {
+    if (row[x] !== "#") {
+      x += 1;
+      continue;
+    }
+    let run = 1;
+    while (row[x + run] === "#") run += 1;
+    rects.push(<rect key={`${x}-${y}`} x={x} y={y} width={run} height={1} />);
+    x += run;
+  }
+  return rects;
+});
+
+function CartIcon({ className = "" }) {
+  return (
+    <svg className={`icon ${className}`.trim()} viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+      {CART_RECTS}
+    </svg>
+  );
+}
+
 export default function SavPage() {
   const [gameKey, setGameKey] = useState("yellow");
   const [caughtPokemon, setCaughtPokemon] = useState([]);
@@ -1199,27 +1308,10 @@ export default function SavPage() {
     };
   }, [showingYellow, lazarusReferenceReady]);
 
-  // Close the open Pokedex panel on Escape or a click/tap outside its row.
-  useEffect(() => {
-    if (openDexEntryKey == null) return undefined;
-    const handlePointerDown = (event) => {
-      const row = event.target instanceof Element ? event.target.closest("[data-dex-entry-key]") : null;
-      if (row?.getAttribute("data-dex-entry-key") !== openDexEntryKey) {
-        setOpenDexEntryKey(null);
-      }
-    };
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setOpenDexEntryKey(null);
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [openDexEntryKey]);
+  // The open Pokédex entry shows in a Sheet (popover on desktop, bottom sheet on phones), which
+  // closes on Escape or a click/tap outside it and returns focus to the entry's sprite button.
+  const dexAnchorRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
 
   const resetResultFilters = useCallback(() => {
     setLocationFilter("");
@@ -1228,12 +1320,8 @@ export default function SavPage() {
     setOpenDexEntryKey(null);
   }, []);
 
-  const handleYellowFileChange = useCallback(
-    async (event) => {
-      const input = event.target;
-      const file = input.files?.[0];
-      // Reset the input so choosing the same file again (e.g. after an error) fires onChange.
-      input.value = "";
+  const readSaveFile = useCallback(
+    async (file) => {
       if (!file) {
         return;
       }
@@ -1264,6 +1352,41 @@ export default function SavPage() {
       }
     },
     [resetResultFilters]
+  );
+
+  const handleYellowFileChange = useCallback(
+    (event) => {
+      const input = event.target;
+      const file = input.files?.[0];
+      // Reset the input so choosing the same file again (e.g. after an error) fires onChange.
+      input.value = "";
+      readSaveFile(file);
+    },
+    [readSaveFile]
+  );
+
+  // The drop zone takes a save file dragged in from the desktop.
+  const handleDragOver = useCallback(
+    (event) => {
+      if (loading || !Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      setDragging(true);
+    },
+    [loading]
+  );
+  const handleDragLeave = useCallback((event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    setDragging(false);
+  }, []);
+  const handleDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+      setDragging(false);
+      if (loading) return;
+      readSaveFile(event.dataTransfer?.files?.[0]);
+    },
+    [loading, readSaveFile]
   );
 
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
@@ -1463,778 +1586,737 @@ export default function SavPage() {
     setOpenDexEntryKey((current) => (current === entryKey ? null : entryKey));
   }, []);
 
-  return (
-    <div className="app-shell sav-page">
-      <header className="app-header">
-        <div className="container">
-          <h1 className="title logo">
-            <span className="logo-accent">Pokedex</span>
-            <div className="logo-dot" />
-            <span className="logo-db">DB</span>
-          </h1>
-          <div className="sav-page__subtitle-wrapper">
-            <p className="subtitle sav-page__subtitle">
-              Import a <strong>Pokemon Yellow Legacy</strong>{" "}
-              <span className="sav-page__subtitle-emphasis">.sav / .srm</span> file to view your save data entirely in the
-              browser, or preview the <strong>Pokemon Lazarus</strong> Pokedex.
-            </p>
-            <CategoryToggle />
-          </div>
-        </div>
-      </header>
-      <main className="container sav-page__content">
-        <section className="sav-page__grid">
-          {!hasSaveData && (
+  const openDexEntry = useCallback(
+    (event, entryKey) => {
+      const trigger = event.currentTarget;
+      dexAnchorRef.current = trigger;
+      // On wide screens the entry opens as a popover under its row: bring a low row up so the
+      // popover has room below it. Phones get a bottom sheet instead.
+      if (!window.matchMedia?.("(max-width: 900px)").matches) {
+        const rect = trigger.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight - 420) {
+          trigger.closest("[data-dex-entry-key]")?.scrollIntoView({ block: "start" });
+        }
+      }
+      toggleDexEntry(entryKey);
+    },
+    [toggleDexEntry]
+  );
+  const closeDexEntry = useCallback(() => setOpenDexEntryKey(null), []);
+
+  const viewContext = { showingYellow, yellowReference, yellowReferenceReady };
+  const openEntry =
+    openDexEntryKey != null ? combinedResults.find((entry) => entry.entryKey === openDexEntryKey) || null : null;
+  const openView = openEntry ? buildEntryView(openEntry, viewContext) : null;
+  const ownedPercent = totalDexCount > 0 ? Math.min(100, (caughtCount / totalDexCount) * 100) : 0;
+
+  const renderEvolution = (requirement) => (
+    <p className="sv-evo">
+      <span className="sv-evo__label">Evolution</span>
+      <span className="sv-evo__chain">
+        {requirement.from && (
+          <>
+            <span className="sv-evo__stage">{requirement.from}</span>
+            <Icon name="right" className="sv-evo__arrow" />
+            <span className="sr-only">evolves by</span>
+          </>
+        )}
+        <span className="sv-evo__method">{requirement.method}</span>
+        <Icon name="right" className="sv-evo__arrow" />
+        <span className="sr-only">into</span>
+        <span className="sv-evo__stage">{requirement.target}</span>
+      </span>
+    </p>
+  );
+
+  const renderDexDetail = () => {
+    if (!openEntry || !openView) return null;
+    const { pokemonName, pokemonSlug, referenceRecord, pokedexUrl, spriteIdentifier, spriteProps } = openView;
+
+    let facts = null;
+    let extra = null;
+    if (!referenceReady) {
+      facts = referenceError ? (
+        <p className="sv-detail__note" role="alert">
+          {referenceError}
+        </p>
+      ) : (
+        <p className="sv-detail__note" role="status">
+          <span className="skeleton sv-detail__ghost" aria-hidden="true" />
+          {`Loading ${activeGameLabel} data...`}
+        </p>
+      );
+    } else if (!referenceRecord) {
+      facts = (
+        <p className="sv-detail__note">
+          {showingYellow ? "Yellow Pokedex entry unavailable." : "Lazarus data unavailable."}
+        </p>
+      );
+    } else if (showingYellow) {
+      facts = (
+        <dl className="kv sv-detail__facts">
+          <dt>Species</dt>
+          <dd>{referenceRecord?.species || "Species unknown"}</dd>
+          <dt>Height</dt>
+          <dd>{formatHeight(referenceRecord?.height)}</dd>
+          <dt>Weight</dt>
+          <dd>{formatWeight(referenceRecord?.weight)}</dd>
+        </dl>
+      );
+      extra = (
+        <DexDialog
+          versions={[
+            {
+              name: "yellow",
+              displayName: "Pokémon Yellow",
+              text: referenceRecord?.entry || "Yellow Pokedex entry unavailable.",
+            },
+          ]}
+          selectedVersion="yellow"
+          onSelect={NO_OP}
+        />
+      );
+    } else {
+      const lazarusStats = referenceRecord?.stats;
+      const lazarusStatRows = lazarusStats
+        ? [
+            ["HP", lazarusStats.hp],
+            ["ATK", lazarusStats.attack],
+            ["DEF", lazarusStats.defense],
+            ["SP. ATK", lazarusStats.spAttack],
+            ["SP. DEF", lazarusStats.spDefense],
+            ["SPEED", lazarusStats.speed],
+          ].filter(([, value]) => value != null)
+        : [];
+      const lazarusTypes = referenceRecord?.types || [];
+      const lazarusAbilities = referenceRecord?.abilities || [];
+      facts = (
+        <dl className="kv sv-detail__facts">
+          <dt>Types</dt>
+          <dd>
+            {lazarusTypes.length > 0 ? (
+              <span className="sv-types">
+                {lazarusTypes.map((type) => (
+                  <TypeTag key={type} typeName={String(type).toLowerCase()} />
+                ))}
+              </span>
+            ) : (
+              "Unknown"
+            )}
+          </dd>
+          {lazarusAbilities.length > 0 && (
             <>
-              <article className="sav-card sav-card--primary">
-                <div className="sav-card__header sav-card__header--with-actions">
-                  <div className="sav-card__header-body">
-                    <h2 className="sav-card__title">Pokemon Yellow Legacy</h2>
-                  </div>
-                  <button
-                    type="button"
-                    className="sav-card__preview-button"
-                    onClick={() => handlePreviewPokedex("yellow")}
-                  >
-                    Preview Pokedex
-                  </button>
-                  <p className="sav-card__description">
-                    Choose your save file to view your caught Pokemon and party.
-                  </p>
-                </div>
-                <div className="sav-card__body">
-                  <label className="sav-field-label" htmlFor="sav-upload-input">
-                    Choose your save file
-                  </label>
-                  <input
-                    id="sav-upload-input"
-                    className="sav-file-input"
-                    type="file"
-                    accept=".sav,.srm"
-                    onChange={handleYellowFileChange}
-                    disabled={loading}
-                  />
-                  <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
-                  {loading && (
-                    <p className="sav-status" role="status">
-                      Processing save file...
-                    </p>
-                  )}
-                  {error && (
-                    <div className="sav-alert sav-alert--error" role="alert">
-                      {error}
-                    </div>
-                  )}
-                </div>
-              </article>
-              <article className="sav-card sav-card--primary">
-                <div className="sav-card__header sav-card__header--with-actions">
-                  <div className="sav-card__header-body">
-                    <h2 className="sav-card__title">Pokemon Lazarus</h2>
-                  </div>
-                  <button
-                    type="button"
-                    className="sav-card__preview-button"
-                    onClick={() => handlePreviewPokedex("lazarus")}
-                  >
-                    Preview Pokedex
-                  </button>
-                  <p className="sav-card__description">
-                    Preview the complete Pokedex for Pokemon Lazarus.
-                  </p>
-                </div>
-              </article>
-              <article className="sav-card sav-card--info-panel-card">
-                <div className="sav-card__body sav-card__info-panel-body">
-                  <h3 className="sav-card__info-heading">Save Reader Notes</h3>
-                  <p>
-                    This reader currently supports <strong>Pokemon Yellow Legacy</strong> saves (English Red, Blue and
-                    Yellow saves use the same format, but locations and evolutions shown are Yellow Legacy&apos;s).{" "}
-                    <strong>Pokemon Lazarus</strong> saves can&apos;t be read yet, but you can preview its Pokedex.
-                  </p>
-                  <p>
-                    Learn more about the Legacy ROMs at{" "}
-                    <a
-                      className="sav-card__info-link"
-                      href="https://www.reddit.com/r/PokemonLegacy/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      r/PokemonLegacy
-                    </a>{" "}
-                    and check out{" "}
-                    <a
-                      className="sav-card__info-link"
-                      href="https://pokemonlazarus.net/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      PokemonLazarus.net
-                    </a>{" "}
-                    for the latest Lazarus documentation and downloads.
-                  </p>
-                </div>
-              </article>
+              <dt>Abilities</dt>
+              <dd>{lazarusAbilities.join(" / ")}</dd>
             </>
           )}
-        </section>
+          <dt>Base stat total</dt>
+          <dd className="sv-num">{referenceRecord?.bst != null ? referenceRecord.bst : "--"}</dd>
+        </dl>
+      );
+      extra =
+        lazarusStatRows.length > 0 ? (
+          <ul className="sv-detail__stats" aria-label="Base stats">
+            {lazarusStatRows.map(([label, value]) => (
+              <li
+                key={label}
+                className={`meter${statTier(value)}`}
+                style={{ "--pct": Math.min(100, (value / 200) * 100) }}
+              >
+                <span className="meter__label">{label}</span>
+                <span className="meter__value">{value != null ? value : "--"}</span>
+                <span className="meter__track" aria-hidden="true">
+                  <span className="meter__fill" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null;
+    }
 
-        {hasSaveData && (
-          <section className="sav-card sav-party-card">
-            <div className="sav-card__header sav-card__header--with-actions">
-              <div className="sav-card__header-body">
-                <h2 className="sav-card__title">
-                  Current Party · {activeGameLabel} ({partyMembers.length} / {PARTY_MAX_SIZE})
-                </h2>
-                <p className="sav-card__description">
-                  These are the Pokémon currently stored in your party slots.
+    const visibleEntries = openEntry.visibleEntries;
+    const showWhere = !legacyMapReady || visibleEntries.length > 0 || !openEntry.evolutionRequirement;
+
+    return (
+      <>
+        <div className="popsheet__head">
+          <h2 className="popsheet__title sv-detail__title">
+            <span className="sv-detail__no">{formatDexNo(openEntry.id)}</span>
+            {pokemonName}
+          </h2>
+          <button type="button" className="btn btn--quiet btn--icon btn--sm" onClick={closeDexEntry} aria-label="Close">
+            <Icon name="close" />
+          </button>
+        </div>
+        <div className="popsheet__body sv-detail">
+          <div className="sv-detail__top">
+            <span className={`sv-detail__screen${showingYellow ? " is-gb" : ""}`}>
+              <SpriteImage
+                id={spriteIdentifier}
+                alt={pokemonName}
+                className="sv-detail__img"
+                width={192}
+                height={192}
+                {...spriteProps}
+              />
+            </span>
+            <div className="sv-detail__id">
+              <span className={`stamp sv-status${openEntry.caught ? " is-caught" : ""}`}>
+                {openEntry.caught ? <Icon name="ball" /> : null}
+                {openEntry.caught ? "Caught" : "Missing"}
+              </span>
+              {facts}
+            </div>
+          </div>
+          {extra}
+
+          {showWhere && (
+            <section className="sv-detail__section" aria-labelledby="sv-detail-where">
+              <h3 className="label" id="sv-detail-where">
+                Where to find
+              </h3>
+              {legacyMapReady ? (
+                visibleEntries.length > 0 ? (
+                  <ul className="sv-where">
+                    {visibleEntries.map((locationEntry, index) => {
+                      const sharedPokemon = locationPokemonLookup.get(locationEntry.location) || [];
+                      const sharedOthers = sharedPokemon.filter((item) => item.slug !== pokemonSlug);
+                      const caughtEntries = sharedOthers.filter((item) => item.caught);
+                      const missingEntries = sharedOthers.filter((item) => !item.caught);
+                      return (
+                        <li key={`${locationEntry.location}-${index}`} className="sv-where__item">
+                          <p className="sv-loc sv-where__head">
+                            <span className="sv-loc__name">{locationEntry.location}</span>
+                            <LocationParts parts={describeLocationParts(locationEntry, showingYellow)} />
+                          </p>
+                          <p className="sv-where__title">Also found here</p>
+                          {sharedOthers.length > 0 ? (
+                            <div className="sv-where__cols">
+                              <div>
+                                <p className="sv-where__sub">Caught</p>
+                                {caughtEntries.length > 0 ? (
+                                  <ul className="sv-where__list">
+                                    {caughtEntries.map(({ name, slug }) => (
+                                      <li key={`${slug || name}-caught`} className="sv-where__mon is-caught">
+                                        <Icon name="ball" />
+                                        <span>{name}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="sv-where__none">None</p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="sv-where__sub">Missing</p>
+                                {missingEntries.length > 0 ? (
+                                  <ul className="sv-where__list">
+                                    {missingEntries.map(({ name, slug }) => (
+                                      <li key={`${slug || name}-missing`} className="sv-where__mon">
+                                        <span>{name}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="sv-where__none">None</p>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="sv-where__none">No other Pokémon share this location.</p>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="sv-detail__note">No encounter data</p>
+                )
+              ) : (
+                <p className="sv-detail__note" role="status">
+                  Loading encounter data...
                 </p>
-                <p className="sav-meta">
-                  <strong>Loaded:</strong> {fileName}
+              )}
+            </section>
+          )}
+
+          {openEntry.evolutionRequirement && (
+            <section className="sv-detail__section">{renderEvolution(openEntry.evolutionRequirement)}</section>
+          )}
+
+          {pokedexUrl ? (
+            <a className="btn btn--sm sv-detail__link" href={pokedexUrl} target="_blank" rel="noopener noreferrer">
+              Open in the Pokédex
+              <Icon name="external" />
+            </a>
+          ) : null}
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <main className="sv">
+      <header className="sv-head">
+        <h1 className="sv-title">Save Reader</h1>
+        <p className="sv-intro">
+          Import a <strong>Pokémon Yellow Legacy</strong> <span className="sv-ext">.sav / .srm</span> file to view your
+          save data entirely in the browser, or preview the <strong>Pokémon Lazarus</strong> Pokédex.
+        </p>
+      </header>
+
+      {!hasSaveData ? (
+        <section className="win sv-load" aria-labelledby="sv-load-title">
+          <div className="win__head">
+            <h2 className="win__title" id="sv-load-title">
+              Load a save file
+            </h2>
+          </div>
+          <div className="win__body sv-load__body">
+            <div className="sv-load__main">
+              <label
+                className={`sv-drop${dragging ? " is-dragging" : ""}${loading ? " is-busy" : ""}`}
+                htmlFor="sv-upload-input"
+                onDragEnter={handleDragOver}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <input
+                  id="sv-upload-input"
+                  className="sr-only sv-drop__input"
+                  type="file"
+                  accept=".sav,.srm"
+                  onChange={handleYellowFileChange}
+                  disabled={loading}
+                />
+                <CartIcon className="sv-drop__icon" />
+                <span className="sv-drop__title">Choose your save file</span>
+                <span className="sv-drop__sub">or drop a .sav or .srm file here</span>
+                <span className="btn btn--primary sv-drop__btn" aria-hidden="true">
+                  Choose file
+                </span>
+              </label>
+              <p className="sv-load__privacy">Processing happens locally in the browser. No files are uploaded.</p>
+              {loading && (
+                <p className="sv-status-line" role="status">
+                  <span className="skeleton sv-status-line__bar" aria-hidden="true" />
+                  Processing save file...
                 </p>
-              </div>
-              <button type="button" className="sav-card__reset-button" onClick={handleClearSave}>
-                Clear information
+              )}
+              {error && (
+                <div className="sv-alert" role="alert">
+                  <span className="stamp stamp--red">Can&apos;t read</span>
+                  <p>{error}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="sv-support">
+              <h3 className="label">Supported saves</h3>
+              <ul className="sv-support__list">
+                <li>
+                  <span className="stamp">Reads</span>
+                  <p>
+                    <strong>Pokémon Yellow Legacy</strong> saves. English Red, Blue and Yellow saves use the same format,
+                    but locations and evolutions shown are Yellow Legacy&apos;s.
+                  </p>
+                </li>
+                <li>
+                  <span className="stamp">Preview</span>
+                  <p>
+                    <strong>Pokémon Lazarus</strong> saves can&apos;t be read yet, but you can preview its Pokédex below.
+                  </p>
+                </li>
+              </ul>
+              <p className="sv-support__links">
+                Learn more about the Legacy ROMs at{" "}
+                <a href="https://www.reddit.com/r/PokemonLegacy/" target="_blank" rel="noreferrer">
+                  r/PokemonLegacy
+                </a>{" "}
+                and check out{" "}
+                <a href="https://pokemonlazarus.net/" target="_blank" rel="noreferrer">
+                  PokemonLazarus.net
+                </a>{" "}
+                for the latest Lazarus documentation and downloads.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <div className="sv-save">
+          <section className="win sv-card" aria-labelledby="sv-card-title">
+            <div className="win__head">
+              <h2 className="win__title" id="sv-card-title">
+                Save file
+              </h2>
+              <button type="button" className="btn btn--sm" onClick={handleClearSave}>
+                Close file
               </button>
             </div>
-            <div className="sav-card__body">
+            <div className="win__body sv-card__body">
+              <dl className="kv sv-card__facts">
+                <dt>File</dt>
+                <dd className="sv-card__file">{fileName}</dd>
+                <dt>Game</dt>
+                <dd>{activeGameLabel}</dd>
+                <dt>Party</dt>
+                <dd>
+                  <span className="sv-num">{partyMembers.length}</span>
+                  <span className="sv-num-of"> / {PARTY_MAX_SIZE}</span>
+                </dd>
+              </dl>
+              <div className="sv-card__dex">
+                <p className="sv-card__dex-head">
+                  <span className="label">Pokédex owned</span>
+                  <span>
+                    <span className="sv-num sv-num--lg">{caughtCount}</span>
+                    <span className="sv-num-of"> / {totalDexCount}</span>
+                  </span>
+                </p>
+                <span className="meter__track sv-card__meter" style={{ "--pct": ownedPercent }} aria-hidden="true">
+                  <span className="meter__fill" />
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section className="win sv-party" aria-labelledby="sv-party-title">
+            <div className="win__head">
+              <h2 className="win__title" id="sv-party-title">
+                Party
+              </h2>
+              <p className="sv-count">
+                <span className="sv-num">{partyMembers.length}</span> / {PARTY_MAX_SIZE}
+              </p>
+            </div>
+            <div className="win__body">
               {partySlots.some(Boolean) ? (
-                <div className="sav-party-grid">
+                <ol className="sv-party__list">
                   {partySlots.map((slot, index) => {
                     if (!slot) {
                       return (
-                        <div key={`party-slot-${index}`} className="sav-party-slot is-empty">
-                          <div className="sav-party-slot__empty">
-                            <span className="sav-party-slot__name">Slot {index + 1}</span>
-                            <span className="sav-party-slot__empty-label">Empty</span>
-                          </div>
-                        </div>
+                        <li key={`party-slot-${index}`} className="sv-mon sv-mon--empty">
+                          <span className="sv-mon__sprite" aria-hidden="true" />
+                          <span className="sv-mon__empty-name">Slot {index + 1}</span>
+                          <span className="sv-mon__empty-label">Empty</span>
+                        </li>
                       );
                     }
 
-                    const displayName =
-                      slot.nickname ||
-                      (slot.slug ? getGen1DisplayName(slot.slug) : `Species #${slot.speciesInternalId}`);
+                    const speciesName = slot.slug ? getGen1DisplayName(slot.slug) : null;
+                    const displayName = slot.nickname || speciesName || `Species #${slot.speciesInternalId}`;
+                    const showSpecies = Boolean(speciesName) && speciesName.toLowerCase() !== displayName.toLowerCase();
                     const hpPercent =
                       slot.maxHp && slot.maxHp > 0
                         ? Math.max(0, Math.min(100, (slot.currentHp / slot.maxHp) * 100))
                         : 0;
-                    const primaryType = slot.types[0] || "Unknown";
-                    const secondaryType = slot.types[1] || "";
-                    const hasSecondaryType = Boolean(secondaryType);
-                    const pokedexNumber =
-                      slot.dexId != null ? `No. ${String(slot.dexId).padStart(3, "0")}` : "No. ---";
-                    // Only Gen 1 saves can be loaded, so party slots always use Yellow sprites.
+                    const pokedexNumber = formatDexNo(slot.dexId);
                     const pokedexUrl = slot.dexId != null ? buildPokemonPath(slot.slug) : null;
                     const spriteIdentifier = slot.dexId ?? 0;
+                    const statusText = slot.statusText || "OK";
                     return (
-                      <div key={`party-slot-${index}`} className="sav-party-slot has-pokemon">
-                        <div className="sav-party-slot__content">
-                          <div className="sav-party-slot__sprite-area">
-                            <div className="sav-party-slot__sprite-panel">
-                              <div className="sav-party-slot__sprite-wrapper">
-                                <SpriteImage
-                                  id={spriteIdentifier}
-                                  alt={displayName}
-                                  gameSpritePath="generation-i/yellow/transparent/"
-                                  style={PARTY_SPRITE_STYLE}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="sav-party-slot__info-area">
-                            <div className="sav-party-slot__header-row">
-                              {pokedexUrl ? (
-                                <a
-                                  className="sav-party-slot__display-name sav-party-slot__display-name-link"
-                                  href={pokedexUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {displayName}
-                                </a>
-                              ) : (
-                                <div className="sav-party-slot__display-name">{displayName}</div>
-                              )}
-                              <div className="sav-party-slot__level">
-                                {slot.level != null ? `Lv${slot.level}` : "Lv??"}
-                              </div>
-                            </div>
-                            <div className="sav-party-slot__hp">
-                              <div className="sav-party-slot__hp-row">
-                                <span className="sav-party-slot__hp-label">HP:</span>
-                                <div className="sav-party-slot__hp-bar">
-                                  <div
-                                    className="sav-party-slot__hp-fill"
-                                    style={{ width: `${hpPercent}%` }}
-                                  />
-                                </div>
-                              </div>
-                              <div className="sav-party-slot__hp-value">
-                                {(slot.currentHp ?? 0).toString()} / {(slot.maxHp ?? 0).toString()}
-                              </div>
-                            </div>
-                            <div className="sav-party-slot__status">
-                              STATUS / {slot.statusText || "OK"}
-                            </div>
-                          </div>
-                          <div className="sav-party-slot__stats-area">
-                            <div className="sav-party-slot__number">{pokedexNumber}</div>
-                            <div className="sav-party-slot__stat-grid">
-                              {/* Gen 1 (including Yellow Legacy) has a single Special stat. */}
-                              {[
-                                ["ATTACK", slot.stats?.attack],
-                                ["DEFENSE", slot.stats?.defense],
-                                ["SPEED", slot.stats?.speed],
-                                ["SPECIAL", slot.stats?.special],
-                              ].map(([label, value]) => (
-                                <div key={label} className="sav-party-slot__stat-row">
-                                  <span>{label}</span>
-                                  <span>{value != null ? value : "--"}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="sav-party-slot__meta-area">
-                            <div className="sav-party-slot__meta-number">{pokedexNumber}</div>
-                            <div className="sav-party-slot__meta-block">
-                              <div className="sav-party-slot__meta-line">
-                                <span className="sav-party-slot__meta-label">
-                                  {hasSecondaryType ? "TYPE 1" : "TYPE"}
-                                </span>
-                                <span className="sav-party-slot__meta-value">{primaryType}</span>
-                              </div>
-                              <div className="sav-party-slot__meta-line">
-                                <span
-                                  className={`sav-party-slot__meta-label ${
-                                    !secondaryType ? "sav-party-slot__meta-label--hidden" : ""
-                                  }`}
-                                >
-                                  TYPE 2
-                                </span>
-                                <span className="sav-party-slot__meta-value">
-                                  {secondaryType || "\u00A0"}
-                                </span>
-                              </div>
-                              <div className="sav-party-slot__meta-line">
-                                <span className="sav-party-slot__meta-label">IDNo</span>
-                                <span className="sav-party-slot__meta-value">
-                                  {slot.originalTrainerIdFormatted}
-                                </span>
-                              </div>
-                              <div className="sav-party-slot__meta-line">
-                                <span className="sav-party-slot__meta-label">OT</span>
-                                <span className="sav-party-slot__meta-value">
-                                  {slot.originalTrainerName || "Unknown"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                      <li key={`party-slot-${index}`} className="sv-mon">
+                        <span className="sv-mon__sprite">
+                          <SpriteImage
+                            id={spriteIdentifier}
+                            alt=""
+                            className="sv-mon__img"
+                            width={96}
+                            height={96}
+                            gameSpritePath={YELLOW_SPRITE_PATH}
+                          />
+                        </span>
+                        <div className="sv-mon__id">
+                          <p className="sv-mon__no">{pokedexNumber}</p>
+                          <h3 className="sv-mon__name">
+                            {pokedexUrl ? (
+                              <a href={pokedexUrl} target="_blank" rel="noopener noreferrer">
+                                {displayName}
+                                <Icon name="external" className="sv-ext-icon" />
+                                <span className="sr-only"> (opens the Pokédex in a new tab)</span>
+                              </a>
+                            ) : (
+                              displayName
+                            )}
+                          </h3>
+                          {showSpecies ? <p className="sv-mon__species">{speciesName}</p> : null}
+                          <p className="sv-types sv-mon__types">
+                            {slot.types.map((type) => (
+                              <TypeTag key={type} typeName={String(type).toLowerCase()} icon={false} />
+                            ))}
+                          </p>
                         </div>
-                      </div>
+                        <div className="sv-mon__vitals">
+                          <p className="sv-mon__lv">
+                            <span className="sv-mon__lv-label">Lv</span>
+                            {slot.level != null ? slot.level : "??"}
+                          </p>
+                          <div
+                            className={`sv-hp${hpTier(hpPercent)}`}
+                            style={{ "--pct": hpPercent }}
+                          >
+                            <span className="sv-hp__label">HP</span>
+                            <span className="meter__track sv-hp__track" aria-hidden="true">
+                              <span className="meter__fill" />
+                            </span>
+                            <span className="sv-hp__value">
+                              {(slot.currentHp ?? 0).toString()}
+                              <span aria-hidden="true">/</span>
+                              <span className="sr-only"> of </span>
+                              {(slot.maxHp ?? 0).toString()}
+                            </span>
+                          </div>
+                          <p className="sv-mon__status">
+                            <span className="sv-mini-label">Status</span>
+                            <span className={`stamp${statusText !== "OK" ? " stamp--gold" : ""}`}>{statusText}</span>
+                          </p>
+                        </div>
+                        {/* Gen 1 (including Yellow Legacy) has a single Special stat. */}
+                        <dl className="sv-mon__stats">
+                          {[
+                            ["Attack", slot.stats?.attack],
+                            ["Defense", slot.stats?.defense],
+                            ["Speed", slot.stats?.speed],
+                            ["Special", slot.stats?.special],
+                          ].map(([label, value]) => (
+                            <div key={label} className="sv-mon__stat">
+                              <dt>{label}</dt>
+                              <dd>{value != null ? value : "--"}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <dl className="sv-mon__ot">
+                          <div>
+                            <dt>OT</dt>
+                            <dd>{slot.originalTrainerName || "Unknown"}</dd>
+                          </div>
+                          <div>
+                            <dt>IDNo</dt>
+                            <dd className="sv-num">{slot.originalTrainerIdFormatted}</dd>
+                          </div>
+                        </dl>
+                      </li>
                     );
                   })}
-                </div>
+                </ol>
               ) : (
-                <div className="sav-party-empty">Party data unavailable (or party is empty).</div>
+                <div className="empty">
+                  <p className="empty__title">No party Pokémon</p>
+                  <p>Party data unavailable (or party is empty).</p>
+                </div>
               )}
             </div>
           </section>
-        )}
+        </div>
+      )}
 
-        <section className="sav-card sav-results-card">
-          <div className="sav-card__header">
-            <h2 className="sav-card__title">
-              Caught Pokemon · {activeGameLabel} ({caughtCount} / {totalDexCount})
-            </h2>
-            <p className="sav-card__description">
+      <section className="win sv-dex" aria-labelledby="sv-dex-title">
+        <div className="win__head">
+          <h2 className="win__title" id="sv-dex-title">
+            Caught Pokémon
+          </h2>
+          <p className="sv-count">
+            <span className="sv-num">{caughtCount}</span> / {totalDexCount}
+          </p>
+        </div>
+        <div className="win__body">
+          <div className="sv-dex__intro">
+            {hasSaveData ? (
+              <p className="sv-dex__game">{activeGameLabel}</p>
+            ) : (
+              <div className="sv-dex__switch" role="group" aria-label="Pokédex to preview">
+                <div className="seg">
+                  <button
+                    type="button"
+                    className="seg__btn"
+                    aria-pressed={showingYellow}
+                    onClick={() => handlePreviewPokedex("yellow")}
+                  >
+                    Yellow Legacy
+                  </button>
+                  <button
+                    type="button"
+                    className="seg__btn"
+                    aria-pressed={!showingYellow}
+                    onClick={() => handlePreviewPokedex("lazarus")}
+                  >
+                    Lazarus
+                  </button>
+                </div>
+              </div>
+            )}
+            <p className="sv-dex__desc">
               Review every Pokédex entry and compare your caught status with their encounter locations.
             </p>
             {!hasSaveData && (
-              <div className="sav-card__hint">
-                All entries default to “Missing” until you select a save file.
-              </div>
+              <p className="sv-dex__hint">All entries default to “Missing” until you select a save file.</p>
             )}
-            <div className="sav-results-controls">
-              <label className="sav-results-controls__item">
-                <span className="sav-results-controls__label">Search Pokémon</span>
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Filter by name"
-                />
-              </label>
-              <label className="sav-results-controls__item">
-                <span className="sav-results-controls__label">Location</span>
-                <select
-                  value={locationFilter}
-                  onChange={(event) => setLocationFilter(event.target.value)}
-                >
-                  <option value="">All locations</option>
-                  {locationOptions.map((location) => (
-                    <option key={location} value={location}>
-                      {location}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="sav-results-controls__item sav-results-controls__item--button">
-                <button
-                  type="button"
-                  className={`sav-results-controls__toggle ${showCaught ? "is-active" : ""}`}
-                  onClick={() => setShowCaught((prev) => !prev)}
-                >
-                  {showCaught ? "Hide caught" : "Show caught"}
-                </button>
-              </div>
-            </div>
           </div>
-            <div className="sav-card__body">
-              {showingYellow && legacyEncounterError && (
-                <div className="sav-alert sav-alert--error">{legacyEncounterError}</div>
-              )}
-              {!showingYellow && lazarusDexError && (
-                <div className="sav-alert sav-alert--error">{lazarusDexError}</div>
-              )}
-              <div className="sav-results-list">
-                {!showingYellow && !lazarusReferenceReady ? (
-                  <div className="sav-location-empty" role="status">
-                    Loading Pokémon Lazarus data...
-                  </div>
-                ) : filteredResults.length > 0 ? (
-                  <>
-                    {filteredResults.map((entry) => {
-                    const pokemonName = entry.displayName;
-                    const pokemonSlug = entry.slug || normalizeSpeciesSlug(entry.name);
-                    const referenceRecord = showingYellow
-                      ? yellowReferenceReady
-                        ? yellowReference.get(pokemonSlug)
-                        : null
-                      : entry.record;
-                    const isDexOpen = openDexEntryKey === entry.entryKey;
-                    const dexPanelId = `sav-dex-panel-${entry.entryKey}`;
-                    const speciesLabel = showingYellow
-                      ? referenceRecord?.species || "Species unknown"
-                      : null;
-                    const heightLabel = showingYellow ? formatHeight(referenceRecord?.height) : null;
-                    const weightLabel = showingYellow ? formatWeight(referenceRecord?.weight) : null;
-                    const entryText = showingYellow
-                      ? referenceRecord?.entry || "Yellow Pokedex entry unavailable."
-                      : null;
-                    const hasLocationInfo = entry.visibleEntries.length > 0;
-                    const cardClassNames = [
-                      "sav-result-row",
-                      entry.caught ? "is-caught" : "is-uncaught",
-                      hasLocationInfo ? "sav-result-row--has-locations" : "",
-                      isDexOpen ? "is-dex-open" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ");
-                    const pokedexUrl = pokemonSlug ? buildPokemonPath(pokemonSlug) : null;
-                    const spriteNationalId = showingYellow ? entry.id : entry.nationalId ?? null;
-                    const entrySlugForSprite = entry.slug || pokemonSlug;
-                    const spriteOverride =
-                      !showingYellow && entrySlugForSprite
-                        ? LAZARUS_SPRITE_OVERRIDES.get(entrySlugForSprite)
-                        : null;
-                    // For non-override sprites, use National Dex ID (numeric) for proper sprite lookup
-                    const defaultResultIdentifier = showingYellow
-                      ? entry.id
-                      : spriteNationalId ?? entry.id;
-                    const spriteIdentifier = showingYellow
-                      ? entry.id
-                      : spriteOverride ?? defaultResultIdentifier;
-                    const resultSpriteProps = showingYellow
-                      ? {
-                          gameSpritePath: "generation-i/yellow/transparent/",
-                          style: {
-                            width: "96px",
-                            height: "96px",
-                            imageRendering: "pixelated",
-                          },
-                        }
-                      : {
-                          style: {
-                            width: "96px",
-                            height: "96px",
-                          },
-                          // Use entry.id for form-specific sprites, fallback to nationalId for base forms
-                          speciesId: spriteNationalId ?? undefined,
-                          formName: pokemonSlug || entry.name,
-                        };
-                    const previewSpriteIdentifier = spriteIdentifier;
-                    const previewSpriteProps = showingYellow
-                      ? {
-                          gameSpritePath: "generation-i/yellow/transparent/",
-                          style: {
-                            width: "192px",
-                            height: "192px",
-                            imageRendering: "pixelated",
-                          },
-                        }
-                      : {
-                          style: {
-                            width: "140px",
-                            height: "140px",
-                          },
-                          // Use entry.id for form-specific sprites, fallback to nationalId for base forms
-                          speciesId: spriteNationalId ?? undefined,
-                          formName: pokemonSlug || entry.name,
-                        };
-                    const lazarusStats = referenceRecord?.stats;
-                    const lazarusStatRows = lazarusStats
-                      ? [
-                          ["HP", lazarusStats.hp],
-                          ["ATK", lazarusStats.attack],
-                          ["DEF", lazarusStats.defense],
-                          ["SP. ATK", lazarusStats.spAttack],
-                          ["SP. DEF", lazarusStats.spDefense],
-                          ["SPEED", lazarusStats.speed],
-                        ].filter(([, value]) => value != null)
-                      : [];
-                    const lazarusTypes = referenceRecord?.types || [];
-                    const lazarusAbilities = referenceRecord?.abilities || [];
 
-                  return (
-                    <div
-                      key={entry.entryKey || entry.id}
-                      className={cardClassNames}
-                      data-dex-entry-key={entry.entryKey}
-                    >
-                      <div className="sav-result-row__pokemon">
-                        <button
-                          type="button"
-                          className="sav-result-row__sprite sav-result-row__dex-toggle"
-                          aria-expanded={isDexOpen}
-                          aria-controls={dexPanelId}
-                          aria-label={`${isDexOpen ? "Hide" : "Show"} ${dexPanelLabel} for ${pokemonName}`}
-                          title={`${dexPanelLabel}: ${pokemonName}`}
-                          onClick={() => toggleDexEntry(entry.entryKey)}
-                        >
-                          <SpriteImage id={spriteIdentifier} alt="" {...resultSpriteProps} />
-                        </button>
-                        <div className="sav-result-row__meta">
-                          <div className="sav-result-row__nameblock">
-                            <div className="sav-result-row__number">#{String(entry.id).padStart(3, "0")}</div>
-                            {pokedexUrl ? (
-                              <a
-                                className="sav-result-row__name"
-                                href={pokedexUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {pokemonName}
-                              </a>
-                            ) : (
-                              <div className="sav-result-row__name">{pokemonName}</div>
-                            )}
-                          </div>
-                          <span
-                            className={`sav-result-row__status ${
-                              entry.caught ? "sav-result-row__status--caught" : "sav-result-row__status--missing"
-                            }`}
-                          >
-                            {entry.caught ? "Caught" : "Missing"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="sav-result-row__locations">
-                        <div className="sav-result-row__locations-content">
-                          {legacyMapReady ? (
-                            entry.visibleEntries.length > 0 ? (
-                              <ul className="sav-location-list">
-                                {entry.visibleEntries.map((locationEntry, index) => {
-                                  const rowClassNames = [
-                                    "sav-location-row",
-                                    locationEntry.methodType ? `sav-location-row--${locationEntry.methodType}` : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ");
+          <div className="sv-tools">
+            <label className="field sv-tools__search">
+              <span className="sr-only">Search Pokémon</span>
+              <Icon name="search" />
+              <input
+                type="search"
+                className="field__input"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Filter by name"
+              />
+            </label>
+            <label className="sv-tools__loc">
+              <span className="sr-only">Location</span>
+              <select
+                className="field__input"
+                value={locationFilter}
+                onChange={(event) => setLocationFilter(event.target.value)}
+              >
+                <option value="">All locations</option>
+                {locationOptions.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="btn sv-tools__toggle"
+              aria-pressed={!showCaught}
+              onClick={() => setShowCaught((prev) => !prev)}
+            >
+              Hide caught
+            </button>
+          </div>
 
-                                  const detailParts = [];
-                                  if (locationEntry.levelSummary && showingYellow) {
-                                    detailParts.push(locationEntry.levelSummary);
-                                  }
-                                  if (locationEntry.chanceSummary && showingYellow) {
-                                    detailParts.push(locationEntry.chanceSummary);
-                                  }
-                                  if (locationEntry.notes && showingYellow) {
-                                    detailParts.push(locationEntry.notes);
-                                  }
+          {showingYellow && legacyEncounterError && (
+            <p className="sv-alert" role="alert">
+              {legacyEncounterError}
+            </p>
+          )}
+          {!showingYellow && lazarusDexError && (
+            <p className="sv-alert" role="alert">
+              {lazarusDexError}
+            </p>
+          )}
 
-                                  const hasSpecialLabel =
-                                    locationEntry.methodLabel &&
-                                    locationEntry.methodLabel !== DEFAULT_METHOD_LABEL;
-                                  const shouldShowMethodBadge = showingYellow
-                                    ? hasSpecialLabel
-                                    : Boolean(locationEntry.methodLabel);
-                                  const shouldShowBadgeRow =
-                                    !showingYellow &&
-                                    (shouldShowMethodBadge ||
-                                      locationEntry.levelSummary ||
-                                      locationEntry.notes ||
-                                      locationEntry.chanceSummary);
-
-                                  const sharedPokemon =
-                                    locationPokemonLookup.get(locationEntry.location) || [];
-                                  const sharedOthers = sharedPokemon.filter(
-                                    (item) => item.slug !== pokemonSlug
-                                  );
-                                  const caughtEntries = sharedOthers.filter((item) => item.caught);
-                                  const missingEntries = sharedOthers.filter((item) => !item.caught);
-
-                                  return (
-                                    <li key={`${locationEntry.location}-${index}`} className={rowClassNames}>
-                                      <div className="sav-location-row__name">{locationEntry.location}</div>
-                                      {shouldShowBadgeRow && (
-                                        <div className="sav-location-row__badges">
-                                          {shouldShowMethodBadge && (
-                                            <span className="sav-location-row__badge sav-location-row__badge--method">
-                                              {locationEntry.methodLabel}
-                                            </span>
-                                          )}
-                                          {locationEntry.levelSummary && (
-                                            <span className="sav-location-row__badge sav-location-row__badge--level">
-                                              {locationEntry.levelSummary}
-                                            </span>
-                                          )}
-                                          {locationEntry.notes && (
-                                            <span className="sav-location-row__badge sav-location-row__badge--note">
-                                              {locationEntry.notes}
-                                            </span>
-                                          )}
-                                          {locationEntry.chanceSummary && (
-                                            <span className="sav-location-row__badge sav-location-row__badge--chance">
-                                              {locationEntry.chanceSummary}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {showingYellow && hasSpecialLabel && (
-                                        <div className="sav-location-row__method-line">
-                                          <span className="sav-location-row__method">{locationEntry.methodLabel}</span>
-                                        </div>
-                                      )}
-                                      {showingYellow && detailParts.length > 0 && (
-                                        <div className="sav-location-row__meta">{detailParts.join(" · ")}</div>
-                                      )}
-                                      <div className="sav-location-row__hover-panel">
-                                        <div className="sav-location-row__hover-title">Also found here</div>
-                                        {sharedOthers.length > 0 ? (
-                                          <div className="sav-location-row__hover-grid">
-                                            <div className="sav-location-row__hover-column">
-                                              <div className="sav-location-row__hover-subtitle">Caught</div>
-                                              {caughtEntries.length > 0 ? (
-                                                <ul className="sav-location-row__hover-list">
-                                                  {caughtEntries.map(({ name, slug }) => (
-                                                    <li
-                                                      key={`${slug || name}-caught`}
-                                                      className="sav-location-row__hover-item sav-location-row__hover-item--caught"
-                                                    >
-                                                      <span className="sav-location-row__hover-item-dot" aria-hidden="true" />
-                                                      <span>{name}</span>
-                                                    </li>
-                                                  ))}
-                                                </ul>
-                                              ) : (
-                                                <div className="sav-location-row__hover-empty">None</div>
-                                              )}
-                                            </div>
-                                            <div className="sav-location-row__hover-column">
-                                              <div className="sav-location-row__hover-subtitle">Missing</div>
-                                              {missingEntries.length > 0 ? (
-                                                <ul className="sav-location-row__hover-list">
-                                                  {missingEntries.map(({ name, slug }) => (
-                                                    <li
-                                                      key={`${slug || name}-missing`}
-                                                      className="sav-location-row__hover-item sav-location-row__hover-item--missing"
-                                                    >
-                                                      <span className="sav-location-row__hover-item-dot" aria-hidden="true" />
-                                                      <span>{name}</span>
-                                                    </li>
-                                                  ))}
-                                                </ul>
-                                              ) : (
-                                                <div className="sav-location-row__hover-empty">None</div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="sav-location-row__hover-empty">
-                                            No other Pokémon share this location.
-                                          </div>
-                                        )}
-                                      </div>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            ) : (
-                              !entry.evolutionRequirement && (
-                                <div className="sav-location-empty">No encounter data</div>
-                              )
-                            )
-                          ) : (
-                            <div className="sav-location-empty">Loading encounter data...</div>
-                          )}
-                        </div>
-                        <div
-                          id={dexPanelId}
-                          className="sav-result-row__yellow-hover-panel"
-                          role="region"
-                          aria-label={`${dexPanelLabel}: ${pokemonName}`}
-                          aria-hidden={!isDexOpen}
-                        >
-                          {referenceReady ? (
-                            referenceRecord ? (
-                              showingYellow ? (
-                                <div className="sav-party-slot sav-party-slot--dex-preview">
-                                  <div className="sav-party-slot__content">
-                                    <div className="sav-party-slot__sprite-area">
-                                      <div className="sav-party-slot__sprite-panel">
-                                        <div className="sav-party-slot__sprite-wrapper">
-                                        <SpriteImage
-                                          id={previewSpriteIdentifier}
-                                          alt={pokemonName}
-                                          {...previewSpriteProps}
-                                        />
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="sav-party-slot__info-area">
-                                      <div className="sav-party-slot__header-row">
-                                        <div className="sav-party-slot__display-name">{pokemonName}</div>
-                                      </div>
-                                      <div className="sav-party-slot__hp">
-                                        <div className="sav-party-slot__hp-row">
-                                          <span className="sav-party-slot__hp-label">{speciesLabel}</span>
-                                        </div>
-                                        <div className="sav-party-slot__stat-row">
-                                          <span className="sav-party-slot__meta-label">Height</span>
-                                          <span className="sav-party-slot__meta-value">{heightLabel}</span>
-                                        </div>
-                                        <div className="sav-party-slot__stat-row">
-                                          <span className="sav-party-slot__meta-label">Weight</span>
-                                          <span className="sav-party-slot__meta-value">{weightLabel}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="sav-party-slot__entry-block">
-                                      <div className="sav-party-slot__entry-label">Yellow Pokedex entry</div>
-                                      <p className="sav-party-slot__entry-text">{entryText}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="sav-lazarus-hover-card">
-                                  <div className="sav-lazarus-hover-card__header">
-                                    <div className="sav-lazarus-hover-card__sprite">
-                                      <SpriteImage
-                                        id={previewSpriteIdentifier}
-                                        alt={pokemonName}
-                                        {...previewSpriteProps}
-                                      />
-                                    </div>
-                                    <div className="sav-lazarus-hover-card__summary">
-                                      <div className="sav-lazarus-hover-card__name">{pokemonName}</div>
-                                      <div className="sav-lazarus-hover-card__bst">
-                                        <span className="sav-lazarus-hover-card__bst-label">Base stat total</span>
-                                        <span className="sav-lazarus-hover-card__bst-value">
-                                          {referenceRecord?.bst != null ? referenceRecord.bst : "--"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="sav-lazarus-hover-card__body">
-                                    <div className="sav-lazarus-hover-card__meta-grid">
-                                      <div className="sav-lazarus-hover-card__meta-line">
-                                        <span className="sav-lazarus-hover-card__meta-label">Types</span>
-                                        <span className="sav-lazarus-hover-card__meta-value">
-                                          {lazarusTypes.length > 0 ? lazarusTypes.join(" / ") : "Unknown"}
-                                        </span>
-                                      </div>
-                                      {lazarusAbilities.length > 0 && (
-                                        <div className="sav-lazarus-hover-card__meta-line">
-                                          <span className="sav-lazarus-hover-card__meta-label">Abilities</span>
-                                          <span className="sav-lazarus-hover-card__meta-value">
-                                            {lazarusAbilities.join(" / ")}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {lazarusStatRows.length > 0 && (
-                                      <div className="sav-lazarus-hover-card__stats">
-                                        {lazarusStatRows.map(([label, value]) => (
-                                          <div key={label} className="sav-lazarus-hover-card__stat">
-                                            <span className="sav-lazarus-hover-card__stat-label">{label}</span>
-                                            <span className="sav-lazarus-hover-card__stat-value">
-                                              {value != null ? value : "--"}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            ) : (
-                              <div className="sav-result-row__yellow-hover-placeholder">
-                                {showingYellow ? "Yellow Pokedex entry unavailable." : "Lazarus data unavailable."}
-                              </div>
-                            )
-                          ) : (
-                            <div className="sav-result-row__yellow-hover-placeholder">
-                              {referenceError || `Loading ${activeGameLabel} data...`}
-                            </div>
-                          )}
-                        </div>
-                        {entry.evolutionRequirement && (
-                          <div
-                            className={
-                              legacyMapReady && entry.visibleEntries.length > 0
-                                ? "sav-evolution"
-                                : "sav-evolution has-no-border"
-                            }
-                          >
-                            <div className="sav-evolution__label">Evolution</div>
-                            <div className="sav-evolution__chain">
-                              {entry.evolutionRequirement.from && (
-                                <>
-                                  <span className="sav-evolution__stage">
-                                    {entry.evolutionRequirement.from}
-                                  </span>
-                                  <span className="sav-evolution__arrow-icon" aria-hidden="true">
-                                    →
-                                  </span>
-                                </>
-                              )}
-                              <span className="sav-evolution__method">
-                                {entry.evolutionRequirement.method}
-                              </span>
-                              <span className="sav-evolution__arrow-icon" aria-hidden="true">
-                                →
-                              </span>
-                              <span className="sav-evolution__stage">
-                                {entry.evolutionRequirement.target}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                  </>
-                ) : (
-                  <div className="sav-location-empty">
-                    No Pokémon match the current search or location filter.
-                  </div>
-                )}
-              </div>
+          {!showingYellow && !lazarusReferenceReady ? (
+            <div className="sv-entries" role="status">
+              <span className="sr-only">Loading Pokémon Lazarus data...</span>
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="sv-entry sv-entry--ghost" aria-hidden="true">
+                  <span className="sv-entry__open">
+                    <span className="skeleton sv-ghost__no" />
+                    <span className="skeleton sv-ghost__sprite" />
+                  </span>
+                  <span className="sv-entry__main">
+                    <span className="skeleton sv-ghost__line" />
+                    <span className="skeleton sv-ghost__line sv-ghost__line--short" />
+                  </span>
+                </div>
+              ))}
             </div>
-          </section>
-      </main>
-    </div>
+          ) : filteredResults.length > 0 ? (
+            <ul className="sv-entries">
+              {filteredResults.map((entry) => {
+                const view = buildEntryView(entry, viewContext);
+                const isDexOpen = openDexEntryKey === entry.entryKey;
+                return (
+                  <li
+                    key={entry.entryKey || entry.id}
+                    className={`sv-entry${entry.caught ? " is-caught" : ""}${isDexOpen ? " is-open" : ""}`}
+                    data-dex-entry-key={entry.entryKey}
+                  >
+                    <button
+                      type="button"
+                      className="sv-entry__open"
+                      aria-haspopup="dialog"
+                      aria-expanded={isDexOpen}
+                      aria-label={`${isDexOpen ? "Hide" : "Show"} ${dexPanelLabel} for ${view.pokemonName}`}
+                      title={`${dexPanelLabel}: ${view.pokemonName}`}
+                      onClick={(event) => openDexEntry(event, entry.entryKey)}
+                    >
+                      <Cursor className="sv-entry__cursor" />
+                      <span className="sv-entry__no">{formatDexNo(entry.id)}</span>
+                      <span className="sv-entry__sprite">
+                        <SpriteImage
+                          id={view.spriteIdentifier}
+                          alt=""
+                          className="sv-entry__img"
+                          width={64}
+                          height={64}
+                          {...view.spriteProps}
+                        />
+                      </span>
+                    </button>
+                    <div className="sv-entry__main">
+                      <p className="sv-entry__title">
+                        {view.pokedexUrl ? (
+                          <a className="sv-entry__name" href={view.pokedexUrl} target="_blank" rel="noopener noreferrer">
+                            {view.pokemonName}
+                            <Icon name="external" className="sv-ext-icon" />
+                            <span className="sr-only"> (opens the Pokédex in a new tab)</span>
+                          </a>
+                        ) : (
+                          <span className="sv-entry__name">{view.pokemonName}</span>
+                        )}
+                        <span className={`stamp sv-status${entry.caught ? " is-caught" : ""}`}>
+                          {entry.caught ? <Icon name="ball" /> : null}
+                          {entry.caught ? "Caught" : "Missing"}
+                        </span>
+                      </p>
+                      {legacyMapReady ? (
+                        entry.visibleEntries.length > 0 ? (
+                          <ul className="sv-entry__locs">
+                            {entry.visibleEntries.map((locationEntry, index) => (
+                              <li
+                                key={`${locationEntry.location}-${index}`}
+                                className={`sv-loc${locationEntry.methodType ? ` sv-loc--${locationEntry.methodType}` : ""}`}
+                              >
+                                <span className="sv-loc__name">{locationEntry.location}</span>
+                                <LocationParts parts={describeLocationParts(locationEntry, showingYellow)} />
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          !entry.evolutionRequirement && <p className="sv-entry__none">No encounter data</p>
+                        )
+                      ) : (
+                        <p className="sv-entry__loading">
+                          <span className="skeleton sv-ghost__line" aria-hidden="true" />
+                          <span className="sr-only">Loading encounter data...</span>
+                        </p>
+                      )}
+                      {entry.evolutionRequirement && renderEvolution(entry.evolutionRequirement)}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="empty sv-dex__empty">
+              <p className="empty__title">No matches</p>
+              <p>No Pokémon match the current search or location filter.</p>
+              <button type="button" className="btn btn--sm" onClick={resetResultFilters}>
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <Sheet
+        open={Boolean(openEntry)}
+        onClose={closeDexEntry}
+        anchorRef={dexAnchorRef}
+        label={openView ? `${dexPanelLabel}: ${openView.pokemonName}` : dexPanelLabel}
+        width={440}
+        className="sv-sheet"
+      >
+        {renderDexDetail()}
+      </Sheet>
+    </main>
   );
 }

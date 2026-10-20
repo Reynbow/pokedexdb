@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import "./App.css";
-import CategoryToggle from "./CategoryToggle.jsx";
-import GameFilters from "./sections/GameFilters.jsx";
-import { NATIONAL_GAME_OPTIONS, GAME_LOGO_LOOKUP } from "./constants/games.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import Icon, { Cursor } from "./components/Icon.jsx";
+import Sheet from "./components/Sheet.jsx";
+import SpriteImage from "./components/SpriteImage.jsx";
+import { CartLogos } from "./pokedex/GamePicker.jsx";
+import { GAME_GROUPS, ROMAN, readGamePreference, regionLabel, writeGamePreference } from "./pokedex/games.js";
+import { GAME_LOOKUP } from "./constants/games.js";
 import {
 	EV_PANEL_FEATHERS,
 	EV_PANEL_POWER_ITEMS,
@@ -10,9 +13,10 @@ import {
 	GRIT_ITEMS,
 	getPowerItemBonus,
 } from "./constants/evItems.js";
-import SpriteImage from "./components/SpriteImage.jsx";
 import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
 import { formatPokemonName } from "./utils/pokemonNames.js";
+import "./styles/pokedex.css";
+import "./styles/pages/ev-training.css";
 
 /*
  * Facts on this page were checked against Bulbapedia ("Effort values", "Effort level", "Go Power",
@@ -485,52 +489,81 @@ const MAP_FILE_BY_STAT = {
 };
 const SHOW_LOCATION_PILL = new Set(["legends-za", "sword-shield"]);
 
+/* -------------------------------------------------------------------------------- stats */
+
+const STATS = [
+	{ key: "HP", short: "HP", full: "HP" },
+	{ key: "Attack", short: "Atk", full: "Attack" },
+	{ key: "Defense", short: "Def", full: "Defense" },
+	{ key: "Sp. Atk", short: "SpA", full: "Sp. Atk" },
+	{ key: "Sp. Def", short: "SpD", full: "Sp. Def" },
+	{ key: "Speed", short: "Spe", full: "Speed" },
+];
+const EMPTY_SPREAD = Object.fromEntries(STATS.map((s) => [s.key, 0]));
+const MAX_PER_STAT = 252;
+const MAX_TOTAL = 510;
+
+const SYSTEM_LABEL = { statexp: "Stat Experience", ev: "Effort Values", av: "Awakening Values", el: "Effort Levels" };
+
+/** One line for the cartridge: the stat system and its caps in the chosen game. */
+function capsSummary(rules) {
+	if (!rules) return "General rules · 510 EVs total · 252 per stat";
+	if (rules.system === "statexp") return "Stat Exp · up to 65,535 per stat";
+	if (rules.system === "av") return "AVs · up to 200 per stat";
+	if (rules.system === "el") return "Effort Levels · 0–10 per stat";
+	return `EVs · 510 total · ${perStatCap(rules.gen)} per stat`;
+}
+
+const kosTo = (goal, perKo) => Math.ceil(goal / perKo);
+
 /* ------------------------------------------------------------------------------ sprites */
 
 const SLUG_TO_NATIONAL_ID = new Map(
 	Object.entries(NATIONAL_ID_TO_SLUG).map(([id, slug]) => [slug, Number(id)])
 );
 
-function NameSprite({ name, size = 56 }) {
+function Mon({ name }) {
 	const id = SLUG_TO_NATIONAL_ID.get(String(name || "").toLowerCase().trim());
-	if (!Number.isFinite(id)) {
-		return <div style={{ width: size, height: size, borderRadius: 8, background: "rgba(255,255,255,0.06)" }} aria-hidden="true" />;
-	}
-	return <SpriteImage id={id} alt="" width={size} height={size} className="ev-target-sprite" />;
-}
-
-function SpeciesRow({ name }) {
-	const label = formatPokemonName(name);
 	return (
-		<div className="ev-target-sprite-wrap" title={label}>
-			<NameSprite name={name} />
-			<div className="ev-target-species">{label}</div>
-		</div>
+		<li className="evt-mon">
+			{Number.isFinite(id) ? (
+				<SpriteImage id={id} alt="" width={48} height={48} loading="lazy" className="evt-mon__sprite" />
+			) : (
+				<span className="evt-mon__sprite evt-mon__sprite--none" aria-hidden="true" />
+			)}
+			<span className="evt-mon__name">{formatPokemonName(name)}</span>
+		</li>
 	);
 }
 
 /* --------------------------------------------------------------------------------- maps */
 
-function MapImage({ src, statLabel, onOpen, overlayLeft = null, overlayRight = null, overlayTopRight = null }) {
-	if (!src) return null;
+function TrainingMap({ src, statLabel, onOpen, yields, place }) {
 	const label = `${statLabel} EV training map`;
 	return (
-		<div className="ev-map-wrap">
-			<button type="button" className="ev-map-button" onClick={() => onOpen?.({ src, label })} aria-label={`Enlarge ${label}`}>
-				<img className="ev-map" src={src} alt={label} loading="lazy" />
+		<figure className="evt-map">
+			<button type="button" className="evt-map__open" onClick={() => onOpen({ src, label })} aria-label={`Enlarge ${label}`}>
+				<img className="evt-map__img" src={src} alt={label} loading="lazy" />
+				<span className="evt-map__zoom" aria-hidden="true">
+					<Icon name="search" />
+				</span>
 			</button>
-			{overlayTopRight}
-			{overlayLeft || overlayRight ? (
-				<div className="ev-map-overlay" aria-hidden="true">
-					<div className="ev-map-overlay-left">{overlayLeft}</div>
-					<div className="ev-map-overlay-right">{overlayRight}</div>
+			{place ? <figcaption className="evt-map__chip evt-map__place">{place}</figcaption> : null}
+			{yields.length ? (
+				<div className="evt-map__yields" aria-hidden="true">
+					{yields.map((text) => (
+						<span key={text} className="evt-map__chip">
+							{text}
+						</span>
+					))}
 				</div>
 			) : null}
-		</div>
+		</figure>
 	);
 }
 
-function MapModal({ map, onClose }) {
+/** The enlarged map: a framed viewer over the page. Escape, the close button or the backdrop closes it. */
+function MapViewer({ map, onClose }) {
 	const closeRef = useRef(null);
 	useEffect(() => {
 		const previouslyFocused = document.activeElement;
@@ -551,153 +584,220 @@ function MapModal({ map, onClose }) {
 			if (previouslyFocused && typeof previouslyFocused.focus === "function") previouslyFocused.focus();
 		};
 	}, [onClose]);
-	return (
-		<div className="ev-map-modal" onClick={onClose}>
-			<div
-				className="ev-map-modal-inner"
-				role="dialog"
-				aria-modal="true"
-				aria-label={map.label}
-				onClick={(event) => event.stopPropagation()}
-			>
-				<img src={map.src} alt={map.label} />
-				<button ref={closeRef} type="button" className="ev-map-close ev-badge ev-badge-top" onClick={onClose} aria-label="Close map">
-					×
-				</button>
+	return createPortal(
+		<>
+			<div className="scrim" onClick={onClose} aria-hidden="true" />
+			<div className="sheet evt-viewer" role="dialog" aria-modal="true" aria-label={map.label}>
+				<div className="popsheet__head">
+					<h2 className="popsheet__title">{map.label}</h2>
+					<button ref={closeRef} type="button" className="btn btn--quiet btn--icon btn--sm" onClick={onClose} aria-label="Close map">
+						<Icon name="close" />
+					</button>
+				</div>
+				<div className="evt-viewer__body">
+					<img src={map.src} alt={map.label} />
+				</div>
 			</div>
-		</div>
+		</>,
+		document.body
 	);
 }
 
-/* ------------------------------------------------------------------------ targets panel */
+/* ------------------------------------------------------------------------ where to train */
 
 const uniqueStrings = (values) => Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean)));
 
-function LocationLines({ lines }) {
-	if (!lines.length) return null;
+function StatGroup({ group, mapSrc, showPlace, bonus, goal, onOpenMap }) {
+	// Lowest yield first; a stable sort keeps the data's order within one yield
+	const entries = [...group.list].sort((a, b) => a.ev - b.ev);
+	const evValues = uniqueStrings(entries.map((it) => it.ev)).map(Number);
+	// On a map, the lower yield's area is on the left and the higher one's on the right
+	const yields = mapSrc && evValues.length <= 2 ? evValues.map((ev) => `+${ev} ${group.key}`) : [];
+	const place = mapSrc && showPlace ? uniqueStrings(entries.map((it) => it.location)).join(" / ") : "";
+	const headId = `evt-stat-${group.short.toLowerCase()}`;
+
 	return (
-		<div className="ev-topline-right">
-			{lines.map((line) => (
-				<div key={line} className="ev-location-line">{line}</div>
-			))}
-		</div>
+		<section className="evt-stat" aria-labelledby={headId}>
+			<h3 className="evt-stat__head" id={headId}>
+				{group.key}
+			</h3>
+			{mapSrc ? <TrainingMap src={mapSrc} statLabel={group.key} onOpen={onOpenMap} yields={yields} place={place} /> : null}
+			<ul className="evt-targets">
+				{entries.map((it) => (
+					<li key={`${it.ev}-${it.species.join("-")}`} className="evt-target">
+						<p className="evt-target__yield">
+							<span className="evt-target__num">+{it.ev}</span>
+							<span className="evt-target__stat">{group.short}</span>
+							<span className="sr-only"> {group.key} EVs per Pokémon defeated</span>
+						</p>
+						<div className="evt-target__body">
+							<ul className="evt-mons">
+								{it.species.map((name) => (
+									<Mon key={name} name={name} />
+								))}
+							</ul>
+							{!place && it.location ? (
+								<p className="evt-target__where">
+									<Icon name="pin" />
+									<span>{it.location}</span>
+								</p>
+							) : null}
+							<p className="evt-target__kos">
+								<span className="num">{kosTo(goal, it.ev)}</span> KOs to {goal}
+								{bonus ? (
+									<>
+										{" · "}
+										<span className="num">{kosTo(goal, it.ev + bonus)}</span> with a Power Item
+									</>
+								) : null}
+							</p>
+						</div>
+					</li>
+				))}
+			</ul>
+		</section>
 	);
 }
 
-function GoToTargets({ gameKey, onOpenMap }) {
+function WhereToTrain({ gameKey, rules, focus, onFocus, spread, onOpenMap }) {
 	const items = TARGETS_BY_GAME[gameKey];
 	if (!items || items.length === 0) return null;
 	const mapFolder = MAP_FOLDERS[gameKey];
-	const showPill = SHOW_LOCATION_PILL.has(gameKey);
+	const showPlace = SHOW_LOCATION_PILL.has(gameKey);
+	const bonus = getPowerItemBonus(rules?.gen);
 	const mapSrcFor = (stat) => (mapFolder && MAP_FILE_BY_STAT[stat] ? `/maps/${mapFolder}/${MAP_FILE_BY_STAT[stat]}.webp` : null);
-	const locationPill = (locations) => {
-		const text = uniqueStrings(locations).join(" / ");
-		return showPill && text ? <span className="ev-badge ev-location-badge ev-badge-top">{text}</span> : null;
-	};
-
-	const groups = new Map();
-	items.forEach((item) => {
-		if (!groups.has(item.stat)) groups.set(item.stat, []);
-		groups.get(item.stat).push(item);
-	});
-
-	const cards = [];
-	for (const [stat, list] of groups.entries()) {
-		const mapSrc = mapSrcFor(stat);
-		const evValues = Array.from(new Set(list.map((it) => it.ev))).sort((a, b) => a - b);
-
-		if (evValues.length === 2) {
-			const [low, high] = evValues;
-			const lowItems = list.filter((it) => it.ev === low);
-			const highItems = list.filter((it) => it.ev === high);
-			const lowLocs = uniqueStrings(lowItems.map((it) => it.location));
-			const highLocs = uniqueStrings(highItems.map((it) => it.location));
-			const lowBadge = <span className="ev-badge">{`+${low} ${stat}`}</span>;
-			const highBadge = <span className="ev-badge">{`+${high} ${stat}`}</span>;
-			cards.push(
-				<div key={`${stat}-split`} className="ev-target" role="listitem">
-					{mapSrc ? (
-						<MapImage
-							src={mapSrc}
-							statLabel={stat}
-							onOpen={onOpenMap}
-							overlayLeft={lowBadge}
-							overlayRight={highBadge}
-							overlayTopRight={locationPill([...lowLocs, ...highLocs])}
-						/>
-					) : (
-						<>
-							<LocationLines lines={uniqueStrings([lowLocs.join(" / "), highLocs.join(" / ")])} />
-							<div className="ev-split ev-split-badges">
-								{lowBadge}
-								{highBadge}
-							</div>
-						</>
-					)}
-					<div className="ev-split">
-						<div className="ev-split-col">
-							{lowItems.flatMap((it) => it.species).map((name) => <SpeciesRow key={`L-${name}`} name={name} />)}
-						</div>
-						<div className="ev-split-col">
-							{highItems.flatMap((it) => it.species).map((name) => <SpeciesRow key={`R-${name}`} name={name} />)}
-						</div>
-					</div>
-				</div>
-			);
-			continue;
-		}
-
-		// One card per entry when a stat has a single yield (or more than two different yields).
-		list.forEach((it, idx) => {
-			const badge = <span className="ev-badge">{`+${it.ev} ${stat}`}</span>;
-			const locs = uniqueStrings([it.location]);
-			cards.push(
-				<div key={`${stat}-${idx}`} className="ev-target" role="listitem">
-					{mapSrc ? (
-						<MapImage src={mapSrc} statLabel={stat} onOpen={onOpenMap} overlayLeft={badge} overlayTopRight={locationPill(locs)} />
-					) : (
-						<>
-							<LocationLines lines={locs} />
-							<div className="ev-split-badges">{badge}</div>
-						</>
-					)}
-					<div className="ev-target-sprites">
-						{it.species.map((name) => <SpeciesRow key={name} name={name} />)}
-					</div>
-				</div>
-			);
-		});
-	}
+	const groups = STATS.map((s) => ({ ...s, list: items.filter((it) => it.stat === s.key) })).filter((g) => g.list.length > 0);
+	const shown = focus ? groups.filter((g) => g.key === focus) : groups;
 
 	return (
-		<div className="matchup-box">
-			<div className="matchup-title">Go-To Targets</div>
-			<div className="ev-targets-grid" role="list">
-				{cards}
+		<section className="win evt-where evt-slot--where" aria-labelledby="evt-where-title">
+			<div className="win__head">
+				<h2 className="win__title" id="evt-where-title">
+					Where to train
+				</h2>
 			</div>
-		</div>
+			<div className="win__body">
+				<div className="seg evt-stats" role="group" aria-label="Show spots for">
+					<button type="button" className="seg__btn" aria-pressed={!focus} onClick={() => onFocus(null)}>
+						All
+					</button>
+					{STATS.map((s) => (
+						<button
+							key={s.key}
+							type="button"
+							className="seg__btn"
+							aria-pressed={focus === s.key}
+							aria-label={s.short === s.full ? s.full : `${s.short} (${s.full})`}
+							onClick={() => onFocus(s.key)}
+						>
+							{s.short}
+						</button>
+					))}
+				</div>
+				{shown.length === 0 ? (
+					<p className="evt-none">No go-to spot is listed for {focus} in this game.</p>
+				) : (
+					shown.map((group) => (
+						<StatGroup
+							key={group.key}
+							group={group}
+							mapSrc={mapSrcFor(group.key)}
+							showPlace={showPlace}
+							bonus={bonus}
+							goal={spread[group.key] > 0 ? spread[group.key] : MAX_PER_STAT}
+							onOpenMap={onOpenMap}
+						/>
+					))
+				)}
+			</div>
+		</section>
+	);
+}
+
+/* --------------------------------------------------------------------------- spread plan */
+
+function SpreadPlanner({ spread, setSpread, focus }) {
+	const total = STATS.reduce((sum, s) => sum + spread[s.key], 0);
+	const setStat = (key, raw) => {
+		setSpread((prev) => {
+			const others = STATS.reduce((sum, s) => (s.key === key ? sum : sum + prev[s.key]), 0);
+			const room = Math.max(0, MAX_TOTAL - others);
+			const value = Math.floor(Math.min(Number(raw) || 0, room, MAX_PER_STAT) / 4) * 4;
+			return prev[key] === value ? prev : { ...prev, [key]: value };
+		});
+	};
+
+	return (
+		<section className="win evt-spread evt-slot--spread" aria-labelledby="evt-spread-title">
+			<div className="win__head">
+				<h2 className="win__title" id="evt-spread-title">
+					Plan a spread
+				</h2>
+				<button type="button" className="btn btn--quiet btn--sm" onClick={() => setSpread(EMPTY_SPREAD)} disabled={total === 0}>
+					Clear
+				</button>
+			</div>
+			<div className="win__body">
+				<ul className="evt-meters">
+					{STATS.map((s) => {
+						const value = spread[s.key];
+						const gain = Math.floor(value / 4);
+						return (
+							<li
+								key={s.key}
+								className={`meter evt-meter${focus === s.key ? " is-focus" : ""}`}
+								style={{ "--pct": (value / MAX_PER_STAT) * 100 }}
+							>
+								<span className="meter__label">
+									<Cursor className="evt-meter__cursor" />
+									{s.short}
+								</span>
+								<span className="meter__value">{value}</span>
+								<span className="evt-meter__slider">
+									<span className="meter__track" aria-hidden="true">
+										<span className="meter__fill" />
+									</span>
+									<input
+										type="range"
+										className="evt-meter__input"
+										min={0}
+										max={MAX_PER_STAT}
+										step={4}
+										value={value}
+										onChange={(event) => setStat(s.key, event.target.value)}
+										aria-label={`${s.full} EVs`}
+										aria-valuetext={`${value} EVs, +${gain} ${s.full} at level 100`}
+									/>
+								</span>
+								<span className="evt-meter__gain">+{gain}</span>
+							</li>
+						);
+					})}
+				</ul>
+				<div className="meter evt-meter evt-meter--total" style={{ "--pct": (total / MAX_TOTAL) * 100 }}>
+					<span className="meter__label">Total</span>
+					<span className="meter__value">{total}</span>
+					<span className="evt-meter__slider">
+						<span className="meter__track" aria-hidden="true">
+							<span className="meter__fill" />
+						</span>
+					</span>
+					<span className="evt-meter__gain">
+						{MAX_TOTAL - total} left
+					</span>
+				</div>
+				<p className="evt-note">
+					Drag a bar to plan: each stat counts up to 252 and all six share 510. +N is the stat gain at level 100 (4 EVs = 1
+					point). Where to train counts KOs to these numbers, or to 252 for a stat left at 0.
+				</p>
+			</div>
+		</section>
 	);
 }
 
 /* -------------------------------------------------------------------------- items panel */
 
-function ItemList({ entries }) {
-	return (
-		<ul className="game-modal-method-description vitamin-list">
-			{entries.map((entry) => (
-				<li key={entry.name} className="vitamin-item">
-					<img className="vitamin-icon" src={entry.image} alt="" loading="lazy" />
-					<div>
-						<strong>{entry.name}</strong>
-						<div>{entry.effect}</div>
-					</div>
-				</li>
-			))}
-		</ul>
-	);
-}
-
-// Columns for the right-hand items panel, based on what exists in the selected game.
+// Columns for the items window, based on what exists in the selected game.
 function getItemColumns(rules) {
 	if (rules && rules.system !== "ev" && rules.system !== "statexp") return [];
 	const gen = rules?.gen ?? null;
@@ -710,6 +810,7 @@ function getItemColumns(rules) {
 			entries: EV_PANEL_VITAMINS.filter((v) => !v.introduced || v.introduced <= gen).map((v) => ({
 				name: v.name,
 				image: v.image,
+				stat: v.stat,
 				effect: `+2,560 ${v.statGen1to2 || v.stat} Stat Exp`,
 			})),
 		});
@@ -723,7 +824,7 @@ function getItemColumns(rules) {
 			: gen >= 8
 				? "Works all the way to 252 EVs."
 				: "Refused once that stat has 100 EVs.",
-		entries: EV_PANEL_VITAMINS.map((v) => ({ name: v.name, image: v.image, effect: `+10 ${v.stat}` })),
+		entries: EV_PANEL_VITAMINS.map((v) => ({ name: v.name, image: v.image, stat: v.stat, effect: `+10 ${v.stat}` })),
 	});
 
 	if (gen == null || rules.feathers) {
@@ -731,7 +832,7 @@ function getItemColumns(rules) {
 		columns.push({
 			title: useWings ? "Wings" : "Feathers",
 			note: rules?.feathers === "dlc" ? "Mega Dimension DLC only." : gen == null ? "Called Wings before Sword & Shield (Gen 5+)." : null,
-			entries: EV_PANEL_FEATHERS.map((f) => ({ name: useWings ? f.wingName : f.name, image: f.image, effect: `+1 ${f.stat}` })),
+			entries: EV_PANEL_FEATHERS.map((f) => ({ name: useWings ? f.wingName : f.name, image: f.image, stat: f.stat, effect: `+1 ${f.stat}` })),
 		});
 	}
 
@@ -740,153 +841,279 @@ function getItemColumns(rules) {
 		columns.push({
 			title: "Power Items",
 			note: gen == null ? "Per KO; +4 in Gen 4–6." : "Per Pokémon defeated, on top of its yield.",
-			entries: EV_PANEL_POWER_ITEMS.map((p) => ({ name: p.name, image: p.image, effect: `+${bonus} ${p.stat}` })),
+			entries: EV_PANEL_POWER_ITEMS.map((p) => ({ name: p.name, image: p.image, stat: p.stat, effect: `+${bonus} ${p.stat}` })),
 		});
 	}
 	return columns;
 }
 
-function ItemsPanel({ rules }) {
+function EvItems({ rules, focus }) {
 	const columns = getItemColumns(rules);
 	if (columns.length === 0) return null;
 	return (
-		<div className="matchup-box">
-			<div className={`vitamin-columns ev-item-cols-${columns.length}`}>
+		<section className="win evt-items evt-slot--items" aria-labelledby="evt-items-title">
+			<div className="win__head">
+				<h2 className="win__title" id="evt-items-title">
+					{rules?.system === "statexp" ? "Stat Exp items" : "EV items"}
+				</h2>
+			</div>
+			<div className="win__body evt-items__body">
 				{columns.map((column) => (
-					<div key={column.title} className="vitamin-column">
-						<div className="vitamin-column-title">{column.title}</div>
-						{column.note ? <div className="ev-item-note">{column.note}</div> : null}
-						<ItemList entries={column.entries} />
-					</div>
+					<section key={column.title} className="evt-items__group" aria-label={column.title}>
+						<h3 className="evt-items__title">{column.title}</h3>
+						{column.note ? <p className="evt-note">{column.note}</p> : null}
+						<ul className="evt-item-list">
+							{column.entries.map((entry) => (
+								<li key={entry.name} className={`evt-item${focus && entry.stat === focus ? " is-focus" : ""}`}>
+									<Cursor className="evt-item__cursor" />
+									<img className="evt-item__icon" src={entry.image} alt="" width={24} height={24} loading="lazy" />
+									<span className="evt-item__name">{entry.name}</span>
+									<span className="evt-item__effect">{entry.effect}</span>
+								</li>
+							))}
+						</ul>
+					</section>
 				))}
 			</div>
-		</div>
+		</section>
 	);
 }
 
-function GritPanel() {
+function GritItems() {
 	return (
-		<div className="matchup-box grit-items-panel">
-			<div className="vitamin-columns">
-				<div className="vitamin-column">
-					<div className="vitamin-column-title">Grit Items</div>
-					<ul className="game-modal-method-description vitamin-list">
-						{GRIT_ITEMS.map((item) => (
-							<li key={item.name} className="vitamin-item">
-								<span className="grit-icon-wrap">
-									<img className="vitamin-icon grit-icon" src={item.image} alt="" loading="lazy" />
-								</span>
-								<div>
-									<strong>{item.name}</strong>
-									<div>{item.effect}</div>
-								</div>
-							</li>
-						))}
-					</ul>
-				</div>
+		<section className="win evt-items evt-slot--items" aria-labelledby="evt-grit-title">
+			<div className="win__head">
+				<h2 className="win__title" id="evt-grit-title">
+					Grit items
+				</h2>
 			</div>
-		</div>
+			<div className="win__body">
+				<ul className="evt-item-list">
+					{GRIT_ITEMS.map((item) => (
+						<li key={item.name} className="evt-item evt-item--grit">
+							<span className="evt-item__well">
+								<img className="evt-item__icon" src={item.image} alt="" width={24} height={24} loading="lazy" />
+							</span>
+							<span className="evt-item__text">
+								<span className="evt-item__name">{item.name}</span>
+								<span className="evt-item__effect">{item.effect}</span>
+							</span>
+						</li>
+					))}
+				</ul>
+			</div>
+		</section>
 	);
 }
 
-/* --------------------------------------------------------------------------------- page */
+/* ------------------------------------------------------------------------ guide windows */
 
-function GuideBoxes({ gameKey }) {
+function GuideWindows({ gameKey }) {
 	const boxes = GUIDES[gameKey];
 	if (!boxes) return null;
 	return (
-		<div className="matchup-grid">
-			{boxes.map((guideBox) => (
-				<div key={guideBox.title} className="matchup-box">
-					<div className="matchup-title">{guideBox.title}</div>
-					<ul className="game-modal-method-description">
-						{guideBox.items.map((item) => (
-							<li key={item}>{item}</li>
-						))}
-					</ul>
-				</div>
+		<div className="evt-guide evt-slot--guide">
+			{boxes.map((guideBox, index) => (
+				<section key={guideBox.title} className="win evt-box" aria-labelledby={`evt-guide-${index}`}>
+					<div className="win__head">
+						<h2 className="win__title" id={`evt-guide-${index}`}>
+							{guideBox.title}
+						</h2>
+					</div>
+					<div className="win__body">
+						<ul className="evt-list">
+							{guideBox.items.map((item) => (
+								<li key={item}>{item}</li>
+							))}
+						</ul>
+					</div>
+				</section>
 			))}
 		</div>
 	);
 }
 
+/* --------------------------------------------------------------------------- game picker */
+
+function PickerOption({ game, selected, onPick }) {
+	const rules = game ? GAME_RULES[game.key] : null;
+	const title = game ? game.label : "All games";
+	const sub = game ? [regionLabel(game), SYSTEM_LABEL[rules?.system]].filter(Boolean).join(" · ") : "General EV rules";
+	return (
+		<li>
+			<button type="button" className="cart-option" aria-pressed={selected} onClick={() => onPick(game ? game.key : null)}>
+				<Cursor className="cart-option__cursor" />
+				<CartLogos game={game} />
+				<span className="cart-option__text">
+					<span className="cart-option__title">{title}</span>
+					<span className="cart-option__sub">{sub}</span>
+				</span>
+			</button>
+		</li>
+	);
+}
+
+// Up/Down moves between games like a menu cursor
+const onMenuKeyDown = (event) => {
+	if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") return;
+	const items = Array.from(event.currentTarget.querySelectorAll(".cart-option"));
+	const index = items.indexOf(document.activeElement);
+	let next = index;
+	if (event.key === "ArrowDown") next = Math.min(items.length - 1, index + 1);
+	if (event.key === "ArrowUp") next = Math.max(0, index - 1);
+	if (event.key === "Home") next = 0;
+	if (event.key === "End") next = items.length - 1;
+	event.preventDefault();
+	items[next]?.focus();
+};
+
+function EvGamePicker({ open, onClose, anchorRef, selectedGame, onPick }) {
+	const pick = (key) => {
+		onPick(key);
+		onClose();
+	};
+	return (
+		<Sheet open={open} onClose={onClose} anchorRef={anchorRef} label="Choose your game" width={400} className="cart-sheet">
+			<div className="popsheet__head">
+				<h2 className="popsheet__title">Choose your game</h2>
+				<button type="button" className="btn btn--quiet btn--icon btn--sm" onClick={onClose} aria-label="Close">
+					<Icon name="close" />
+				</button>
+			</div>
+			<div className="popsheet__body cart-menu" onKeyDown={onMenuKeyDown}>
+				<ul className="cart-list">
+					<PickerOption game={null} selected={!selectedGame} onPick={pick} />
+				</ul>
+				{GAME_GROUPS.map((group) => (
+					<section key={group.gen} className="cart-group" aria-label={group.label}>
+						<h3 className="cart-group__label">{group.label}</h3>
+						<ul className="cart-list">
+							{group.games.map((game) => (
+								<PickerOption key={game.key} game={game} selected={selectedGame === game.key} onPick={pick} />
+							))}
+						</ul>
+					</section>
+				))}
+			</div>
+		</Sheet>
+	);
+}
+
+/* --------------------------------------------------------------------------------- page */
+
 export default function EvTrainingPage() {
-	const [selectedGame, setSelectedGame] = useState(null);
+	// Starts on the game picked on the Pokédex (the cartridge is shared across the site)
+	const [selectedGame, setSelectedGameState] = useState(() => readGamePreference());
+	const setSelectedGame = useCallback((key) => {
+		setSelectedGameState(key || null);
+		writeGamePreference(key || null);
+	}, []);
 	const [openMap, setOpenMap] = useState(null);
+	const [pickerOpen, setPickerOpen] = useState(false);
+	const [focus, setFocus] = useState(null);
+	const [spread, setSpread] = useState(EMPTY_SPREAD);
+	const cartRef = useRef(null);
+
 	const rules = selectedGame ? GAME_RULES[selectedGame] || null : null;
+	const game = selectedGame ? GAME_LOOKUP.get(selectedGame) || null : null;
 	const isLegendsArceus = rules?.system === "el";
 	const showEvBasics = !rules || rules.system === "ev";
-
-	const availableGames = NATIONAL_GAME_OPTIONS;
-	const showGameFilters = availableGames.length > 0;
-
-	// Sort games newest → oldest (left to right)
-	const sortedAvailableGames = useMemo(() => {
-		const orderIndex = new Map(availableGames.map((g, idx) => [g.key, idx]));
-		return availableGames.slice().sort((a, b) => (orderIndex.get(b?.key) ?? -1) - (orderIndex.get(a?.key) ?? -1));
-	}, [availableGames]);
-
-	const onGameClick = useCallback((gameKey) => {
-		setSelectedGame((prev) => (prev === gameKey ? null : gameKey));
-	}, []);
-
-	const resolveLogoUrls = useCallback((game) => {
-		const logos = game?.logos || [];
-		return logos.map((f) => GAME_LOGO_LOOKUP.get(f)).filter(Boolean);
-	}, []);
+	const hasTargets = Boolean(selectedGame && TARGETS_BY_GAME[selectedGame]?.length);
+	// The stat focus only applies where the game lists training spots
+	const activeFocus = hasTargets ? focus : null;
 
 	const closeMap = useCallback(() => setOpenMap(null), []);
+	const closePicker = useCallback(() => setPickerOpen(false), []);
+	const openPicker = () => setPickerOpen(true);
 
 	return (
-		<div className="app-shell">
-			<header className="app-header">
-				<div className="container">
-					<h1 className="title">EV Training</h1>
-					<p className="subtitle">Effort Values (EVs): quick primer</p>
-					<CategoryToggle />
+		<main className="evt">
+			<h1 className="sr-only">EV Training</h1>
+			<div className="strip evt-strip">
+				<div className="strip__row">
+					<button
+						ref={cartRef}
+						type="button"
+						className="cart"
+						aria-haspopup="dialog"
+						aria-expanded={pickerOpen}
+						onClick={openPicker}
+					>
+						<CartLogos game={game} />
+						<span className="cart__text">
+							<span className="cart__title">{game ? game.label : "All games"}</span>
+							<span className="cart__sub">{capsSummary(rules)}</span>
+						</span>
+						<Icon name="down" className="cart__chevron" />
+						<span className="sr-only">Change game</span>
+					</button>
+					{rules ? (
+						<p className="evt-strip__system">
+							<span className="label">Gen {ROMAN[rules.gen]}</span>
+							{SYSTEM_LABEL[rules.system]}
+						</p>
+					) : null}
 				</div>
-			</header>
-			<main className="container">
-				{showGameFilters && (
-					<GameFilters
-						showFilters
-						showGameFilters={showGameFilters}
-						selectedDex="national"
-						gameFiltersRef={null}
-						availableGames={sortedAvailableGames}
-						selectedGame={selectedGame}
-						onGameClick={onGameClick}
-						resolveLogoUrls={resolveLogoUrls}
-					/>
-				)}
-				<section className={`content ev-layout${isLegendsArceus ? " pla-layout" : ""}`} style={{ paddingTop: 16 }}>
-					<div className="ev-col-left">
-						{showEvBasics && (
-							<div className="matchup-box">
-								<div className="matchup-title">EV Basics</div>
-								<ul className="game-modal-method-description">
+			</div>
+
+			<div className="evt-body">
+				<div className="evt-col evt-col--main">
+					{!selectedGame ? (
+						<section className="win evt-prompt evt-slot--prompt" aria-labelledby="evt-prompt-title">
+							<div className="empty">
+								<h2 className="empty__title" id="evt-prompt-title">
+									Choose your game
+								</h2>
+								<p>EV rules, training spots and where to buy items change from game to game. Pick the one you're playing.</p>
+								<button type="button" className="btn" onClick={openPicker}>
+									<Icon name="ball" />
+									Choose game
+								</button>
+							</div>
+						</section>
+					) : null}
+					{hasTargets ? (
+						<WhereToTrain
+							gameKey={selectedGame}
+							rules={rules}
+							focus={activeFocus}
+							onFocus={setFocus}
+							spread={spread}
+							onOpenMap={setOpenMap}
+						/>
+					) : null}
+					{selectedGame ? <GuideWindows gameKey={selectedGame} /> : null}
+					{showEvBasics ? (
+						<section className="win evt-box evt-slot--basics" aria-labelledby="evt-basics-title">
+							<div className="win__head">
+								<h2 className="win__title" id="evt-basics-title">
+									EV basics
+								</h2>
+							</div>
+							<div className="win__body">
+								<ul className="evt-list">
 									{getEvBasics(rules).map((item) => (
 										<li key={item}>{item}</li>
 									))}
 								</ul>
 							</div>
-						)}
-						{selectedGame ? (
-							<GuideBoxes gameKey={selectedGame} />
-						) : (
-							<div className="matchup-box">
-								<div className="matchup-title">Select a Game</div>
-								<p style={{ margin: 0 }}>Choose a game above to see EV training specifics for that version.</p>
-							</div>
-						)}
-					</div>
-					<div className="ev-col-right">
-						{isLegendsArceus ? <GritPanel /> : <ItemsPanel rules={rules} />}
-						{selectedGame ? <GoToTargets gameKey={selectedGame} onOpenMap={setOpenMap} /> : null}
-					</div>
-				</section>
-			</main>
-			{openMap ? <MapModal map={openMap} onClose={closeMap} /> : null}
-		</div>
+						</section>
+					) : null}
+				</div>
+				<div className="evt-col evt-col--side">
+					{showEvBasics ? <SpreadPlanner spread={spread} setSpread={setSpread} focus={activeFocus} /> : null}
+					{isLegendsArceus ? <GritItems /> : <EvItems rules={rules} focus={activeFocus} />}
+				</div>
+			</div>
+
+			<EvGamePicker
+				open={pickerOpen}
+				onClose={closePicker}
+				anchorRef={cartRef}
+				selectedGame={selectedGame}
+				onPick={setSelectedGame}
+			/>
+			{openMap ? <MapViewer map={openMap} onClose={closeMap} /> : null}
+		</main>
 	);
 }

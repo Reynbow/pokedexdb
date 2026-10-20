@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import "./App.css";
-import CategoryToggle from "./CategoryToggle.jsx";
-import { updatePokemonLocation } from "./utils/url.js";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import Icon, { Cursor } from "./components/Icon.jsx";
+import Sheet from "./components/Sheet.jsx";
+import { TypeTag } from "./pokedex/EntryParts.jsx";
+import { buildPokemonPath, updatePokemonLocation } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
 import { formatPokemonName } from "./utils/pokemonNames.js";
 import { formatMoveName, getMoveGroupKey, titleCaseSlug } from "./utils/moveNames.js";
@@ -11,6 +12,7 @@ import {
   loadMoveEffects,
   loadPokemonList,
 } from "./data/staticData.js";
+import "./styles/pages/moves.css";
 
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 const SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
@@ -22,10 +24,19 @@ const MOVE_TYPES = [
   "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy",
 ];
 const DAMAGE_CLASSES = ["physical", "special", "status"];
+const CATEGORY_LABELS = { physical: "Physical", special: "Special", status: "Status" };
+
+// Same breakpoint as the shell and Sheet: below it the list and the open move take turns.
+const PHONE_QUERY = "(max-width: 900px)";
+const isPhoneLayout = () => typeof window !== "undefined" && Boolean(window.matchMedia?.(PHONE_QUERY).matches);
+
+// History entries this page pushes remember how many steps back the plain list is.
+const BACK_STATE_KEY = "mvBack";
+
+const isPlainLeftClick = (event) =>
+  event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 
 /* ---------------------------------------------------------------- Names */
-
-const formatTypeName = (type) => (type === "unknown" ? "???" : titleCaseSlug(type));
 
 // formatPokemonName drops Mega/Gigantamax tokens because Pokédex cards tag them; spell them out here.
 const FORM_PREFIX_TOKENS = new Map([
@@ -69,7 +80,8 @@ const formatVersionGroup = (name) => VERSION_GROUP_LABELS.get(name) ?? titleCase
 
 const formatGenerationRange = (from, to) => (from === to ? `Gen ${from}` : `Gen ${from}–${to}`);
 const formatAccuracy = (value) => (value == null ? "—" : `${value}%`);
-const formatPriority = (value) => (value > 0 ? `+${value}` : String(value ?? 0));
+const formatPriority = (value) => (value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : "0");
+const formatMoveNo = (value) => (value ? String(value).padStart(3, "0") : "—");
 
 const hideBrokenImage = (event) => {
   event.currentTarget.style.display = "none";
@@ -79,28 +91,30 @@ const hideBrokenSprite = (event) => {
 };
 
 const readSearchParam = (key) => new URLSearchParams(window.location.search).get(key);
+const moveHref = (name) => `?m=${encodeURIComponent(name)}`;
 
 /* ---------------------------------------------------------------- Data hooks */
 
-/** Resolves one of the cached static-data loaders (`null` = don't load yet). */
-function useStaticResource(loader) {
-  const [state, setState] = useState({ data: null, error: null });
+/** Resolves one of the cached static-data loaders (`null` = don't load yet). Bump `attempt` to retry. */
+function useStaticResource(loader, attempt = 0) {
+  const [state, setState] = useState({ data: null, error: null, attempt });
   useEffect(() => {
     if (!loader) return undefined;
     let cancelled = false;
     loader().then(
       (data) => {
-        if (!cancelled) setState({ data, error: null });
+        if (!cancelled) setState({ data, error: null, attempt });
       },
       (error) => {
-        if (!cancelled) setState((previous) => (previous.data ? previous : { data: null, error }));
+        if (!cancelled) setState((previous) => (previous.data ? previous : { data: null, error, attempt }));
       }
     );
     return () => {
       cancelled = true;
     };
-  }, [loader]);
-  return state;
+  }, [loader, attempt]);
+  // A retry in flight reads as loading, not as the previous failure.
+  return state.error && state.attempt !== attempt ? { data: null, error: null, attempt } : state;
 }
 
 // `/move/{name}` responses (flavor text, full effect, learners), shared by the detail and learners panels.
@@ -132,25 +146,25 @@ function fetchMoveDetail(name) {
 
 const IDLE_DETAIL = { data: null, loading: false, error: null };
 
-function useMoveDetail(name) {
-  const [result, setResult] = useState({ name: null, data: null, error: null });
+function useMoveDetail(name, attempt = 0) {
+  const [result, setResult] = useState({ name: null, attempt: 0, data: null, error: null });
   useEffect(() => {
     if (!name) return undefined;
     let cancelled = false;
     fetchMoveDetail(name).then(
       (data) => {
-        if (!cancelled) setResult({ name, data, error: null });
+        if (!cancelled) setResult({ name, attempt, data, error: null });
       },
       (error) => {
-        if (!cancelled) setResult({ name, data: null, error });
+        if (!cancelled) setResult({ name, attempt, data: null, error });
       }
     );
     return () => {
       cancelled = true;
     };
-  }, [name]);
+  }, [name, attempt]);
   if (!name) return IDLE_DETAIL;
-  if (result.name === name) return { data: result.data, loading: false, error: result.error };
+  if (result.name === name && result.attempt === attempt) return { data: result.data, loading: false, error: result.error };
   const cached = moveDetailCache.get(name)?.data;
   if (cached) return { data: cached, loading: false, error: null };
   return { data: null, loading: true, error: null };
@@ -236,6 +250,7 @@ const SIDE_VERSION_GROUPS = new Set([
   "legends-arceus",
 ]);
 const HISTORY_FIELDS = ["type", "damage_class", "power", "accuracy", "pp"];
+const HISTORY_LABELS = { type: "Type", damage_class: "Category", power: "Power", accuracy: "Accuracy", pp: "PP" };
 const sameHistoryStats = (a, b) => HISTORY_FIELDS.every((field) => a?.[field] === b?.[field]);
 
 /**
@@ -308,110 +323,241 @@ function buildMoveHistory(moveData, moveName) {
 
 /* ---------------------------------------------------------------- Small pieces */
 
-function TypeChip({ type }) {
+/** A type tag; Curse's old "???" type gets the neutral tag. */
+function MoveType({ type, size = "", icon = false }) {
+  if (!type) return <span className="mv-none">—</span>;
+  if (type === "unknown") {
+    return <span className={`tag t-unknown${size ? ` tag--${size}` : ""}`}>???</span>;
+  }
+  return <TypeTag typeName={type} size={size} icon={icon} />;
+}
+
+function CategoryIcon({ category }) {
+  if (!category) return null;
   return (
-    <span className={`type-chip type-${type}`}>
-      {type !== "unknown" ? (
-        <img src={getTypeIconUrl(type)} alt="" className="type-icon" loading="lazy" onError={hideBrokenImage} />
-      ) : null}
-      <span className="type-name">{formatTypeName(type)}</span>
-    </span>
+    <img
+      className="mv-cat__icon"
+      src={`/move-categories/${category}.png`}
+      alt={CATEGORY_LABELS[category] || titleCaseSlug(category)}
+      title={CATEGORY_LABELS[category] || titleCaseSlug(category)}
+      width="20"
+      height="16"
+      loading="lazy"
+      decoding="async"
+      onError={hideBrokenImage}
+    />
   );
 }
 
 function CategoryChip({ category }) {
   return (
-    <span className={category ? `move-category-chip move-category-${category}` : "move-category-chip"}>
+    <span className="mv-cat">
       {category ? (
-        <img className="move-meta-icon" src={`/move-categories/${category}.png`} alt="" aria-hidden="true" loading="lazy" />
+        <img
+          className="mv-cat__icon"
+          src={`/move-categories/${category}.png`}
+          alt=""
+          width="20"
+          height="16"
+          loading="lazy"
+          decoding="async"
+          onError={hideBrokenImage}
+        />
       ) : null}
-      {category ? titleCaseSlug(category) : "Unknown"}
+      {category ? CATEGORY_LABELS[category] || titleCaseSlug(category) : "Unknown"}
     </span>
   );
 }
 
 function HistoryValue({ field, value }) {
-  if (field === "type") return value ? <TypeChip type={value} /> : <span className="move-stat-chip">Type: —</span>;
+  if (field === "type") return <MoveType type={value} />;
   if (field === "damage_class") return <CategoryChip category={value} />;
-  if (field === "power") return <span className="move-stat-chip">Power: {value ?? "—"}</span>;
-  if (field === "accuracy") return <span className="move-stat-chip">Accuracy: {formatAccuracy(value)}</span>;
-  return <span className="move-stat-chip">PP: {value ?? "—"}</span>;
+  if (field === "power") return <span className="mv-num">{value ?? "—"}</span>;
+  if (field === "accuracy") return <span className="mv-num">{formatAccuracy(value)}</span>;
+  return <span className="mv-num">{value ?? "—"}</span>;
 }
 
-function StageInfoPanel() {
+/** Type picker: every type as a tag, one at a time (picking the current one clears it). */
+function TypeGrid({ selected, onPick }) {
   return (
-    <div className="effect-window stage-info-panel">
-      <div className="stage-info-header">
-        <h3 className="stage-info-title">Understanding Stat Stages</h3>
-        <p className="stage-info-intro">
+    <div className="mv-types" role="group" aria-label="Type">
+      <button type="button" className="btn btn--sm mv-types__all" aria-pressed={selected == null} onClick={() => onPick(null)}>
+        All types
+      </button>
+      {MOVE_TYPES.map((type) => {
+        const on = selected === type;
+        return (
+          <button
+            key={type}
+            type="button"
+            className={`tag t-${type} mv-type${on ? "" : " tag--off"}`}
+            aria-pressed={on}
+            onClick={() => onPick(on ? null : type)}
+          >
+            <img src={getTypeIconUrl(type)} alt="" loading="lazy" decoding="async" onError={hideBrokenImage} />
+            {type}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CategorySeg({ value, onChange, className = "", labelledBy }) {
+  return (
+    <div
+      className={`seg mv-seg ${className}`.trim()}
+      role="group"
+      aria-label={labelledBy ? undefined : "Category"}
+      aria-labelledby={labelledBy}
+    >
+      <button type="button" className="seg__btn" aria-pressed={value == null} onClick={() => onChange(null)}>
+        All
+      </button>
+      {DAMAGE_CLASSES.map((category) => (
+        <button
+          key={category}
+          type="button"
+          className="seg__btn"
+          aria-pressed={value === category}
+          onClick={() => onChange(value === category ? null : category)}
+        >
+          {CATEGORY_LABELS[category]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function GenerationSelect({ value, onChange, generations, className = "", labelledBy }) {
+  return (
+    <select
+      className={`field__input mv-gen${value ? " is-active" : ""} ${className}`.trim()}
+      value={value ?? ""}
+      aria-label={labelledBy ? undefined : "Introduced in"}
+      aria-labelledby={labelledBy}
+      onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}
+    >
+      <option value="">Any gen</option>
+      {generations.map((generation) => (
+        <option key={generation} value={generation}>
+          New in Gen {generation}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function StageInfo() {
+  return (
+    <details className="win mv-sec mv-stages">
+      <summary className="mv-stages__summary">
+        <h3 className="win__title">How stat stages work</h3>
+        <Icon name="down" className="mv-stages__chevron" />
+      </summary>
+      <div className="win__body mv-stages__body">
+        <p className="mv-prose">
           When moves mention &ldquo;stages,&rdquo; they&rsquo;re referring to in-battle stat modifiers. Each stat&rsquo;s
           stage ranges from <strong>−6</strong> (lowest) to <strong>+6</strong> (highest), and stages reset when the
           Pokémon switches out.
         </p>
-      </div>
 
-      <div className="stage-info-section">
-        <h4 className="stage-info-subtitle">Battle Stats</h4>
-        <p className="stage-info-description">Attack, Defense, Special Attack, Special Defense, and Speed:</p>
-        <div className="stage-info-chips">
-          <div className="stage-info-chip-group">
-            <span className="stage-info-label">Boosts:</span>
-            <div className="stage-info-chip-row">
-              <span className="move-stat-chip positive">+1 stage = 1.5×</span>
-              <span className="move-stat-chip positive">+2 stages = 2×</span>
-              <span className="move-stat-chip positive">+6 stages = 4×</span>
-            </div>
-          </div>
-          <div className="stage-info-chip-group">
-            <span className="stage-info-label">Drops:</span>
-            <div className="stage-info-chip-row">
-              <span className="move-stat-chip negative">−1 stage = 0.67×</span>
-              <span className="move-stat-chip negative">−2 stages = 0.5×</span>
-              <span className="move-stat-chip negative">−6 stages = 0.25×</span>
-            </div>
-          </div>
-        </div>
-      </div>
+        <h4 className="label mv-stages__head">Battle stats</h4>
+        <p className="mv-prose">Attack, Defense, Special Attack, Special Defense, and Speed:</p>
+        <table className="mv-table mv-stages__table">
+          <thead>
+            <tr>
+              <td />
+              <th scope="col">1 stage</th>
+              <th scope="col">2 stages</th>
+              <th scope="col">6 stages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Boosts</th>
+              <td>1.5×</td>
+              <td>2×</td>
+              <td>4×</td>
+            </tr>
+            <tr>
+              <th scope="row">Drops</th>
+              <td>0.67×</td>
+              <td>0.5×</td>
+              <td>0.25×</td>
+            </tr>
+          </tbody>
+        </table>
 
-      <div className="stage-info-section">
-        <h4 className="stage-info-subtitle">Accuracy &amp; Evasion</h4>
-        <p className="stage-info-description">
+        <h4 className="label mv-stages__head">Accuracy &amp; evasion</h4>
+        <p className="mv-prose">
           These also go from −6 to +6 but use a gentler scale. The user&rsquo;s accuracy stage minus the target&rsquo;s
           evasion stage (capped at ±6) multiplies the move&rsquo;s accuracy:
         </p>
-        <div className="stage-info-chips">
-          <div className="stage-info-chip-group">
-            <span className="stage-info-label">Boosts:</span>
-            <div className="stage-info-chip-row">
-              <span className="move-stat-chip positive">+1 stage = 1.33×</span>
-              <span className="move-stat-chip positive">+2 stages = 1.67×</span>
-              <span className="move-stat-chip positive">+6 stages = 3×</span>
-            </div>
-          </div>
-          <div className="stage-info-chip-group">
-            <span className="stage-info-label">Drops:</span>
-            <div className="stage-info-chip-row">
-              <span className="move-stat-chip negative">−1 stage = 0.75×</span>
-              <span className="move-stat-chip negative">−2 stages = 0.6×</span>
-              <span className="move-stat-chip negative">−6 stages = 0.33×</span>
-            </div>
-          </div>
-        </div>
+        <table className="mv-table mv-stages__table">
+          <thead>
+            <tr>
+              <td />
+              <th scope="col">1 stage</th>
+              <th scope="col">2 stages</th>
+              <th scope="col">6 stages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Boosts</th>
+              <td>1.33×</td>
+              <td>1.67×</td>
+              <td>3×</td>
+            </tr>
+            <tr>
+              <th scope="row">Drops</th>
+              <td>0.75×</td>
+              <td>0.6×</td>
+              <td>0.33×</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </div>
+    </details>
+  );
+}
+
+function SkeletonLines({ count = 3 }) {
+  return (
+    <span className="mv-lines" aria-hidden="true">
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} className="skeleton mv-lines__line" />
+      ))}
+    </span>
   );
 }
 
 /* ---------------------------------------------------------------- Page */
 
 export default function MovesPage() {
-  const moveData = useStaticResource(loadMoveData);
-  const moveEffects = useStaticResource(loadMoveEffects);
+  const [dataAttempt, setDataAttempt] = useState(0);
+  const moveData = useStaticResource(loadMoveData, dataAttempt);
+  const moveEffects = useStaticResource(loadMoveEffects, dataAttempt);
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState(null);
   const [selectedDamageClass, setSelectedDamageClass] = useState(null); // 'physical' | 'special' | 'status'
+  const [selectedGeneration, setSelectedGeneration] = useState(null); // generation the move was introduced in
   const [priorityOnly, setPriorityOnly] = useState(false); // true => priority > 0
   const [selectedName, setSelectedName] = useState(() => readSearchParam("m"));
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const [typeOpen, setTypeOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const pageRef = useRef(null);
+  const stripRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const searchRef = useRef(null);
+  const typeButtonRef = useRef(null);
+  const filtersButtonRef = useRef(null);
+  const listScrollYRef = useRef(null); // phone: where the list was when a move opened
+  const lastKeyRef = useRef(null);
+  const previousSelectedRef = useRef(selectedName);
 
   useEffect(() => {
     // The Moves page only carries its own `?m=` param.
@@ -431,16 +577,35 @@ export default function MovesPage() {
     };
   }, []);
 
+  // The list sits under the sticky strip, so publish the strip's height for it.
+  useEffect(() => {
+    const strip = stripRef.current;
+    const page = pageRef.current;
+    if (!strip || !page || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      if (strip.offsetHeight > 0) page.style.setProperty("--mv-strip-h", `${strip.offsetHeight}px`);
+    });
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, []);
+
   const allMoves = useMemo(() => {
     const data = moveData.data;
     if (!data?.moves) return [];
+    // The snapshot lists moves in PokeAPI id order, which is the games' move number.
     return Object.keys(data.moves)
-      .map((name) => ({
+      .map((name, index) => ({
         ...getMoveForVersionGroup(data, name, null),
+        no: index + 1,
         searchKey: `${toSearchKey(name)} ${toSearchKey(formatMoveName(name))}`,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [moveData.data]);
+
+  const generations = useMemo(
+    () => [...new Set(allMoves.map((move) => move.generation).filter(Boolean))].sort((a, b) => a - b),
+    [allMoves]
+  );
 
   const movesByName = useMemo(() => new Map(allMoves.map((move) => [move.name, move])), [allMoves]);
   const selectedMove = (selectedName && movesByName.get(selectedName)) || null;
@@ -452,6 +617,7 @@ export default function MovesPage() {
     for (const move of allMoves) {
       if (selectedType && move.type !== selectedType) continue;
       if (selectedDamageClass && move.damage_class !== selectedDamageClass) continue;
+      if (selectedGeneration && move.generation !== selectedGeneration) continue;
       if (priorityOnly && !(move.priority > 0)) continue;
       if (search && !move.searchKey.includes(search)) continue;
       const key = getMoveGroupKey(move.name);
@@ -463,14 +629,14 @@ export default function MovesPage() {
       // Prefer the plain move; Z-moves only have "--physical"/"--special" variants.
       primary: variants.find((variant) => !variant.name.includes("--")) ?? variants[0],
     })).sort((a, b) => a.key.localeCompare(b.key));
-  }, [allMoves, query, selectedType, selectedDamageClass, priorityOnly]);
+  }, [allMoves, query, selectedType, selectedDamageClass, selectedGeneration, priorityOnly]);
 
   const variantsForSelected = useMemo(
     () => (selectedGroupKey ? allMoves.filter((move) => getMoveGroupKey(move.name) === selectedGroupKey) : []),
     [allMoves, selectedGroupKey]
   );
 
-  const detail = useMoveDetail(selectedMove ? selectedMove.name : null);
+  const detail = useMoveDetail(selectedMove ? selectedMove.name : null, detailAttempt);
   const pokemonList = useStaticResource(selectedMove ? loadPokemonList : null);
   const pokemonById = useMemo(
     () => new Map((pokemonList.data || []).filter((pokemon) => pokemon.id != null).map((pokemon) => [pokemon.id, pokemon])),
@@ -481,331 +647,725 @@ export default function MovesPage() {
     const url = new URL(window.location.href);
     ["p", "i", "a"].forEach((key) => url.searchParams.delete(key));
     if (url.searchParams.get("m") !== name) {
+      // Count the steps back to the plain list, so "back" can return there instead of stacking entries.
+      const depth = url.searchParams.has("m") ? window.history.state?.[BACK_STATE_KEY] : 0;
       url.searchParams.set("m", name);
-      window.history.pushState({}, "", url);
+      window.history.pushState(typeof depth === "number" ? { [BACK_STATE_KEY]: depth + 1 } : {}, "", url);
     }
     setSelectedName(name);
   }, []);
 
-  const resetFilters = () => {
-    setQuery("");
+  const openFromList = useCallback(
+    (name) => {
+      if (isPhoneLayout()) listScrollYRef.current = window.scrollY;
+      selectMove(name);
+    },
+    [selectMove]
+  );
+
+  const backToList = useCallback(() => {
+    const depth = window.history.state?.[BACK_STATE_KEY];
+    if (typeof depth === "number" && depth > 0 && readSearchParam("m")) {
+      window.history.go(-depth);
+      return;
+    }
+    // Opened from a link: there's no list entry behind this one, so add one.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("m");
+    window.history.pushState({}, "", url);
+    setSelectedName(null);
+  }, []);
+
+  // A move opening starts at the top; on phones, closing it returns to where the list was.
+  useLayoutEffect(() => {
+    const previous = previousSelectedRef.current;
+    previousSelectedRef.current = selectedName;
+    if (previous === selectedName) return;
+    if (previous) lastKeyRef.current = getMoveGroupKey(previous);
+    if (selectedName) {
+      if (window.scrollY > 0) window.scrollTo(0, 0);
+      return;
+    }
+    if (!isPhoneLayout()) return;
+    if (listScrollYRef.current != null) {
+      window.scrollTo(0, listScrollYRef.current);
+    } else if (lastKeyRef.current) {
+      const row = listScrollRef.current?.querySelector(`[data-key="${CSS.escape(lastKeyRef.current)}"]`);
+      row?.scrollIntoView({ block: "center" });
+    }
+  }, [selectedName]);
+
+  // Desktop: keep the open move's row in view inside the list (deep links, back/forward).
+  const listReady = groups.length > 0;
+  useEffect(() => {
+    const list = listScrollRef.current;
+    if (!list || !selectedGroupKey || !listReady) return;
+    if (list.scrollHeight <= list.clientHeight + 1) return; // phones: the page scrolls, not the list
+    const row = list.querySelector(`[data-key="${CSS.escape(selectedGroupKey)}"]`);
+    if (!row) return;
+    const listBox = list.getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+    if (rowBox.top >= listBox.top && rowBox.bottom <= listBox.bottom) return;
+    list.scrollTop += rowBox.top - listBox.top - (list.clientHeight - rowBox.height) / 2;
+  }, [selectedGroupKey, listReady]);
+
+  const clearFilters = useCallback(() => {
     setSelectedType(null);
     setSelectedDamageClass(null);
+    setSelectedGeneration(null);
     setPriorityOnly(false);
+  }, []);
+
+  const resetAll = () => {
+    setQuery("");
+    clearFilters();
   };
 
+  const closeType = useCallback(() => setTypeOpen(false), []);
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
+  const retryDetail = useCallback(() => setDetailAttempt((attempt) => attempt + 1), []);
+
+  const activeFilterCount =
+    (selectedType ? 1 : 0) + (selectedDamageClass ? 1 : 0) + (selectedGeneration ? 1 : 0) + (priorityOnly ? 1 : 0);
   const loading = !moveData.data && !moveData.error;
+  // If the move data failed to load there is nothing to open; the list shows the error instead.
+  const open = Boolean(selectedName) && !moveData.error;
+  const resultLabel = `${groups.length.toLocaleString()} ${groups.length === 1 ? "move" : "moves"}`;
+
+  const onSearchKeyDown = (event) => {
+    if (event.key === "Escape" && query) {
+      event.stopPropagation();
+      setQuery("");
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      // Phones: the search key just puts the keyboard away. Desktop: open the top match.
+      if (isPhoneLayout()) event.currentTarget.blur();
+      else if (groups.length > 0) openFromList(groups[0].primary.name);
+    } else if (event.key === "ArrowDown") {
+      const first = listScrollRef.current?.querySelector("a.mv-row");
+      if (first) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
+  const onListKeyDown = (event) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    const item = event.target.closest?.("li");
+    if (!item) return;
+    const next = event.key === "ArrowDown" ? item.nextElementSibling : item.previousElementSibling;
+    const link = next?.querySelector("a.mv-row") || (event.key === "ArrowUp" ? searchRef.current : null);
+    if (!link) return;
+    event.preventDefault();
+    link.focus();
+  };
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="container">
-          <h1 className="title">Moves</h1>
-          <p className="subtitle">Search and explore all Pokemon moves</p>
-          <CategoryToggle />
-          <div className="search-row">
+    <main ref={pageRef} className={`mv${open ? " mv--open" : ""}`}>
+      <div className="mv-strip" ref={stripRef}>
+        <div className="mv-strip__row">
+          <h1 className="mv-strip__title">Moves</h1>
+
+          <label className="field mv-strip__search">
+            <span className="sr-only">Search moves</span>
+            <Icon name="search" />
             <input
-              className="search"
-              placeholder="Search Moves"
-              aria-label="Search moves"
+              ref={searchRef}
+              className="field__input"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              spellCheck="false"
+              placeholder="Search moves"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={onSearchKeyDown}
             />
-            <button type="button" className="reset-button" onClick={resetFilters}>
-              Reset
+            {query ? (
+              <button
+                type="button"
+                className="btn btn--quiet btn--icon btn--sm field__clear"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+              >
+                <Icon name="close" />
+              </button>
+            ) : null}
+          </label>
+
+          <div className="mv-strip__controls">
+            <button
+              ref={typeButtonRef}
+              type="button"
+              className={`btn mv-strip__type${selectedType ? " is-active" : ""}`}
+              aria-haspopup="dialog"
+              aria-expanded={typeOpen}
+              onClick={() => setTypeOpen(true)}
+            >
+              <span className="sr-only">Type: </span>
+              {selectedType ? <MoveType type={selectedType} /> : "All types"}
+              <Icon name="down" className="mv-strip__chevron" />
+            </button>
+            <CategorySeg value={selectedDamageClass} onChange={setSelectedDamageClass} className="mv-strip__seg" />
+            <GenerationSelect
+              value={selectedGeneration}
+              onChange={setSelectedGeneration}
+              generations={generations}
+              className="mv-strip__gen"
+            />
+            <button
+              type="button"
+              className="btn mv-strip__prio"
+              aria-pressed={priorityOnly}
+              title="Moves with increased priority (+1 or higher)"
+              onClick={() => setPriorityOnly((value) => !value)}
+            >
+              Priority
+            </button>
+            {query || activeFilterCount > 0 ? (
+              <button type="button" className="btn btn--quiet btn--sm mv-strip__reset" onClick={resetAll}>
+                Reset
+              </button>
+            ) : null}
+          </div>
+
+          <button
+            ref={filtersButtonRef}
+            type="button"
+            className={`btn mv-strip__filters${activeFilterCount ? " is-active" : ""}`}
+            aria-haspopup="dialog"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen(true)}
+          >
+            <Icon name="filter" />
+            <span className="sr-only">Filters</span>
+            {activeFilterCount ? <span className="mv-strip__badge">{activeFilterCount}</span> : null}
+          </button>
+        </div>
+
+        {activeFilterCount > 0 ? (
+          <ul className="mv-strip__tokens" aria-label="Active filters">
+            {selectedType ? (
+              <li>
+                <button
+                  type="button"
+                  className={`tag t-${selectedType} mv-token`}
+                  onClick={() => setSelectedType(null)}
+                >
+                  {selectedType}
+                  <Icon name="close" />
+                  <span className="sr-only">Remove filter</span>
+                </button>
+              </li>
+            ) : null}
+            {selectedDamageClass ? (
+              <li>
+                <button type="button" className="btn btn--sm mv-token" onClick={() => setSelectedDamageClass(null)}>
+                  {CATEGORY_LABELS[selectedDamageClass]}
+                  <Icon name="close" />
+                  <span className="sr-only">Remove filter</span>
+                </button>
+              </li>
+            ) : null}
+            {selectedGeneration ? (
+              <li>
+                <button type="button" className="btn btn--sm mv-token" onClick={() => setSelectedGeneration(null)}>
+                  New in Gen {selectedGeneration}
+                  <Icon name="close" />
+                  <span className="sr-only">Remove filter</span>
+                </button>
+              </li>
+            ) : null}
+            {priorityOnly ? (
+              <li>
+                <button type="button" className="btn btn--sm mv-token" onClick={() => setPriorityOnly(false)}>
+                  Priority
+                  <Icon name="close" />
+                  <span className="sr-only">Remove filter</span>
+                </button>
+              </li>
+            ) : null}
+            <li>
+              <button type="button" className="btn btn--quiet btn--sm" onClick={clearFilters}>
+                Clear all
+              </button>
+            </li>
+          </ul>
+        ) : null}
+
+        <Sheet open={typeOpen} onClose={closeType} anchorRef={typeButtonRef} label="Move type" width={420}>
+          <div className="popsheet__head">
+            <h2 className="popsheet__title">Type</h2>
+            <button type="button" className="btn btn--quiet btn--icon btn--sm" onClick={closeType} aria-label="Close">
+              <Icon name="close" />
             </button>
           </div>
-          <div className="filters-desktop">
-            <div className="filters-row moves-filters">
-              {/* Type group */}
-              <div className="filter-box-wrap">
-                <div className="filter-box-title">Type</div>
-                <div className="filter-box type-filters">
-                  <button
-                    type="button"
-                    className={`neutral-chip${selectedType == null ? " is-on" : ""}`}
-                    aria-pressed={selectedType == null}
-                    onClick={() => setSelectedType(null)}
-                  >
-                    All
-                  </button>
-                  {MOVE_TYPES.map((t) => {
-                    const isOn = selectedType === t;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        className={`type-chip type-${t}${isOn ? " is-on" : ""}`}
-                        aria-pressed={isOn}
-                        onClick={() => setSelectedType(isOn ? null : t)}
-                      >
-                        <img src={getTypeIconUrl(t)} alt="" className="type-icon" loading="lazy" onError={hideBrokenImage} />
-                        <span className="type-name">{t}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Category group */}
-              <div className="filter-box-wrap">
-                <div className="filter-box-title">Category</div>
-                <div className="filter-box special-filters">
-                  {DAMAGE_CLASSES.map((c) => {
-                    const isOn = selectedDamageClass === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`special-filter-chip${isOn ? " is-on" : ""}`}
-                        aria-pressed={isOn}
-                        onClick={() => setSelectedDamageClass(isOn ? null : c)}
-                      >
-                        {c}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    className={`special-filter-chip${priorityOnly ? " is-on" : ""}`}
-                    aria-pressed={priorityOnly}
-                    title="Moves with increased priority (+1 or higher)"
-                    onClick={() => setPriorityOnly((v) => !v)}
-                  >
-                    priority
-                  </button>
-                </div>
-              </div>
-            </div>
+          <div className="popsheet__body">
+            <TypeGrid
+              selected={selectedType}
+              onPick={(type) => {
+                setSelectedType(type);
+                closeType();
+              }}
+            />
           </div>
-        </div>
-      </header>
-      <main className="container">
-        {moveData.error ? (
-          <div className="list-empty">Failed to load moves.</div>
-        ) : loading ? (
-          <div className="list-empty">Loading moves…</div>
-        ) : groups.length === 0 ? (
-          <div className="list-empty">No moves found.</div>
-        ) : (
-          <section className="content split">
-            <div className="list-panel">
-              <div className="list-scroll">
-                <div className="list items-list">
-                  {groups.map(({ key, primary }) => {
-                    const isSelected = selectedGroupKey === key;
-                    const type = primary.type;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className={`item-row${isSelected ? " is-selected" : ""}${type ? ` move-type-${type}` : ""}`}
-                        onClick={() => selectMove(primary.name)}
-                        aria-pressed={isSelected}
+        </Sheet>
+
+        <Sheet open={filtersOpen} onClose={closeFilters} anchorRef={filtersButtonRef} label="Move filters" width={440} align="end">
+          <div className="popsheet__head">
+            <h2 className="popsheet__title">Filters</h2>
+            <button type="button" className="btn btn--quiet btn--icon btn--sm" onClick={closeFilters} aria-label="Close">
+              <Icon name="close" />
+            </button>
+          </div>
+          <div className="popsheet__body">
+            <section className="mv-fgroup" aria-labelledby="mv-filter-type">
+              <h3 className="label mv-fgroup__head" id="mv-filter-type">
+                Type
+              </h3>
+              <TypeGrid selected={selectedType} onPick={setSelectedType} />
+            </section>
+            <section className="mv-fgroup" aria-labelledby="mv-filter-category">
+              <h3 className="label mv-fgroup__head" id="mv-filter-category">
+                Category
+              </h3>
+              <CategorySeg
+                value={selectedDamageClass}
+                onChange={setSelectedDamageClass}
+                className="mv-fgroup__seg"
+                labelledBy="mv-filter-category"
+              />
+            </section>
+            <section className="mv-fgroup" aria-labelledby="mv-filter-gen">
+              <h3 className="label mv-fgroup__head" id="mv-filter-gen">
+                Introduced
+              </h3>
+              <GenerationSelect
+                value={selectedGeneration}
+                onChange={setSelectedGeneration}
+                generations={generations}
+                labelledBy="mv-filter-gen"
+              />
+            </section>
+            <section className="mv-fgroup" aria-labelledby="mv-filter-priority">
+              <h3 className="label mv-fgroup__head" id="mv-filter-priority">
+                Priority
+              </h3>
+              <button
+                type="button"
+                className="btn mv-fgroup__toggle"
+                aria-pressed={priorityOnly}
+                onClick={() => setPriorityOnly((value) => !value)}
+              >
+                Only moves that go first (+1 or higher)
+              </button>
+            </section>
+          </div>
+          <div className="popsheet__foot">
+            <button type="button" className="btn btn--quiet" onClick={clearFilters} disabled={activeFilterCount === 0}>
+              Clear filters
+            </button>
+            <button type="button" className="btn btn--primary" onClick={closeFilters}>
+              Show {resultLabel}
+            </button>
+          </div>
+        </Sheet>
+      </div>
+
+      <div className="mv-split">
+        <nav className="mv-list" aria-label="Moves">
+          <div className="mv-list__scroll" ref={listScrollRef}>
+            <div className="mv-list__head">
+              <p className="mv-list__count" aria-live="polite">
+                {loading ? (
+                  "Loading moves…"
+                ) : moveData.error ? (
+                  "Moves unavailable"
+                ) : (
+                  <>
+                    <span className="num">{groups.length.toLocaleString()}</span> {groups.length === 1 ? "move" : "moves"}
+                  </>
+                )}
+              </p>
+              <span className="mv-list__col" aria-hidden="true">
+                Pwr
+              </span>
+              <span className="mv-list__col" aria-hidden="true">
+                Acc
+              </span>
+              <span className="mv-list__col" aria-hidden="true">
+                PP
+              </span>
+            </div>
+            {moveData.error ? (
+              <div className="empty mv-list__empty" role="alert">
+                <p className="empty__title">Couldn&rsquo;t load moves</p>
+                <p>Check your connection, then try again.</p>
+                <button type="button" className="btn" onClick={() => setDataAttempt((attempt) => attempt + 1)}>
+                  Try again
+                </button>
+              </div>
+            ) : loading ? (
+              <ol className="mv-rows" aria-hidden="true">
+                {Array.from({ length: 14 }, (_, index) => (
+                  <li key={index}>
+                    <span className="mv-row mv-row--ghost">
+                      <span className="mv-row__name skeleton" />
+                      <span className="mv-row__meta skeleton" />
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : groups.length === 0 ? (
+              <div className="empty mv-list__empty">
+                <p className="empty__title">No moves match</p>
+                <p>
+                  {query && activeFilterCount
+                    ? `Nothing called “${query}” with these filters.`
+                    : query
+                    ? `No move called “${query}”.`
+                    : "No move has all of these filters."}
+                </p>
+                <button type="button" className="btn" onClick={resetAll}>
+                  {query && activeFilterCount ? "Clear search and filters" : query ? "Clear search" : "Clear filters"}
+                </button>
+              </div>
+            ) : (
+              <ol className="mv-rows" onKeyDown={onListKeyDown}>
+                {groups.map(({ key, primary }) => {
+                  const isSelected = selectedGroupKey === key;
+                  return (
+                    <li key={key}>
+                      <a
+                        href={moveHref(primary.name)}
+                        className={`mv-row${isSelected ? " is-selected" : ""}`}
+                        aria-current={isSelected ? "true" : undefined}
+                        data-key={key}
+                        onClick={(event) => {
+                          if (!isPlainLeftClick(event)) return;
+                          event.preventDefault();
+                          openFromList(primary.name);
+                        }}
                       >
-                        {type ? (
-                          <img
-                            src={getTypeIconUrl(type)}
-                            alt=""
-                            className="type-icon type-icon-bg"
-                            loading="lazy"
-                            aria-hidden="true"
-                            onError={hideBrokenImage}
-                          />
-                        ) : null}
-                        <span className="item-name proper-name">{formatMoveName(key)}</span>
-                        {type ? (
-                          <img
-                            src={getTypeIconUrl(type)}
-                            alt={type}
-                            className="type-icon item-type-icon"
-                            loading="lazy"
-                            onError={hideBrokenImage}
-                          />
-                        ) : null}
-                      </button>
-                    );
-                  })}
+                        <Cursor className="mv-row__cursor" />
+                        <span className="mv-row__no" aria-hidden="true">
+                          {formatMoveNo(primary.no)}
+                        </span>
+                        <span className="mv-row__name">{formatMoveName(key)}</span>
+                        <span className="mv-row__meta">
+                          <MoveType type={primary.type} />
+                          <CategoryIcon category={primary.damage_class} />
+                          {primary.priority ? (
+                            <span className="stamp mv-row__prio" title={`Priority ${formatPriority(primary.priority)}`}>
+                              <span className="sr-only">Priority </span>
+                              {formatPriority(primary.priority)}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mv-row__stat mv-row__stat--pwr">
+                          <span className="sr-only">Power </span>
+                          {primary.power ?? "—"}
+                        </span>
+                        <span className="mv-row__stat mv-row__stat--acc">
+                          <span className="sr-only">Accuracy </span>
+                          {primary.accuracy ?? "—"}
+                        </span>
+                        <span className="mv-row__stat mv-row__stat--pp">
+                          <span className="sr-only">PP </span>
+                          {primary.pp ?? "—"}
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+        </nav>
+
+        <div className="mv-detail">
+          {selectedMove ? (
+            <MoveEntry
+              move={selectedMove}
+              moveData={moveData.data}
+              shortEffect={moveEffects.data?.[selectedMove.name] || ""}
+              detail={detail}
+              variants={variantsForSelected}
+              onSelectVariant={selectMove}
+              onBack={backToList}
+              onRetry={retryDetail}
+              pokemonById={pokemonById}
+              pokemonListPending={!pokemonList.data && !pokemonList.error}
+            />
+          ) : selectedName && loading ? (
+            <EntryGhost onBack={backToList} />
+          ) : selectedName && !moveData.error ? (
+            <article className="mv-entry" aria-labelledby="mv-missing-title">
+              <EntryBar onBack={backToList} />
+              <div className="win">
+                <div className="empty">
+                  <h2 className="empty__title" id="mv-missing-title">
+                    No move called &ldquo;{selectedName}&rdquo;
+                  </h2>
+                  <p>The link may be misspelled. Search the list for the move instead.</p>
                 </div>
               </div>
-            </div>
-            <aside className="detail-panel">
-              <div className="detail-inner moves-detail-inner">
-                <MoveDetailPanel
-                  move={selectedMove}
-                  moveData={moveData.data}
-                  shortEffect={selectedMove ? moveEffects.data?.[selectedMove.name] || "" : ""}
-                  detail={detail}
-                  variants={variantsForSelected}
-                  onSelectVariant={selectMove}
-                />
-                <MoveLearnersPanel
-                  key={selectedMove?.name || "none"}
-                  move={selectedMove}
-                  detail={detail}
-                  pokemonById={pokemonById}
-                  pokemonListPending={!pokemonList.data && !pokemonList.error}
-                />
+            </article>
+          ) : (
+            <div className="win mv-detail__empty">
+              <div className="empty">
+                <p className="empty__title">Pick a move</p>
+                <p>See its effect, how it changed between games and which Pokémon learn it.</p>
               </div>
-            </aside>
-          </section>
-        )}
-      </main>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/* ---------------------------------------------------------------- Detail */
+
+function EntryBar({ onBack }) {
+  return (
+    <div className="mv-entry__bar">
+      <button type="button" className="btn btn--quiet mv-entry__back" onClick={onBack}>
+        <Icon name="left" />
+        Moves
+      </button>
     </div>
   );
 }
 
-function MoveDetailPanel({ move, moveData, shortEffect, detail, variants, onSelectVariant }) {
+function EntryGhost({ onBack }) {
+  return (
+    <div className="mv-entry" role="status">
+      <EntryBar onBack={onBack} />
+      <span className="sr-only">Loading move…</span>
+      <div className="mv-ghost" aria-hidden="true">
+        <span className="skeleton mv-ghost__title" />
+        <span className="skeleton mv-ghost__tags" />
+        <span className="skeleton mv-ghost__figures" />
+        <span className="skeleton mv-ghost__block" />
+      </div>
+    </div>
+  );
+}
+
+function MoveEntry({
+  move,
+  moveData,
+  shortEffect,
+  detail,
+  variants,
+  onSelectVariant,
+  onBack,
+  onRetry,
+  pokemonById,
+  pokemonListPending,
+}) {
   const longEffect = useMemo(() => getEnglishEffect(detail.data), [detail.data]);
   const effectLines = useMemo(() => toEffectLines(longEffect, shortEffect), [longEffect, shortEffect]);
   const showStageInfo = useMemo(() => mentionsStatStages(`${shortEffect} ${longEffect}`), [shortEffect, longEffect]);
-  const history = useMemo(() => (move ? buildMoveHistory(moveData, move.name) : null), [moveData, move]);
+  const history = useMemo(() => buildMoveHistory(moveData, move.name), [moveData, move]);
   const flavorEntries = useMemo(
     () => groupFlavorText(detail.data?.flavor_text_entries, moveData?.versionGroups),
     [detail.data, moveData]
   );
 
-  if (!move) {
-    return (
-      <div className="move-detail-frame">
-        <div className="detail-title detail-title-top" style={{ display: "none" }} />
-        <div className="move-hero-container" style={{ display: "none" }}>
-          <div className="detail-hero single-col" />
-        </div>
-      </div>
-    );
-  }
-
-  const otherVariants = variants.filter((variant) => variant.name !== move.name);
+  const showEffect = Boolean(shortEffect) || effectLines.length > 0 || detail.loading;
+  const showFlavor = detail.loading || Boolean(detail.error) || flavorEntries.length > 0;
 
   return (
-    <div className="move-detail-frame">
-      <div className="detail-title detail-title-top">
-        <h2 className="proper-name">{formatMoveName(move.name)}</h2>
+    <article className="mv-entry" aria-labelledby="mv-entry-title">
+      <EntryBar onBack={onBack} />
+
+      <header className="mv-id">
+        <h2 className="mv-id__name" id="mv-entry-title">
+          {formatMoveName(move.name)}
+        </h2>
+        <div className="mv-id__tags">
+          <MoveType type={move.type} size="lg" icon />
+          <CategoryChip category={move.damage_class} />
+        </div>
+        <p className="mv-id__meta">
+          <span className="mv-id__no">No.{formatMoveNo(move.no)}</span>
+          {move.generation ? <span>Introduced in Gen {move.generation}</span> : null}
+        </p>
+      </header>
+
+      <div className="mv-facts">
+        <dl className="mv-figures">
+          <div className="mv-figure">
+            <dt>Power</dt>
+            <dd>{move.power ?? "—"}</dd>
+          </div>
+          <div className="mv-figure">
+            <dt>Accuracy</dt>
+            <dd>{formatAccuracy(move.accuracy)}</dd>
+          </div>
+          <div className="mv-figure">
+            <dt>PP</dt>
+            <dd>{move.pp ?? "—"}</dd>
+          </div>
+          <div className="mv-figure">
+            <dt>Priority</dt>
+            <dd>{formatPriority(move.priority)}</dd>
+          </div>
+        </dl>
+        {history ? (
+          <p className="mv-muted mv-facts__note">Values in the latest games. Older games differ: see Changes by generation.</p>
+        ) : null}
+        {variants.length > 1 ? (
+          <div className="mv-variants">
+            <span className="label" id="mv-variant-label">
+              Form
+            </span>
+            <div className="seg" role="group" aria-labelledby="mv-variant-label">
+              {variants.map((variant) => {
+                const suffix = variant.name.split("--")[1];
+                return (
+                  <button
+                    key={variant.name}
+                    type="button"
+                    className="seg__btn"
+                    aria-pressed={variant.name === move.name}
+                    onClick={() => onSelectVariant(variant.name)}
+                  >
+                    {suffix ? titleCaseSlug(suffix) : formatMoveName(variant.name)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
-      <div className="move-hero-container">
-        <div className="detail-hero single-col">
-          <div className="hero-right">
-            <div className="main-col">
-              <section className="about">
-                <h3 className="list-subheading" style={{ textAlign: "left" }}>Overview</h3>
-                <div className="about-list" style={{ padding: 0 }}>
-                  <div className="about-row">
-                    <div className="label">Type</div>
-                    <div className="value">{move.type ? <TypeChip type={move.type} /> : <span>Unknown</span>}</div>
-                  </div>
 
-                  <div className="about-row">
-                    <div className="label">Category</div>
-                    <div className="value">
-                      <CategoryChip category={move.damage_class} />
-                    </div>
-                  </div>
-
-                  <div className="about-row">
-                    <div className="label">Stats</div>
-                    <div className="value move-stats-group">
-                      <span className="move-stat-chip">Power: {move.power ?? "—"}</span>
-                      <span className="move-stat-chip">Accuracy: {formatAccuracy(move.accuracy)}</span>
-                      <span className="move-stat-chip">PP: {move.pp ?? "—"}</span>
-                      <span className="move-stat-chip">Priority: {formatPriority(move.priority)}</span>
-                    </div>
-                  </div>
-
-                  {move.generation ? (
-                    <div className="about-row">
-                      <div className="label">Introduced</div>
-                      <div className="value">Gen {move.generation}</div>
-                    </div>
-                  ) : null}
-                </div>
-                {otherVariants.length > 0 ? (
-                  <div style={{ marginTop: 10 }}>
-                    <h3 className="list-subheading" style={{ textAlign: "left" }}>Alternate Forms</h3>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {otherVariants.map((variant) => (
-                        <button
-                          key={variant.name}
-                          type="button"
-                          className="neutral-chip"
-                          onClick={() => onSelectVariant(variant.name)}
-                        >
-                          {formatMoveName(variant.name)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </section>
-
-              {shortEffect || effectLines.length > 0 ? (
-                <div className="effect-window">
-                  {shortEffect ? <div className="effect-summary">{shortEffect}</div> : null}
-                  {effectLines.length > 0 ? (
-                    <ul className="effect-list">
-                      {effectLines.map((line, idx) => (
-                        <li key={idx}>{line}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {showStageInfo ? <StageInfoPanel /> : null}
-
-              {history ? (
-                <section className="about">
-                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Changes by Generation</h3>
-                  <div className="about-list" style={{ padding: 0 }}>
-                    {history.rows.map((row, idx) => (
-                      <div className="about-row" key={idx}>
-                        <div className="label">
-                          {formatGenerationRange(row.fromGen, row.toGen)}
-                          {row.games ? (
-                            <span className="move-history-games">{row.games.map(formatVersionGroup).join(", ")}</span>
-                          ) : null}
-                        </div>
-                        <div className="value">
-                          {history.fields.map((field) => (
-                            <HistoryValue key={field} field={field} value={row.stats[field]} />
-                          ))}
-                        </div>
-                      </div>
+      <div className="mv-entry__body">
+        <div className="mv-entry__main">
+          {showEffect ? (
+            <section className="win mv-sec" aria-labelledby="mv-effect-title">
+              <div className="win__head">
+                <h3 className="win__title" id="mv-effect-title">
+                  Effect
+                </h3>
+              </div>
+              <div className="win__body mv-effect">
+                {shortEffect ? <p className="mv-effect__summary">{shortEffect}</p> : null}
+                {effectLines.length > 0 ? (
+                  <ul className="mv-effect__lines">
+                    {effectLines.map((line, idx) => (
+                      <li key={idx}>{line}</li>
                     ))}
-                  </div>
-                  {history.categoryFromType ? (
-                    <p className="move-history-note">
-                      Before Gen 4, a damaging move&rsquo;s category came from its type rather than the move itself.
-                    </p>
-                  ) : null}
-                </section>
-              ) : null}
+                  </ul>
+                ) : detail.loading ? (
+                  <SkeletonLines count={shortEffect ? 2 : 3} />
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
-              {detail.loading ? (
-                <p className="moves-inline-status">Loading game descriptions…</p>
-              ) : detail.error ? (
-                <p className="moves-inline-status">Couldn&rsquo;t load game descriptions from PokeAPI.</p>
-              ) : flavorEntries.length > 0 ? (
-                <section className="about">
-                  <div className="flavor-window">
+          {showStageInfo ? <StageInfo /> : null}
+
+          {history ? (
+            <section className="win mv-sec" aria-labelledby="mv-history-title">
+              <div className="win__head">
+                <h3 className="win__title" id="mv-history-title">
+                  Changes by generation
+                </h3>
+              </div>
+              <div className="win__body">
+                <div className="mv-scroll">
+                  <table className="mv-table mv-history">
+                    <thead>
+                      <tr>
+                        <th scope="col">Games</th>
+                        {history.fields.map((field) => (
+                          <th scope="col" key={field}>
+                            {HISTORY_LABELS[field]}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.rows.map((row, idx) => (
+                        <tr key={idx}>
+                          <th scope="row">
+                            <span className="mv-history__gen">{formatGenerationRange(row.fromGen, row.toGen)}</span>
+                            {row.games ? (
+                              <span className="mv-history__games">{row.games.map(formatVersionGroup).join(", ")}</span>
+                            ) : null}
+                          </th>
+                          {history.fields.map((field) => (
+                            <td key={field}>
+                              <HistoryValue field={field} value={row.stats[field]} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {history.categoryFromType ? (
+                  <p className="mv-muted mv-history__note">
+                    Before Gen 4, a damaging move&rsquo;s category came from its type rather than the move itself.
+                  </p>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {showFlavor ? (
+            <section className="win mv-sec" aria-labelledby="mv-flavor-title">
+              <div className="win__head">
+                <h3 className="win__title" id="mv-flavor-title">
+                  In-game description
+                </h3>
+              </div>
+              <div className="win__body">
+                {detail.loading ? (
+                  <div role="status">
+                    <span className="sr-only">Loading game descriptions…</span>
+                    <SkeletonLines count={3} />
+                  </div>
+                ) : detail.error ? (
+                  <div className="mv-error" role="alert">
+                    <p>Couldn&rsquo;t load game descriptions from PokeAPI.</p>
+                    <button type="button" className="btn btn--sm" onClick={onRetry}>
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <dl className="mv-flavor">
                     {flavorEntries.map((entry) => (
-                      <div key={entry.newest} className="flavor-row">
-                        <div className="flavor-meta">
+                      <div key={entry.newest} className="mv-flavor__row">
+                        <dt>
                           {entry.oldest === entry.newest
                             ? formatVersionGroup(entry.newest)
                             : `${formatVersionGroup(entry.oldest)} – ${formatVersionGroup(entry.newest)}`}
-                        </div>
-                        <div className="flavor-text">{entry.text}</div>
+                        </dt>
+                        <dd>{entry.text}</dd>
                       </div>
                     ))}
-                  </div>
-                </section>
-              ) : null}
-            </div>
-          </div>
+                  </dl>
+                )}
+              </div>
+            </section>
+          ) : null}
         </div>
+
+        <MoveLearners
+          key={move.name}
+          detail={detail}
+          onRetry={onRetry}
+          pokemonById={pokemonById}
+          pokemonListPending={pokemonListPending}
+        />
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -813,7 +1373,7 @@ const goToPokemon = (slug) => {
   if (slug) updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
 };
 
-function MoveLearnersPanel({ move, detail, pokemonById, pokemonListPending }) {
+function MoveLearners({ detail, onRetry, pokemonById, pokemonListPending }) {
   const [visibleCount, setVisibleCount] = useState(LEARNERS_PAGE_SIZE);
 
   const learners = useMemo(() => {
@@ -834,73 +1394,89 @@ function MoveLearnersPanel({ move, detail, pokemonById, pokemonListPending }) {
     return [...byId.values()].sort((a, b) => a.speciesId - b.speciesId || a.id - b.id);
   }, [detail.data, pokemonById]);
 
-  if (!move) {
-    return <aside className="learners-panel" style={{ display: "none" }} />;
-  }
-
   const loading = detail.loading || (pokemonListPending && learners.length > 0);
   const visible = learners.slice(0, visibleCount);
   const remaining = learners.length - visible.length;
 
   return (
-    <aside className="learners-panel">
-      <h4 className="learners-title">
-        Learnt By
-        {!loading && learners.length > 0 ? (
-          <span className="learners-count">({learners.length.toLocaleString()})</span>
-        ) : null}
-      </h4>
-      {loading ? (
-        <div className="learners-empty">Loading</div>
-      ) : detail.error ? (
-        <div className="learners-empty">Failed to load</div>
-      ) : learners.length === 0 ? (
-        <div className="learners-empty">No Pokémon learn this move</div>
-      ) : (
-        <ul className="learners-list" role="list">
-          {visible.map((pokemon) => {
-            const name = formatLearnerName(pokemon.slug);
-            return (
-              <li key={pokemon.id}>
-                <button
-                  type="button"
-                  className="learners-poke-button"
-                  onClick={() => goToPokemon(pokemon.slug)}
-                  title={`Open ${name}`}
-                >
-                  <img
-                    className="learners-poke-sprite"
-                    src={`${SPRITE_BASE}/${pokemon.id}.png`}
-                    alt=""
-                    loading="lazy"
-                    onError={hideBrokenSprite}
-                  />
-                  <span className="label proper-name">{name}</span>
-                  <span className="types-vertical">
-                    {pokemon.types.map((t) => (
-                      <span key={t} className={`type-chip type-${t}`}>
-                        <img src={getTypeIconUrl(t)} alt={t} className="type-icon" loading="lazy" onError={hideBrokenImage} />
-                        <span className="type-name">{t}</span>
-                      </span>
-                    ))}
+    <section className="win mv-sec mv-learners" aria-labelledby="mv-learners-title">
+      <div className="win__head">
+        <h3 className="win__title" id="mv-learners-title">
+          Learnt by
+        </h3>
+        {!loading && learners.length > 0 ? <span className="mv-count num">{learners.length.toLocaleString()}</span> : null}
+      </div>
+      <div className="win__body">
+        {loading ? (
+          <div role="status">
+            <span className="sr-only">Loading Pokémon…</span>
+            <ul className="mv-mons" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, index) => (
+                <li key={index}>
+                  <span className="mv-mon mv-mon--ghost">
+                    <span className="skeleton mv-mon__sprite" />
+                    <span className="skeleton mv-mon__name" />
                   </span>
-                </button>
-              </li>
-            );
-          })}
-          {remaining > 0 ? (
-            <li className="learners-more">
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : detail.error ? (
+          <div className="mv-error" role="alert">
+            <p>Couldn&rsquo;t load which Pokémon learn this move.</p>
+            <button type="button" className="btn btn--sm" onClick={onRetry}>
+              Try again
+            </button>
+          </div>
+        ) : learners.length === 0 ? (
+          <p className="mv-muted">No Pokémon learn this move.</p>
+        ) : (
+          <>
+            <p className="mv-muted mv-learners__note">In at least one game.</p>
+            <ul className="mv-mons">
+              {visible.map((pokemon) => (
+                <li key={pokemon.id}>
+                  <a
+                    className="mv-mon"
+                    href={buildPokemonPath(pokemon.slug)}
+                    onClick={(event) => {
+                      if (!isPlainLeftClick(event)) return;
+                      event.preventDefault();
+                      goToPokemon(pokemon.slug);
+                    }}
+                  >
+                    <img
+                      className="mv-mon__sprite"
+                      src={`${SPRITE_BASE}/${pokemon.id}.png`}
+                      alt=""
+                      width="48"
+                      height="48"
+                      loading="lazy"
+                      decoding="async"
+                      onError={hideBrokenSprite}
+                    />
+                    <span className="mv-mon__name">{formatLearnerName(pokemon.slug)}</span>
+                    <span className="mv-mon__types">
+                      {pokemon.types.map((type) => (
+                        <TypeTag key={type} typeName={type} icon={false} />
+                      ))}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            {remaining > 0 ? (
               <button
                 type="button"
-                className="neutral-chip learners-more-button"
+                className="btn mv-more"
                 onClick={() => setVisibleCount((count) => count + LEARNERS_PAGE_SIZE)}
               >
                 Show {Math.min(LEARNERS_PAGE_SIZE, remaining)} more ({remaining.toLocaleString()} left)
               </button>
-            </li>
-          ) : null}
-        </ul>
-      )}
-    </aside>
+            ) : null}
+          </>
+        )}
+      </div>
+    </section>
   );
 }

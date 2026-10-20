@@ -1,0 +1,605 @@
+/* Abilities: the ability index (search, generation, rows with the effect at a glance) beside the open ability.
+   Phones: the list, then the open ability full screen with a back control. */
+
+.ab {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--s-5) var(--s-7);
+}
+
+/* ---------------------------------------------------------------- Context strip */
+
+.ab-strip {
+  position: sticky;
+  top: var(--bar-h);
+  z-index: calc(var(--z-bar) - 1);
+  margin: 0 calc(var(--s-5) * -1);
+  padding: var(--s-3) var(--s-5);
+  background: var(--screen-0);
+  border-bottom: 1px solid var(--line);
+}
+
+.ab-strip__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+}
+
+.ab-strip__title {
+  flex: none;
+  margin: 0 var(--s-1) 0 0;
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.ab-strip__search {
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+.ab-strip__search .field__input:not(:placeholder-shown) {
+  padding-right: 40px;
+}
+
+/* Generation select: pixel face like the other strip controls */
+.ab-gen {
+  flex: none;
+  width: auto;
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.03em;
+}
+.ab-gen.is-active {
+  border-color: var(--select);
+}
+
+/* ---------------------------------------------------------------- Split */
+
+.ab-split {
+  display: grid;
+  grid-template-columns: var(--list-w) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-5);
+  padding-top: var(--s-4);
+}
+
+/* ---------------------------------------------------------------- Ability list */
+
+/* The list window: frame outside, rows scroll inside the inner rule */
+.ab-list {
+  position: sticky;
+  top: calc(var(--bar-h) + var(--ab-strip-h, 65px) + var(--s-4));
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - var(--bar-h) - var(--ab-strip-h, 65px) - var(--s-4) * 2);
+  padding: 3px;
+  overflow: hidden;
+  background: var(--screen-1);
+  border: 2px solid var(--frame);
+  border-radius: var(--r-3);
+  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line);
+}
+
+.ab-list__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Head and rows share one grid so the Gen label sits over its numbers */
+.ab-list__head,
+.ab-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 2rem;
+  column-gap: var(--s-2);
+}
+
+.ab-list__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-items: baseline;
+  padding: var(--s-2) 12px var(--s-2) 10px;
+  background: var(--screen-1);
+  border-bottom: 1px solid var(--line);
+}
+.ab-list__count {
+  grid-column: 1 / 3;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ab-list__count .num {
+  color: var(--ink);
+  font-size: var(--text-md);
+}
+.ab-list__col {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.ab-rows {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--s-1) var(--s-1) var(--s-2);
+  list-style: none;
+}
+.ab-rows > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
+
+.ab-row {
+  grid-template-areas:
+    "cursor name gen"
+    "cursor effect gen";
+  align-items: center;
+  row-gap: 2px;
+  min-height: 48px;
+  padding: 6px var(--s-2) 6px 6px;
+  border-radius: var(--r-2);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+.ab-row:hover {
+  background: var(--screen-2);
+  color: var(--ink);
+}
+.ab-row:focus-visible {
+  outline: 2px solid var(--select);
+  outline-offset: -2px;
+}
+
+.ab-row__cursor {
+  grid-area: cursor;
+  visibility: hidden;
+  color: var(--select);
+}
+.ab-row:hover .ab-row__cursor,
+.ab-row:focus-visible .ab-row__cursor {
+  visibility: visible;
+}
+
+.ab-row__name {
+  grid-area: name;
+  align-self: end;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.ab-row__effect {
+  grid-area: effect;
+  align-self: start;
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+.ab-row__gen {
+  grid-area: gen;
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Inverse video: the open ability */
+.ab-row.is-selected,
+.ab-row.is-selected:hover {
+  background: var(--select);
+  color: var(--select-ink);
+}
+.ab-row.is-selected .ab-row__effect,
+.ab-row.is-selected .ab-row__gen,
+.ab-row.is-selected .ab-row__cursor {
+  color: var(--select-ink);
+}
+.ab-row.is-selected .ab-row__cursor {
+  visibility: visible;
+}
+.ab-row.is-selected:focus-visible {
+  outline-color: var(--select-ink);
+}
+
+/* Loading ghosts */
+.ab-row--ghost {
+  pointer-events: none;
+}
+.ab-row--ghost .ab-row__name {
+  width: 55%;
+  height: 13px;
+}
+.ab-row--ghost .ab-row__effect {
+  display: block;
+  width: 85%;
+  height: 10px;
+}
+
+.ab-list__empty {
+  padding: var(--s-6) var(--s-4);
+}
+
+/* ---------------------------------------------------------------- Open ability */
+
+.ab-detail {
+  min-width: 0;
+}
+.ab-detail__empty .empty {
+  padding: var(--s-7) var(--s-5);
+}
+
+.ab-entry {
+  container: ab-entry / inline-size;
+  display: grid;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+/* Phone back control (hidden beside the list on desktop) */
+.ab-entry__bar {
+  display: none;
+}
+
+.ab-id {
+  display: grid;
+  gap: var(--s-2);
+}
+.ab-id__name {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.ab-id__meta {
+  margin: 0;
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.03em;
+}
+
+.ab-entry__body {
+  display: grid;
+  gap: var(--s-4);
+  align-items: start;
+}
+
+/* Wide: the Pokémon get their own column */
+@container ab-entry (min-width: 820px) {
+  .ab-entry__body {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  }
+}
+
+/* ---------------------------------------------------------------- Sections */
+
+.ab-sec {
+  min-width: 0;
+}
+.ab-sec .win__head {
+  justify-content: flex-start;
+}
+.ab-count {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+}
+
+.ab-muted {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.ab-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  color: var(--ink-2);
+}
+.ab-error p {
+  margin: 0;
+}
+
+.ab-lines {
+  display: grid;
+  gap: var(--s-2);
+  max-width: 60ch;
+}
+.ab-lines__line {
+  display: block;
+  height: 12px;
+}
+.ab-lines__line:last-child {
+  width: 70%;
+}
+
+/* Effect */
+.ab-effect {
+  display: grid;
+  gap: var(--s-3);
+  max-width: calc(68ch + var(--s-4) * 2);
+}
+.ab-effect__summary {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.ab-effect__lines {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0 0 0 var(--s-4);
+  color: var(--ink-2);
+  line-height: 1.55;
+  list-style: square;
+}
+.ab-effect__lines li::marker {
+  color: var(--frame-strong);
+}
+
+/* Pokémon with this ability */
+.ab-holders__note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+  font-size: var(--text-xs);
+}
+.ab-mons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 2px;
+  margin: 0 calc(var(--s-2) * -1);
+  padding: 0;
+  list-style: none;
+}
+.ab-mons > li {
+  min-width: 0;
+}
+.ab-mon {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-areas:
+    "sprite name"
+    "sprite types";
+  align-items: center;
+  column-gap: var(--s-3);
+  row-gap: 3px;
+  min-height: 56px;
+  padding: 4px var(--s-2);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+.ab-mon:hover {
+  background: var(--screen-2);
+  color: var(--ink);
+}
+.ab-mon:focus-visible {
+  outline-offset: -2px;
+}
+.ab-mon__sprite {
+  grid-area: sprite;
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.ab-mon__name {
+  grid-area: name;
+  align-self: end;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ab-mon__types {
+  grid-area: types;
+  align-self: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.ab-mon__types .tag {
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.6875rem;
+}
+.ab-mon__hidden {
+  height: 18px;
+  font-size: 0.6875rem;
+}
+.ab-mon--ghost {
+  pointer-events: none;
+}
+.ab-mon--ghost .ab-mon__sprite {
+  border-radius: var(--r-2);
+}
+.ab-mon--ghost .ab-mon__name {
+  width: 70%;
+  height: 13px;
+}
+.ab-more {
+  width: 100%;
+  margin-top: var(--s-3);
+}
+
+/* Loading the open ability */
+.ab-ghost {
+  display: grid;
+  gap: var(--s-3);
+}
+.ab-ghost > .skeleton {
+  display: block;
+}
+.ab-ghost__title {
+  width: min(50%, 320px);
+  height: 36px;
+}
+.ab-ghost__meta {
+  width: 160px;
+  height: 14px;
+}
+.ab-ghost__block {
+  height: 180px;
+  border-radius: var(--r-3);
+}
+
+/* ---------------------------------------------------------------- Phone */
+
+@media (max-width: 900px) {
+  .ab {
+    padding: 0 var(--s-4) var(--s-6);
+  }
+
+  .ab-strip {
+    margin: 0 calc(var(--s-4) * -1);
+    padding: var(--s-2) var(--s-4);
+  }
+  .ab-strip__row {
+    flex-wrap: nowrap;
+    gap: var(--s-2);
+  }
+  /* The tab bar already names the page */
+  .ab-strip__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .ab-strip__search {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+  .ab-strip__search .field__input,
+  .ab-gen {
+    min-height: 44px;
+  }
+  .ab-gen {
+    max-width: 40%;
+  }
+  /* The field's clear button and "Any gen" already undo each control */
+  .ab-strip__reset {
+    display: none;
+  }
+
+  .ab-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-top: 0;
+  }
+
+  /* The list is the page: no window, the page scrolls */
+  .ab-list {
+    position: static;
+    display: block;
+    max-height: none;
+    padding: 0;
+    overflow: visible;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .ab-list__scroll {
+    overflow: visible;
+  }
+  .ab-list__head {
+    top: calc(var(--bar-h) + var(--ab-strip-h, 61px));
+    margin: 0 calc(var(--s-4) * -1);
+    padding: var(--s-2) calc(var(--s-4) + 8px) var(--s-2) calc(var(--s-4) + 6px);
+    background: var(--screen-0);
+  }
+  .ab-rows {
+    padding: var(--s-1) 0 var(--s-2);
+  }
+  .ab-rows > li {
+    contain-intrinsic-size: auto 64px;
+  }
+  .ab-row__effect {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  /* List and open ability take turns */
+  .ab--open .ab-strip,
+  .ab--open .ab-list {
+    display: none;
+  }
+  .ab:not(.ab--open) .ab-detail {
+    display: none;
+  }
+
+  .ab-entry {
+    gap: var(--s-3);
+  }
+  .ab-entry__bar {
+    position: sticky;
+    top: var(--bar-h);
+    z-index: calc(var(--z-bar) - 1);
+    display: flex;
+    align-items: center;
+    margin: 0 calc(var(--s-4) * -1);
+    padding: var(--s-2) var(--s-4);
+    background: var(--screen-0);
+    border-bottom: 1px solid var(--line);
+  }
+  .ab-entry__back {
+    min-height: 40px;
+    padding-left: var(--s-2);
+  }
+
+  .ab-id__name {
+    font-size: var(--text-2xl);
+  }
+
+  .ab-detail__empty .empty {
+    padding: var(--s-6) var(--s-4);
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+  .ab-id__name {
+    font-size: var(--text-2xl);
+  }
+}

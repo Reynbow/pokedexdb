@@ -1,0 +1,585 @@
+/* EV Training: the game cartridge, where to train for each stat, a spread plan on stat meters,
+   the EV items and the game's own notes. Phones get one column in the order a player needs it. */
+
+.evt {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--s-5) var(--s-7);
+}
+
+/* ---------------------------------------------------------------- Strip */
+
+.evt-strip__system {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0;
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.evt-strip__system .label {
+  font-size: var(--text-xs);
+}
+
+/* ---------------------------------------------------------------- Columns */
+
+.evt-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 384px;
+  align-items: start;
+  gap: var(--s-5);
+  padding-top: var(--s-5);
+}
+.evt-body:has(> .evt-col--side:empty) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.evt-col {
+  display: grid;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+/* Shared text */
+.evt-list {
+  display: grid;
+  gap: var(--s-2);
+  max-width: 72ch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.evt-list li {
+  position: relative;
+  padding-left: var(--s-4);
+  line-height: 1.55;
+}
+/* A drawn pixel bullet */
+.evt-list li::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  background: var(--frame-strong);
+}
+.evt-note {
+  margin: 0 0 var(--s-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.evt-none {
+  color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------------- No game yet */
+
+.evt-prompt .empty {
+  padding: var(--s-6) var(--s-5);
+}
+.evt-prompt .empty p {
+  max-width: 46ch;
+}
+
+/* ---------------------------------------------------------------- Where to train */
+
+.evt-stats {
+  display: flex;
+  width: 100%;
+  max-width: 560px;
+  margin-bottom: var(--s-4);
+}
+.evt-stats .seg__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 var(--s-1);
+}
+
+.evt-stat + .evt-stat {
+  margin-top: var(--s-5);
+}
+.evt-stat__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-3);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.evt-stat__head::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  border-top: 2px solid var(--frame);
+  border-bottom: 1px solid var(--line);
+  box-sizing: content-box;
+}
+
+/* Map screenshot: lower yield's area on the left, higher on the right */
+.evt-map {
+  position: relative;
+  margin: 0 0 var(--s-2);
+}
+.evt-map__open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: var(--screen-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  cursor: zoom-in;
+  transition: border-color var(--dur-1) var(--ease-out);
+}
+.evt-map__open:hover {
+  border-color: var(--frame-strong);
+}
+.evt-map__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 280px;
+  object-fit: contain;
+}
+.evt-map__zoom {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--screen-0);
+  border: 1px solid var(--frame);
+  border-radius: var(--r-1);
+  color: var(--ink-2);
+}
+.evt-map__open:hover .evt-map__zoom {
+  color: var(--ink);
+  border-color: var(--frame-strong);
+}
+.evt-map__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  background: var(--screen-0);
+  border: 1px solid var(--frame);
+  border-radius: var(--r-1);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+.evt-map__place {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  max-width: calc(100% - 52px);
+  text-align: right;
+}
+.evt-map__yields {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  pointer-events: none;
+}
+
+/* One target: the yield, the species, where, and how many KOs */
+.evt-targets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.evt-target {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  column-gap: var(--s-3);
+  padding: var(--s-3) 0;
+}
+.evt-target + .evt-target {
+  border-top: 1px solid var(--line);
+}
+.evt-target__yield {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  margin: 0;
+  padding-top: 10px;
+}
+.evt-target__num {
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.evt-target__stat {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.evt-target__body {
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.evt-mons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.evt-mon {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.evt-mon__sprite {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.evt-mon__sprite--none {
+  display: inline-block;
+  background: var(--screen-2);
+  border-radius: var(--r-2);
+}
+.evt-mon__name {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.evt-target__where {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.evt-target__where .icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ink-3);
+}
+.evt-target__kos {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.evt-target__kos .num {
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+}
+
+/* ---------------------------------------------------------------- Spread plan */
+
+.evt-meters {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.meter.evt-meter {
+  grid-template-columns: 3.5rem 2.25rem minmax(0, 1fr) 3.5rem;
+  gap: var(--s-2);
+  min-height: 36px;
+}
+.evt-meter .meter__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.evt-meter__cursor {
+  visibility: hidden;
+  color: var(--select);
+}
+.evt-meter.is-focus .evt-meter__cursor {
+  visibility: visible;
+}
+.evt-meter.is-focus .meter__label {
+  color: var(--ink);
+}
+.evt-meter .meter__track {
+  height: 12px;
+}
+.evt-meter .meter__fill {
+  transition: none; /* follows the finger while dragging */
+}
+
+/* The meter is the visual; an invisible range input on top of it does the work */
+.evt-meter__slider {
+  position: relative;
+  display: grid;
+  align-items: center;
+  height: 32px;
+}
+.evt-meter__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.evt-meter__slider:hover .meter__track {
+  border-color: var(--frame-strong);
+}
+.evt-meter__slider:has(.evt-meter__input:focus-visible) .meter__track {
+  outline: 2px solid var(--select);
+  outline-offset: 3px;
+}
+
+.evt-meter__gain {
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.evt-meter--total {
+  margin: var(--s-2) 0 var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+}
+.evt-meter--total .meter__label {
+  padding-left: 14px; /* lines up with the stat names after the cursor column */
+}
+.evt-meter--total .evt-meter__gain {
+  color: var(--ink-2);
+}
+
+/* ---------------------------------------------------------------- EV items */
+
+.evt-items__body {
+  display: grid;
+  gap: var(--s-4);
+}
+.evt-items__group + .evt-items__group {
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.evt-items__title {
+  margin: 0 0 var(--s-1);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.evt-item-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.evt-item {
+  display: grid;
+  grid-template-columns: 8px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  padding: 2px var(--s-2) 2px var(--s-1);
+  border-radius: var(--r-2);
+}
+.evt-item__cursor {
+  visibility: hidden;
+  color: var(--select);
+}
+/* The stat picked under Where to train */
+.evt-item.is-focus {
+  background: var(--select-wash);
+}
+.evt-item.is-focus .evt-item__cursor {
+  visibility: visible;
+}
+.evt-item__icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.evt-item__name {
+  min-width: 0;
+  color: var(--ink);
+}
+.evt-item__effect {
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Grit: icon well, name over effect */
+.evt-item--grit {
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+}
+.evt-item--grit + .evt-item--grit {
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+.evt-item__well {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  background: var(--screen-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+}
+.evt-item--grit .evt-item__icon {
+  width: 64px;
+  height: 64px;
+  max-width: none;
+}
+.evt-item__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.evt-item__text .evt-item__name {
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+.evt-item--grit .evt-item__effect {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+  white-space: normal;
+}
+
+/* ---------------------------------------------------------------- The game's own notes */
+
+.evt-guide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--s-4);
+}
+
+/* ---------------------------------------------------------------- Map viewer */
+
+.evt-viewer {
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 1200px);
+  max-height: 92dvh;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  animation: evt-viewer-in var(--dur-2) var(--ease-out);
+}
+@keyframes evt-viewer-in {
+  from {
+    opacity: 0;
+  }
+}
+.evt-viewer__body {
+  display: grid;
+  place-items: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--s-3);
+  overflow: auto;
+}
+.evt-viewer__body img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(92dvh - 84px);
+  border-radius: var(--r-2);
+}
+
+/* ---------------------------------------------------------------- Phone */
+
+@media (max-width: 900px) {
+  .evt {
+    padding: 0 var(--s-4) var(--s-6);
+  }
+  .evt-strip__system {
+    display: none;
+  }
+
+  /* One column, in the order a player needs it */
+  .evt-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+  }
+  .evt-col {
+    display: contents;
+  }
+  .evt-slot--prompt {
+    order: 0;
+  }
+  .evt-slot--where {
+    order: 1;
+  }
+  .evt-slot--spread {
+    order: 2;
+  }
+  .evt-slot--items {
+    order: 3;
+  }
+  .evt-slot--guide {
+    order: 4;
+  }
+  .evt-slot--basics {
+    order: 5;
+  }
+
+  .evt-guide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-3);
+  }
+
+  .evt-prompt .empty {
+    padding: var(--s-5) var(--s-4);
+  }
+
+  .evt-map__img {
+    max-height: 220px;
+  }
+  .evt-mon__sprite {
+    width: 44px;
+    height: 44px;
+  }
+  .evt-target {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+}

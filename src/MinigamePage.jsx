@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import "./App.css";
-import CategoryToggle from "./CategoryToggle.jsx";
+import "./styles/pages/whos-that.css";
+import Icon, { Cursor } from "./components/Icon.jsx";
 import SpriteImage from "./components/SpriteImage.jsx";
+import { TypeTag } from "./pokedex/EntryParts.jsx";
 import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
 import { formatPokemonName, toTitleCase } from "./utils/pokemonNames.js";
 
@@ -16,7 +17,10 @@ const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const OUTCOME_SOLVED = "solved";
 const OUTCOME_FAILED = "failed";
-const CONFETTI_COLORS = ["#38bdf8", "#fbbf24", "#f472b6", "#34d399", "#a855f7", "#f97316"];
+// Four guesses (steps 1-4); step 5 is the final reveal.
+const GUESS_COUNT = STEP_COUNT - 1;
+// Confetti bits take one of these palette tones (whos-that.css .wt-confetti__bit--N).
+const CONFETTI_TONES = 4;
 
 // Case, accents, punctuation, spaces and ♀/♂ are ignored when comparing names, so "mr mime",
 // "flabebe" and "nidoran f" match "Mr. Mime", "Flabébé" and "Nidoran♀".
@@ -287,20 +291,47 @@ const formatOutcomeSummary = (record) => {
   return cluesUsed === 0 ? "Solved with no clues" : `Solved after ${formatCluesUsed(cluesUsed)}`;
 };
 
-// Green = solved with no clues (best) ... orange = solved after 3 clues, red = not solved.
-const SOLVED_COLORS = [
-  "rgba(34, 197, 94, 0.2)", // green-500 - no clues
-  "rgba(74, 222, 128, 0.2)", // green-400 - 1 clue
-  "rgba(234, 179, 8, 0.2)", // yellow-500 - 2 clues
-  "rgba(249, 115, 22, 0.2)", // orange-500 - 3 clues
-];
-const FAILED_COLOR = "rgba(239, 68, 68, 0.2)"; // red-500
-
-const getCompletionColor = (record) => {
-  if (record?.outcome !== OUTCOME_SOLVED) return FAILED_COLOR;
+// History stamp per result: gold = solved with no clues (best), plain = solved after 1-3 clues,
+// red = not solved.
+const getOutcomeStamp = (record) => {
+  if (record?.outcome !== OUTCOME_SOLVED) return { className: "stamp stamp--red", short: "Missed" };
   const cluesUsed = Math.max(0, (record.solvedAtStep ?? 1) - 1);
-  return SOLVED_COLORS[Math.min(SOLVED_COLORS.length - 1, cluesUsed)];
+  if (cluesUsed === 0) return { className: "stamp stamp--gold", short: "No clues" };
+  return { className: "stamp", short: formatCluesUsed(cluesUsed) };
 };
+
+// Days solved in a row, counting back from today. Today not being played yet doesn't break it.
+const computeStreak = (days) => {
+  let streak = 0;
+  for (let index = 0; index < days.length; index += 1) {
+    const day = days[index];
+    if (day.isCompleted && day.outcome === OUTCOME_SOLVED) {
+      streak += 1;
+    } else if (index === 0 && !day.isCompleted) {
+      continue;
+    } else {
+      break;
+    }
+  }
+  return streak;
+};
+
+// Stamp shown at the start of the dialog message for each feedback type.
+const FEEDBACK_STAMPS = {
+  success: { className: "stamp stamp--gold", label: "Solved" },
+  warning: { className: "stamp stamp--red", label: "Revealed" },
+  error: { className: "stamp stamp--red", label: "Miss" },
+};
+
+// What the dialog says while a day is being played and no feedback message is set.
+const STEP_PROMPTS = {
+  1: "Who's that Pokémon? A wrong or empty guess reveals a clue.",
+  2: "Clue 1 of 3: its type.",
+  3: "Clue 2 of 3: its classification and generation.",
+  4: "Clue 3 of 3: in colour, with height and weight. Last guess!",
+};
+
+const formatDexNo = (pokemonId) => `No.${String(pokemonId).padStart(3, "0")}`;
 
 // Every date from today back to MIN_HISTORY_DATE (newest first), with that day's record if played.
 const buildFullHistory = (records, todayKey) => {
@@ -392,8 +423,8 @@ export default function MinigamePage() {
       left: Math.random() * 100,
       delay: Math.random() * 0.25,
       duration: 1.6 + Math.random() * 0.8,
-      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
-      xOffset: Math.random() * 40 - 20,
+      tone: Math.floor(Math.random() * CONFETTI_TONES),
+      xOffset: Math.random() * 80 - 40,
     }));
     setConfettiPieces(pieces);
     if (confettiTimeoutRef.current) {
@@ -436,11 +467,19 @@ export default function MinigamePage() {
   const nameClueChars = useMemo(() => {
     if (!activePokemon) return null;
     return nameSlots.map(({ char, index }) => {
-      if (index == null) return { char, kind: char.trim() ? "is-letter" : "is-space" };
-      if (isCompleted || revealedLetters[index]) return { char, kind: "is-letter" };
-      return { char: "_", kind: "is-underscore" };
+      if (index == null) return { char, kind: char.trim() ? "mark" : "space" };
+      if (isCompleted || revealedLetters[index]) return { char, kind: "shown" };
+      return { char: "_", kind: "blank" };
     });
   }, [activePokemon, nameSlots, isCompleted, revealedLetters]);
+
+  // The name clue as a screen reader hears it: "7 letters: P blank K blank ..."
+  const nameClueSpoken = useMemo(() => {
+    if (!nameClueChars) return "";
+    const letters = nameClueChars.filter((slot) => slot.kind === "blank" || normalizeName(slot.char));
+    const spoken = nameClueChars.map((slot) => (slot.kind === "blank" ? "blank" : slot.kind === "space" ? "space" : slot.char));
+    return `${letters.length} letters: ${spoken.join(" ")}`;
+  }, [nameClueChars]);
 
   const typeLabel = useMemo(() => {
     if (!activePokemon?.types?.length) return "Unknown";
@@ -449,15 +488,49 @@ export default function MinigamePage() {
 
   const generationLabel = useMemo(() => formatGeneration(activePokemon?.generation), [activePokemon]);
 
-  const hintList = useMemo(() => {
-    if (!activePokemon) return [];
-    const hints = [];
-    if (step >= 2) hints.push({ id: "types", label: "Type", value: typeLabel });
-    if (step >= 3) {
-      hints.push({ id: "classification", label: "Classification", value: activePokemon.classification || "Unknown" });
-      hints.push({ id: "generation", label: "Generation", value: generationLabel });
-    }
-    return hints;
+  // Every clue has a slot from the start; each unlocks at its step (after guess `after`).
+  const clueItems = useMemo(() => {
+    const types = activePokemon?.types || [];
+    return [
+      {
+        id: "types",
+        label: "Type",
+        after: 1,
+        unlocked: Boolean(activePokemon) && step >= 2,
+        value:
+          types.length > 0 ? (
+            <span className="wt-clue__types">
+              {types.map((type) => (
+                <TypeTag key={type} typeName={type} />
+              ))}
+            </span>
+          ) : (
+            typeLabel
+          ),
+      },
+      {
+        id: "classification",
+        label: "Classification",
+        after: 2,
+        unlocked: Boolean(activePokemon) && step >= 3,
+        value: activePokemon?.classification || "Unknown",
+      },
+      { id: "generation", label: "Generation", after: 2, unlocked: Boolean(activePokemon) && step >= 3, value: generationLabel },
+      {
+        id: "height",
+        label: "Height",
+        after: 3,
+        unlocked: Boolean(activePokemon) && step >= STEP_COUNT - 1,
+        value: formatHeight(activePokemon?.height),
+      },
+      {
+        id: "weight",
+        label: "Weight",
+        after: 3,
+        unlocked: Boolean(activePokemon) && step >= STEP_COUNT - 1,
+        value: formatWeight(activePokemon?.weight),
+      },
+    ];
   }, [activePokemon, step, typeLabel, generationLabel]);
 
   const markCompletion = useCallback(
@@ -558,6 +631,7 @@ export default function MinigamePage() {
   const totalHistory = fullHistory.length;
   const solvedCount = fullHistory.filter((entry) => entry.isCompleted && entry.outcome === OUTCOME_SOLVED).length;
   const failedCount = fullHistory.filter((entry) => entry.isCompleted && entry.outcome !== OUTCOME_SOLVED).length;
+  const streak = useMemo(() => computeStreak(fullHistory), [fullHistory]);
   const hasHistory = totalHistory > 0;
 
   const getHistoryPokemonName = (entry) => {
@@ -567,292 +641,331 @@ export default function MinigamePage() {
   };
 
   const guessDisabled = !activePokemon || isCompleted;
-  const revealDetailsStep = STEP_COUNT - 1;
-  const showRevealDetails = step >= revealDetailsStep;
   const showFinalReveal = step >= STEP_COUNT;
   const headerTitle = "Who's That Pokémon?";
-  const isPixelatedSprite = step <= 1;
+  // Steps 1-3 show a silhouette; step 4 (the last guess) and the final reveal show the Pokémon.
   const isHiddenSprite = step <= 3;
-  const spriteClassName = [
-    "minigame-sprite",
-    isPixelatedSprite ? "is-pixelated" : "",
-    isHiddenSprite ? "is-hidden" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const spriteWrapperClassName = [
-    "minigame-sprite-wrapper",
-    isPixelatedSprite ? "is-pixelated" : "",
-    isHiddenSprite ? "is-hidden" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const isToday = dailyKey === todayKey;
+
+  let stepLabel = `Guess ${Math.min(step, GUESS_COUNT)} of ${GUESS_COUNT}`;
+  if (isCompleted) stepLabel = isSolved ? "Solved" : "Revealed";
+  else if (loading) stepLabel = "Loading";
+  else if (error) stepLabel = "No signal";
+
+  // One pip per guess: used, the current guess, the winning guess, or not reached.
+  const solvedAtStep = isSolved ? currentRecord?.solvedAtStep ?? null : null;
+  const pips = Array.from({ length: GUESS_COUNT }, (_, index) => {
+    const guessNumber = index + 1;
+    if (isCompleted) {
+      if (solvedAtStep == null) return "used";
+      return guessNumber < solvedAtStep ? "used" : guessNumber === solvedAtStep ? "hit" : "idle";
+    }
+    return guessNumber < step ? "used" : guessNumber === step ? "current" : "idle";
+  });
+
+  let dialogMessage = shownFeedback;
+  if (!dialogMessage) {
+    if (loading) dialogMessage = "Loading a mystery Pokémon…";
+    else if (error) dialogMessage = "The mystery Pokémon didn't load.";
+    else dialogMessage = STEP_PROMPTS[step] || STEP_PROMPTS[1];
+  }
+  const feedbackStamp = shownFeedback ? FEEDBACK_STAMPS[shownFeedbackType] || null : null;
+
+  const statusText = isCompleted
+    ? `${isSolved ? "Completed" : "Revealed"} ${formatHistoryTimestamp(currentRecord.completedAt)} · ${formatOutcomeSummary(currentRecord)}`
+    : "Not completed yet";
 
   return (
-    <div className="minigame-page">
-      <div className="container">
-        <CategoryToggle />
-        <div className="minigame-card" role="main">
-          <header className="minigame-header">
-            <h1>{headerTitle}</h1>
-          </header>
+    <main className="wt">
+      <header className="wt-head">
+        <div className="wt-head__text">
+          <h1 className="wt-title">{headerTitle}</h1>
+          <p className="wt-intro">Name the daily mystery Pokémon from its silhouette. A new one appears at midnight UTC.</p>
+        </div>
 
-          <div className="minigame-status-row">
-            <span className="minigame-status-date">
-              {dailyKey === todayKey ? "Daily Challenge" : "Challenge"} • {formatHistoryDate(dailyKey)}
-              {dailyKey !== todayKey && (
-                <button
-                  type="button"
-                  className="minigame-status-button"
-                  onClick={() => loadGameForDate(todayKey)}
-                  style={{ marginLeft: "8px", fontSize: "0.875rem" }}
-                >
-                  Back to Today
-                </button>
-              )}
+        <div className="wt-days" role="group" aria-label="Choose a day">
+          <button
+            type="button"
+            className="btn btn--icon wt-days__step"
+            onClick={() => loadGameForDate(previousDateKey)}
+            disabled={!previousDateKey}
+            aria-label="Previous date"
+            title="Previous date"
+          >
+            <Icon name="left" />
+          </button>
+          <p className="wt-days__date">
+            <span className="wt-days__day">
+              {isToday ? "Today" : "Daily"} · {formatHistoryDate(dailyKey)}
             </span>
-            <div className="minigame-status-controls">
-              <span className={`minigame-status-indicator${isSolved ? " is-complete" : ""}`}>
-                <span className="minigame-status-dot" aria-hidden="true"></span>
-                {isCompleted
-                  ? `${isSolved ? "Completed" : "Revealed"} ${formatHistoryTimestamp(currentRecord.completedAt)}`
-                  : "Not completed yet"}
-              </span>
-              <button type="button" className="minigame-status-button" onClick={handleHistoryToggle}>
-                {showHistory ? "Hide History" : "View History"}
-              </button>
-            </div>
+          </p>
+          <button
+            type="button"
+            className="btn btn--icon wt-days__step"
+            onClick={() => loadGameForDate(nextDateKey)}
+            disabled={!nextDateKey}
+            aria-label="Next date"
+            title="Next date"
+          >
+            <Icon name="right" />
+          </button>
+          {!isToday && (
+            <button type="button" className="btn btn--sm wt-days__today" onClick={() => loadGameForDate(todayKey)}>
+              Back to today
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div className="wt-game">
+        <section className="win wt-screen" aria-label="Mystery Pokémon">
+          <div className="wt-screen__head">
+            <p className="wt-screen__step">{stepLabel}</p>
+            <span className="wt-pips" aria-hidden="true">
+              {pips.map((state, index) => (
+                <span key={index} className={`wt-pip wt-pip--${state}`} />
+              ))}
+            </span>
           </div>
 
-          <div className={`minigame-stage step-${step}`}>
+          <div className={`wt-stage${activePokemon ? " is-on" : ""}${isHiddenSprite ? " is-silhouette" : ""}`}>
             {confettiPieces.length > 0 && (
-              <div className="minigame-confetti" aria-hidden="true">
+              <div className="wt-confetti" aria-hidden="true">
                 {confettiPieces.map((piece, idx) => (
                   <span
                     key={idx}
-                    className="minigame-confetti-piece"
+                    className={`wt-confetti__bit wt-confetti__bit--${piece.tone}`}
                     style={{
                       left: `${piece.left}%`,
                       animationDelay: `${piece.delay}s`,
                       animationDuration: `${piece.duration}s`,
-                      backgroundColor: piece.color,
-                      transform: `translate3d(0, 0, 0)`,
-                      "--confetti-x": `${piece.xOffset}vw`,
+                      "--confetti-x": `${piece.xOffset}px`,
                     }}
-                  ></span>
+                  />
                 ))}
               </div>
             )}
 
             {loading ? (
-              <div className="minigame-loader" aria-live="polite">
-                Loading a mystery Pokémon...
-              </div>
+              <span className="skeleton wt-stage__ghost" aria-hidden="true" />
             ) : error ? (
-              <div className="minigame-error" role="alert">
+              <div className="empty wt-stage__error" role="alert">
+                <p className="empty__title">Couldn&apos;t load the Pokémon</p>
                 <p>{error}</p>
-                <button type="button" onClick={handleRetry} className="minigame-button">
-                  Try Again
+                <button type="button" onClick={handleRetry} className="btn">
+                  Try again
                 </button>
               </div>
             ) : (
-              <div className="minigame-stage-content" aria-live="polite">
-                {hintList.length > 0 && (
-                  <div className="minigame-stage-hints is-floating">
-                    <span className="minigame-stage-hints-title">Clues</span>
-                    <div className="minigame-stage-hints-list">
-                      {hintList.map((hint) => (
-                        <div key={hint.id} className="minigame-stage-pill">
-                          <span className="minigame-stage-pill-label">{hint.label}</span>
-                          <span className="minigame-stage-pill-value">{hint.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {nameClueChars && nameClueChars.length > 0 && (
-                  <div className="minigame-name-clue">
-                    <span className="minigame-name-clue-title">Name</span>
-                    <div className="minigame-name-clue-content">
-                      {nameClueChars.map(({ char, kind }, index) => (
-                        <span key={index} className={`minigame-name-clue-char ${kind}`}>
-                          {char}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="minigame-stage-center">
-                  <div className={spriteWrapperClassName}>
-                    <SpriteImage
-                      id={activePokemon.id}
-                      alt={showFinalReveal ? displayName : "Silhouette of a mystery Pokémon"}
-                      className={spriteClassName}
-                      variant="home"
-                      width={256}
-                      height={256}
-                      loading="lazy"
-                      draggable="false"
-                      onContextMenu={(e) => e.preventDefault()}
-                      onDragStart={(e) => e.preventDefault()}
-                    />
-                  </div>
-                </div>
-              </div>
+              <span className="wt-art">
+                <SpriteImage
+                  id={activePokemon.id}
+                  alt={showFinalReveal ? displayName : "Silhouette of a mystery Pokémon"}
+                  className="wt-sprite"
+                  variant="home"
+                  width={256}
+                  height={256}
+                  loading="lazy"
+                  draggable="false"
+                  onContextMenu={(e) => e.preventDefault()}
+                  onDragStart={(e) => e.preventDefault()}
+                />
+              </span>
             )}
           </div>
 
-          <div className="minigame-progress" aria-hidden="true">
-            {Array.from({ length: STEP_COUNT }, (_, index) => {
-              const current = index + 1;
-              const status = current === step ? "current" : current < step ? "complete" : "upcoming";
-              return <span key={current} className={`minigame-progress-dot ${status}`} />;
-            })}
-          </div>
+          {nameClueChars && nameClueChars.length > 0 ? (
+            <p className="wt-name">
+              <span className="sr-only">Name: {nameClueSpoken}</span>
+              <span className="wt-name__slots" aria-hidden="true">
+                {nameClueChars.map(({ char, kind }, index) => (
+                  <span key={index} className={`wt-name__ch wt-name__ch--${kind}`}>
+                    {kind === "blank" ? "" : char}
+                  </span>
+                ))}
+              </span>
+            </p>
+          ) : (
+            <p className="wt-name" aria-hidden="true">
+              <span className="skeleton wt-name__ghost" />
+            </p>
+          )}
 
-          <form className="minigame-guess-form" onSubmit={handleGuessSubmit}>
-            <div className="minigame-nav-container">
-              <button
-                type="button"
-                className="minigame-nav-button"
-                onClick={() => loadGameForDate(previousDateKey)}
-                disabled={!previousDateKey}
-                aria-label="Previous date"
-                title="Previous date"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                className="minigame-nav-button"
-                onClick={() => loadGameForDate(nextDateKey)}
-                disabled={!nextDateKey}
-                aria-label="Next date"
-                title="Next date"
-              >
-                →
-              </button>
-            </div>
+          <p className="wt-screen__status">{statusText}</p>
+        </section>
+
+        <div className="dialog wt-dialog">
+          <p className="wt-dialog__text" aria-live="polite">
+            {feedbackStamp ? <span className={`${feedbackStamp.className} wt-dialog__stamp`}>{feedbackStamp.label}</span> : null}
+            {dialogMessage}
+            {isCompleted ? <Icon name="down" className="dialog__caret wt-dialog__caret" /> : null}
+          </p>
+          <form className="wt-guess" onSubmit={handleGuessSubmit}>
+            <label className="sr-only" htmlFor="wt-guess-input">
+              Guess the Pokémon
+            </label>
             <input
-              className="minigame-guess-input"
+              id="wt-guess-input"
+              className="field__input wt-guess__input"
               type="text"
               placeholder={isCompleted ? (isSolved ? "Solved for today" : "Answer revealed") : "Enter Pokémon name"}
               value={guess}
               onChange={(event) => setGuess(event.target.value)}
               disabled={guessDisabled}
-              aria-label="Guess the Pokémon"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="go"
             />
-            <button type="submit" className="minigame-guess-button" disabled={guessDisabled}>
-              {isCompleted ? (isSolved ? "Solved" : "Revealed") : "Submit Guess"}
+            <button type="submit" className="btn btn--primary wt-guess__btn" disabled={guessDisabled}>
+              {isCompleted ? (isSolved ? "Solved" : "Revealed") : "Guess"}
             </button>
           </form>
+        </div>
 
-          {shownFeedback && <div className={`minigame-feedback ${shownFeedbackType}`}>{shownFeedback}</div>}
-
-          {activePokemon ? (
-            <>
-              {isCompleted && (
-                <div className="minigame-success-summary">
-                  <span>{formatOutcomeSummary(currentRecord)}</span>
-                </div>
-              )}
-
-              {showRevealDetails && (
-                <section className="minigame-reveal" aria-live="polite">
-                  <div className="minigame-reveal-grid">
-                    <div>
-                      <span className="minigame-reveal-label">Height</span>
-                      <span className="minigame-reveal-value">{formatHeight(activePokemon.height)}</span>
-                    </div>
-                    <div>
-                      <span className="minigame-reveal-label">Weight</span>
-                      <span className="minigame-reveal-value">{formatWeight(activePokemon.weight)}</span>
-                    </div>
-                    <div>
-                      <span className="minigame-reveal-label">Type</span>
-                      <span className="minigame-reveal-value">{typeLabel}</span>
-                    </div>
-                    <div>
-                      <span className="minigame-reveal-label">Generation</span>
-                      <span className="minigame-reveal-value">{generationLabel}</span>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {showHistory && (
-                <section className="minigame-history" aria-live="polite">
-                  <div className="minigame-history-header">
-                    <h3>Game History</h3>
-                    <span className="minigame-history-count">
-                      {solvedCount} of {totalHistory} solved
-                      {failedCount > 0 ? ` · ${failedCount} missed` : ""}
-                    </span>
-                  </div>
-                  {hasHistory ? (
-                    <ul className="minigame-history-list">
-                      {fullHistory.map((entry) => {
-                        const entryCompleted = entry.isCompleted;
-                        const pokemonName = getHistoryPokemonName(entry);
-                        const completionColor = entryCompleted ? getCompletionColor(entry) : null;
-                        return (
-                          <li
-                            key={entry.date}
-                            className={`minigame-history-entry${!entryCompleted ? " is-uncompleted" : ""}`}
-                            style={completionColor ? { backgroundColor: completionColor } : undefined}
-                          >
-                            <div className="minigame-history-entry-primary">
-                              <span className="minigame-history-name">{pokemonName}</span>
-                              <span className="minigame-history-date">{formatHistoryDate(entry.date)}</span>
-                            </div>
-                            {entryCompleted && entry.pokemonId != null && (
-                              <div className="minigame-history-entry-sprite">
-                                <SpriteImage
-                                  id={entry.pokemonId}
-                                  alt={pokemonName}
-                                  variant="home"
-                                  width={64}
-                                  height={64}
-                                  loading="lazy"
-                                  draggable="false"
-                                  onContextMenu={(e) => e.preventDefault()}
-                                  onDragStart={(e) => e.preventDefault()}
-                                />
-                              </div>
-                            )}
-                            <div className="minigame-history-entry-meta">
-                              {entryCompleted && entry.pokemonId != null && (
-                                <span className="minigame-history-id">ID #{entry.pokemonId}</span>
-                              )}
-                              {entryCompleted ? (
-                                <span className="minigame-history-time">{formatOutcomeSummary(entry)}</span>
-                              ) : (
-                                <>
-                                  <span className="minigame-history-time">Not completed</span>
-                                  <button
-                                    type="button"
-                                    className="minigame-history-play-button"
-                                    onClick={() => loadGameForDate(entry.date)}
-                                    aria-label={`Play game from ${formatHistoryDate(entry.date)}`}
-                                  >
-                                    Play
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
+        <section className="win wt-clues" aria-labelledby="wt-clues-title">
+          <div className="win__head">
+            <h2 className="win__title" id="wt-clues-title">
+              Clues
+            </h2>
+          </div>
+          <dl className="win__body wt-clues__list" aria-live="polite">
+            {clueItems.map((item) => (
+              <div key={item.id} className={`wt-clue${item.unlocked ? "" : " is-locked"}`}>
+                <dt className="wt-clue__label">{item.label}</dt>
+                <dd className="wt-clue__value">
+                  {item.unlocked ? (
+                    item.value
                   ) : (
-                    <div className="minigame-history-empty">No game history available.</div>
+                    <>
+                      <span aria-hidden="true">???</span>
+                      <span className="sr-only">Revealed after guess {item.after}</span>
+                    </>
                   )}
-                </section>
-              )}
-            </>
-          ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <div className="wt-score">
+          <dl className="wt-score__list">
+            <div className="wt-score__item">
+              <dt>Solved</dt>
+              <dd>
+                <span className="wt-score__num">{solvedCount}</span>
+                <span className="wt-score__of">/{totalHistory}</span>
+              </dd>
+            </div>
+            <div className="wt-score__item">
+              <dt>Missed</dt>
+              <dd>
+                <span className="wt-score__num">{failedCount}</span>
+              </dd>
+            </div>
+            <div className="wt-score__item" title="Days solved in a row">
+              <dt>Streak</dt>
+              <dd>
+                <span className="wt-score__num">{streak}</span>
+              </dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            className="btn btn--sm wt-score__history"
+            onClick={handleHistoryToggle}
+            aria-expanded={showHistory}
+            aria-controls={showHistory ? "wt-history" : undefined}
+          >
+            {showHistory ? "Hide history" : "View history"}
+            <Icon name={showHistory ? "up" : "down"} />
+          </button>
         </div>
       </div>
-    </div>
+
+      {showHistory && (
+        <section id="wt-history" className="win wt-history" aria-labelledby="wt-history-title">
+          <div className="win__head">
+            <h2 className="win__title" id="wt-history-title">
+              Game history
+            </h2>
+            <p className="wt-history__count">
+              {solvedCount} of {totalHistory} solved
+              {failedCount > 0 ? ` · ${failedCount} missed` : ""}
+            </p>
+          </div>
+          <div className="win__body">
+            {hasHistory ? (
+              <ul className="wt-history__list">
+                {fullHistory.map((entry) => {
+                  const entryCompleted = entry.isCompleted;
+                  const pokemonName = getHistoryPokemonName(entry);
+                  const isCurrent = entry.date === dailyKey;
+                  const outcomeStamp = entryCompleted ? getOutcomeStamp(entry) : null;
+                  return (
+                    <li
+                      key={entry.date}
+                      className={`wt-day${isCurrent ? " is-current" : ""}${entryCompleted ? "" : " is-unplayed"}`}
+                      aria-current={isCurrent ? "date" : undefined}
+                    >
+                      <Cursor className="wt-day__cursor" />
+                      <span className="wt-day__sprite" aria-hidden="true">
+                        {entryCompleted && entry.pokemonId != null ? (
+                          <SpriteImage
+                            id={entry.pokemonId}
+                            alt=""
+                            className="wt-day__img"
+                            variant="home"
+                            width={64}
+                            height={64}
+                            loading="lazy"
+                            draggable="false"
+                            onContextMenu={(e) => e.preventDefault()}
+                            onDragStart={(e) => e.preventDefault()}
+                          />
+                        ) : null}
+                      </span>
+                      <span className="wt-day__name">
+                        {pokemonName}
+                        {entryCompleted && entry.pokemonId != null ? (
+                          <span className="wt-day__no">{formatDexNo(entry.pokemonId)}</span>
+                        ) : null}
+                      </span>
+                      <span className="wt-day__date">{formatHistoryDate(entry.date)}</span>
+                      <span className="wt-day__outcome">
+                        {outcomeStamp ? (
+                          <span className={outcomeStamp.className} title={formatOutcomeSummary(entry)}>
+                            <span aria-hidden="true">{outcomeStamp.short}</span>
+                            <span className="sr-only">{formatOutcomeSummary(entry)}</span>
+                          </span>
+                        ) : (
+                          <>
+                            <span className="wt-day__pending">Not completed</span>
+                            <button
+                              type="button"
+                              className="btn btn--sm wt-day__play"
+                              onClick={() => loadGameForDate(entry.date)}
+                              aria-label={`Play game from ${formatHistoryDate(entry.date)}`}
+                            >
+                              <Icon name="play" />
+                              Play
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="empty">
+                <p className="empty__title">No game history available.</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+    </main>
   );
 }
