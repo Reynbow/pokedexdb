@@ -1,12 +1,9 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import "./App.css";
 import SpriteImage from "./components/SpriteImage.jsx";
 import CategoryToggle from "./CategoryToggle.jsx";
-import { getTypeIconUrl } from "./utils/typeIcons.js";
 import { buildPokemonPath, getBasePath } from "./utils/url.js";
-import gen1TypeMapData from "./data/gen1-types.json";
-import gen1TypeChartData from "./data/gen1-type-chart.json";
-import parseLazarusSavFile, { normalizeSpeciesSlug } from "./utils/lazarusSave.js";
+import { normalizeSpeciesSlug } from "./utils/lazarusSave.js";
 import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
 
 // Generation 1 Pokemon names (Pokemon Yellow has 151 Pokemon)
@@ -41,6 +38,13 @@ const GEN1_POKEMON_NAMES = [
 const GEN1_SLUG_TO_POKEDEX_ID = new Map(
   GEN1_POKEMON_NAMES.map((slug, index) => [slug, index + 1])
 );
+// Names whose slug doesn't title-case cleanly.
+const GEN1_DISPLAY_NAME_OVERRIDES = new Map([
+  ["nidoran-f", "Nidoran\u2640"],
+  ["nidoran-m", "Nidoran\u2642"],
+  ["farfetchd", "Farfetch\u2019d"],
+  ["mr-mime", "Mr. Mime"],
+]);
 
 const LAZARUS_SPRITE_OVERRIDES = new Map([
   ["hisuian-decidueye", "10244"],
@@ -126,65 +130,68 @@ const LAZARUS_SPRITE_OVERRIDES = new Map([
   ["ogerpon-wellspring", "10273"],
 ]);
 
-// Pokemon Yellow save file offsets
-// According to Bulbapedia: https://bulbapedia.bulbagarden.net/wiki/Save_data_structure_(Generation_I)
-// The save file is 32KB divided into 4 banks of 8KB each
-// Bank 1 (main data) starts at 0x2000
-// Bulbapedia lists these offsets relative to Bank 1, so we derive both the absolute
-// position and the copy stored at the mirrored backup bank.
-// Common offsets (absolute in the SRAM layout):
-// - 0x25A3: US Yellow Pokedex owned (caught) bitfield (19 bytes)
-// - 0x25B6: US Yellow Pokedex seen bitfield (19 bytes)
-// Some emulators may save without bank structure, so we try both absolute and bank-relative offsets
-const BANK1_START = 0x2000;
-const MAIN_POKEDEX_OWNED_OFFSET = 0x25A3;
-const BACKUP_POKEDEX_OWNED_OFFSET = MAIN_POKEDEX_OWNED_OFFSET - BANK1_START; // 0x05A3
+// Gen 1 (English Red/Blue/Yellow) save layout, verified against Bulbapedia
+// "Save data structure (Generation I)" and pret/pokeyellow ram/sram.asm.
+// Pokemon Yellow Legacy keeps the same layout: it removes 78 unused bytes from the
+// main data block but grows the bag by the same amount (BAG_ITEM_CAPACITY 20 -> 59).
+// - The file is 32 KiB (0x8000): four 8 KiB banks. Bank 0 is scratch + Hall of Fame,
+//   bank 1 (0x2000) is the main data, banks 2-3 hold PC boxes. There is no backup copy.
+// - 0x25A3: Pokedex owned flags, 19 bytes, bit (n - 1) for dex number n, LSB first.
+// - 0x2F2C: party list (count, 6 species + 0xFF, 6 x 44-byte mons, OT names, nicknames).
+// - 0x3523: checksum = bitwise NOT of the 8-bit sum of bytes 0x2598..0x3522.
+const GEN1_SAVE_SIZE = 0x8000;
+const GEN1_CHECKSUM_START = 0x2598;
+const GEN1_CHECKSUM_END = 0x3522; // inclusive
+const GEN1_CHECKSUM_OFFSET = 0x3523;
+const GEN1_POKEDEX_OWNED_OFFSET = 0x25A3;
 const GEN1_POKEMON_COUNT = 151;
-const POKEDEX_FLAG_BYTES = Math.ceil(GEN1_POKEMON_COUNT / 8); // 19 bytes for 151 entries
-const POKEDEX_DATA_LOCATIONS = [
-  { offset: MAIN_POKEDEX_OWNED_OFFSET, label: "Main data (0x25A3)" },
-  { offset: BACKUP_POKEDEX_OWNED_OFFSET, label: "Backup copy (0x05A3)" },
-];
-const LEGACY_CSV_FILENAME = "data/pokemon_yellow_legacy_list.csv";
-const DEFAULT_METHOD_LABEL = "Grass";
-const PARTY_DATA_OFFSETS = [0x2F2C, BANK1_START + 0x2F2C];
+const PARTY_DATA_OFFSET = 0x2F2C;
 const PARTY_MAX_SIZE = 6;
+const PARTY_MON_SIZE = 0x2C;
+const PARTY_NAME_LENGTH = 11;
+// Largest file accepted before reading it (GBA saves are 128 KiB).
+const MAX_SAVE_FILE_BYTES = 0x40000;
+// Every 4 KiB Gen 3 (GBA) save section ends with this signature at offset 0xFF8.
+const GEN3_SECTION_SIGNATURE = 0x08012025;
+
+const LEGACY_CSV_FILENAME = "data/pokemon_yellow_legacy_list.csv";
+const YELLOW_REFERENCE_FILENAME = "data/pokemon_yellow_reference.json";
+const LAZARUS_REFERENCE_FILENAME = "data/pokemon_lazarus_reference.json";
+const DEFAULT_METHOD_LABEL = "Grass";
 const LOCATION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const LAZARUS_PC_CODE_LOCATION = "Cheat Code";
-
-let legacyEncounterCache = null;
-let legacyEncounterPromise = null;
-
-function resolveLegacyCsvUrl() {
-  let baseUrl = "/";
-  try {
-    if (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) {
-      baseUrl = import.meta.env.BASE_URL;
-    }
-  } catch {
-    baseUrl = "/";
-  }
-  return `${String(baseUrl || "/").replace(/\/+$/, "/")}${LEGACY_CSV_FILENAME}`;
-}
+const EMPTY_LIST = Object.freeze([]);
+const PARTY_SPRITE_STYLE = {
+  width: "192px",
+  height: "192px",
+  imageRendering: "pixelated",
+  transform: "scaleX(-1)",
+};
 
 function resolveStaticDataUrl(filename) {
-  let baseUrl = "/";
-  try {
-    if (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) {
-      baseUrl = import.meta.env.BASE_URL;
-    }
-  } catch {
-    baseUrl = "/";
+  return `${getBasePath()}${filename}`;
+}
+
+// Static reference files are fetched at most once per page load and only when the
+// game that needs them is shown. A failed request is dropped so it can be retried.
+const staticResourceCache = new Map();
+
+function loadStaticResource(filename, parseResponse) {
+  if (!staticResourceCache.has(filename)) {
+    const promise = fetch(resolveStaticDataUrl(filename))
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return parseResponse(response);
+      })
+      .catch((err) => {
+        staticResourceCache.delete(filename);
+        throw err;
+      });
+    staticResourceCache.set(filename, promise);
   }
-  return `${String(baseUrl || "/").replace(/\/+$/, "/")}${filename}`;
-}
-
-function resolveYellowReferenceUrl() {
-  return resolveStaticDataUrl("data/pokemon_yellow_reference.json");
-}
-
-function resolveLazarusReferenceUrl() {
-  return resolveStaticDataUrl("data/pokemon_lazarus_reference.json");
+  return staticResourceCache.get(filename);
 }
 
 function readUint16(data, offset) {
@@ -196,7 +203,8 @@ function decodeGen1String(bytes) {
   if (!bytes || bytes.length === 0) return null;
   const chars = [];
   for (const value of bytes) {
-    if (value === 0x50 || value === 0xff) {
+    // 0x50 terminates names (0xFF is the digit "9", not a terminator).
+    if (value === 0x50) {
       break;
     }
     const mapped = GEN1_CHAR_MAP.get(value);
@@ -243,17 +251,6 @@ function formatWeight(hectograms) {
   return `${(hectograms / 10).toFixed(1)} kg`;
 }
 
-function normalizeLegacyPokemonName(rawName) {
-  if (!rawName) return "";
-  return rawName
-    .toLowerCase()
-    .replace(/\u2640|female/g, "-f")
-    .replace(/\u2642|male/g, "-m")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 function toTitleCase(str) {
   if (typeof str !== "string" || str.length === 0) {
     return "";
@@ -264,145 +261,100 @@ function toTitleCase(str) {
     .join(" ");
 }
 
-const SLUG_TO_TITLE_NAME = new Map(
-  GEN1_POKEMON_NAMES.map((name) => [normalizeLegacyPokemonName(name), toTitleCase(name)])
-);
-
-const GEN1_POKEMON_TYPE_MAP = new Map(
-  Object.entries(gen1TypeMapData || {}).map(([slug, types]) => [
-    slug,
-    Array.isArray(types) ? types.map((type) => String(type || "").toLowerCase()) : [],
-  ])
-);
-
-const GEN1_TYPE_CHART = new Map(
-  Object.entries(gen1TypeChartData || {}).map(([defensiveType, attackMap]) => [
-    defensiveType,
-    Object.fromEntries(
-      Object.entries(attackMap || {}).map(([attackType, value]) => [
-        attackType,
-        Number.isFinite(value) ? Number(value) : 1,
-      ])
-    ),
-  ])
-);
-
-const GEN1_ATTACK_TYPES = Object.keys(gen1TypeChartData || {}).sort();
-const TYPE_SUMMARY_CACHE = new Map();
-
-function getGen1TypeSummary(slug) {
-  if (!slug) return null;
-  if (TYPE_SUMMARY_CACHE.has(slug)) {
-    return TYPE_SUMMARY_CACHE.get(slug);
-  }
-  const pokemonTypes = GEN1_POKEMON_TYPE_MAP.get(slug) || [];
-  if (pokemonTypes.length === 0) {
-    TYPE_SUMMARY_CACHE.set(slug, null);
-    return null;
-  }
-  const summary = {
-    types: pokemonTypes,
-    weaknesses: [],
-    resistances: [],
-    immunities: [],
-  };
-  GEN1_ATTACK_TYPES.forEach((attackType) => {
-    let multiplier = 1;
-    pokemonTypes.forEach((defensiveType) => {
-      const relations = GEN1_TYPE_CHART.get(defensiveType);
-      const relationValue =
-        relations && Object.prototype.hasOwnProperty.call(relations, attackType)
-          ? relations[attackType]
-          : 1;
-      const parsedValue = Number.isFinite(relationValue) ? relationValue : 1;
-      multiplier *= parsedValue;
-    });
-    if (multiplier === 0) {
-      summary.immunities.push({ type: attackType, multiplier: 0 });
-    } else if (multiplier > 1) {
-      summary.weaknesses.push({ type: attackType, multiplier });
-    } else if (multiplier < 1) {
-      summary.resistances.push({ type: attackType, multiplier });
-    }
-  });
-  summary.weaknesses.sort(
-    (a, b) => b.multiplier - a.multiplier || a.type.localeCompare(b.type)
-  );
-  summary.resistances.sort(
-    (a, b) => a.multiplier - b.multiplier || a.type.localeCompare(b.type)
-  );
-  summary.immunities.sort((a, b) => a.type.localeCompare(b.type));
-  TYPE_SUMMARY_CACHE.set(slug, summary);
-  return summary;
+function getGen1DisplayName(slug) {
+  return GEN1_DISPLAY_NAME_OVERRIDES.get(slug) || toTitleCase(slug);
 }
 
-function formatTypeMultiplier(multiplier) {
-  if (multiplier === 0) {
-    return "x0";
-  }
-  const rounded =
-    Math.abs(multiplier - Math.round(multiplier)) < 0.001
-      ? Math.round(multiplier)
-      : Number(multiplier.toFixed(2));
-  return `x${rounded}`;
-}
-
-const RAW_EVOLUTION_DATA = [
-  "Abra~-/-~Level 16~-/-~Kadabra~-/-~Level 42~-/-~Alakazam",
-  "Ekans~-/-~Level 22~-/-~Arbok",
-  "Growlithe~-/-~Fire Stone~-/-~Arcanine",
-  "Weedle~-/-~Level 7~-/-~Kakuna~-/-~Level 10~-/-~Beedrill",
-  "Bellsprout~-/-~Level 21~-/-~Weepinbell~-/-~Leaf Stone~-/-~Victreebel",
-  "Squirtle~-/-~Level 16~-/-~Wartortle~-/-~Level 36~-/-~Blastoise",
-  "Bulbasaur~-/-~Level 16~-/-~Ivysaur~-/-~Level 32~-/-~Venusaur",
-  "Caterpie~-/-~Level 7~-/-~Metapod~-/-~Level 10~-/-~Butterfree",
-  "Charmander~-/-~Level 16~-/-~Charmeleon~-/-~Level 36~-/-~Charizard",
-  "Clefairy~-/-~Moon Stone~-/-~Clefable",
-  "Shellder~-/-~Water Stone~-/-~Cloyster",
-  "Cubone~-/-~Level 28~-/-~Marowak",
-  "Seel~-/-~Level 34~-/-~Dewgong",
-  "Diglett~-/-~Level 26~-/-~Dugtrio",
-  "Doduo~-/-~Level 31~-/-~Dodrio",
-  "Dratini~-/-~Level 30~-/-~Dragonair~-/-~Level 55~-/-~Dragonite",
-  "Drowzee~-/-~Level 26~-/-~Hypno",
-  "Eevee~-/-~Water/Thunder/Fire Stone~-/-~Vaporeon/Jolteon/Flareon",
-  "Voltorb~-/-~Level 30~-/-~Electrode",
-  "Exeggcute~-/-~Leaf Stone~-/-~Exeggutor",
-  "Spearow~-/-~Level 20~-/-~Fearow",
-  "Gastly~-/-~Level 25~-/-~Haunter~-/-~Level 42~-/-~Gengar",
-  "Geodude~-/-~Level 25~-/-~Graveler~-/-~Level 38~-/-~Golem",
-  "Oddish~-/-~Level 21~-/-~Gloom~-/-~Leaf Stone~-/-~Vileplume",
-  "Zubat~-/-~Level 22~-/-~Golbat",
-  "Goldeen~-/-~Level 33~-/-~Seaking",
-  "Psyduck~-/-~Level 33~-/-~Golduck",
-  "Grimer~-/-~Level 38~-/-~Muk",
-  "Magikarp~-/-~Level 20~-/-~Gyarados",
-  "Horsea~-/-~Level 32~-/-~Seadra",
-  "Jigglypuff~-/-~Moon Stone~-/-~Wigglytuff",
-  "Kabuto~-/-~Level 40~-/-~Kabutops",
-  "Krabby~-/-~Level 28~-/-~Kingler",
-  "Koffing~-/-~Level 35~-/-~Weezing",
-  "Machop~-/-~Level 28~-/-~Machoke~-/-~Level 38~-/-~Machamp",
-  "Magnemite~-/-~Level 30~-/-~Magneton",
-  "Mankey~-/-~Level 28~-/-~Primeape",
-  "Meowth~-/-~Level 28~-/-~Persian",
-  "Nidoran-m~-/-~Level 16~-/-~Nidorino~-/-~Moon Stone~-/-~Nidoking",
-  "Nidoran-f~-/-~Level 16~-/-~Nidorina~-/-~Moon Stone~-/-~Nidoqueen",
-  "Vulpix~-/-~Fire Stone~-/-~Ninetales",
-  "Omanyte~-/-~Level 40~-/-~Omastar",
-  "Paras~-/-~Level 24~-/-~Parasect",
-  "Pidgey~-/-~Level 18~-/-~Pidgeotto~-/-~Level 36~-/-~Pidgeot",
-  "Pikachu~-/-~Thunder Stone~-/-~Raichu",
-  "Poliwag~-/-~Level 25~-/-~Poliwhirl~-/-~Water Stone~-/-~Poliwrath",
-  "Ponyta~-/-~Level 40~-/-~Rapidash",
-  "Rattata~-/-~Level 20~-/-~Raticate",
-  "Rhyhorn~-/-~Level 42~-/-~Rhydon",
-  "Sandshrew~-/-~Level 22~-/-~Sandslash",
-  "Slowpoke~-/-~Level 37~-/-~Slowbro",
-  "Staryu~-/-~Water Stone~-/-~Starmie",
-  "Tentacool~-/-~Level 30~-/-~Tentacruel",
-  "Venonat~-/-~Level 31~-/-~Venomoth",
+// Evolution methods in Pokemon Yellow Legacy (the hack's data/pokemon/evos_moves.asm).
+// The optional fourth value is the method in the original Pokemon Yellow when it differs
+// (pret/pokeyellow data/pokemon/evos_moves.asm): Legacy turns the four trade evolutions
+// into level-ups and moves Poliwag's evolution from level 25 to 18.
+const GEN1_EVOLUTIONS = [
+  ["bulbasaur", "ivysaur", "Level 16"],
+  ["ivysaur", "venusaur", "Level 32"],
+  ["charmander", "charmeleon", "Level 16"],
+  ["charmeleon", "charizard", "Level 36"],
+  ["squirtle", "wartortle", "Level 16"],
+  ["wartortle", "blastoise", "Level 36"],
+  ["caterpie", "metapod", "Level 7"],
+  ["metapod", "butterfree", "Level 10"],
+  ["weedle", "kakuna", "Level 7"],
+  ["kakuna", "beedrill", "Level 10"],
+  ["pidgey", "pidgeotto", "Level 18"],
+  ["pidgeotto", "pidgeot", "Level 36"],
+  ["rattata", "raticate", "Level 20"],
+  ["spearow", "fearow", "Level 20"],
+  ["ekans", "arbok", "Level 22"],
+  ["pikachu", "raichu", "Thunder Stone"],
+  ["sandshrew", "sandslash", "Level 22"],
+  ["nidoran-f", "nidorina", "Level 16"],
+  ["nidorina", "nidoqueen", "Moon Stone"],
+  ["nidoran-m", "nidorino", "Level 16"],
+  ["nidorino", "nidoking", "Moon Stone"],
+  ["clefairy", "clefable", "Moon Stone"],
+  ["vulpix", "ninetales", "Fire Stone"],
+  ["jigglypuff", "wigglytuff", "Moon Stone"],
+  ["zubat", "golbat", "Level 22"],
+  ["oddish", "gloom", "Level 21"],
+  ["gloom", "vileplume", "Leaf Stone"],
+  ["paras", "parasect", "Level 24"],
+  ["venonat", "venomoth", "Level 31"],
+  ["diglett", "dugtrio", "Level 26"],
+  ["meowth", "persian", "Level 28"],
+  ["psyduck", "golduck", "Level 33"],
+  ["mankey", "primeape", "Level 28"],
+  ["growlithe", "arcanine", "Fire Stone"],
+  ["poliwag", "poliwhirl", "Level 18", "Level 25"],
+  ["poliwhirl", "poliwrath", "Water Stone"],
+  ["abra", "kadabra", "Level 16"],
+  ["kadabra", "alakazam", "Level 42", "Trade"],
+  ["machop", "machoke", "Level 28"],
+  ["machoke", "machamp", "Level 38", "Trade"],
+  ["bellsprout", "weepinbell", "Level 21"],
+  ["weepinbell", "victreebel", "Leaf Stone"],
+  ["tentacool", "tentacruel", "Level 30"],
+  ["geodude", "graveler", "Level 25"],
+  ["graveler", "golem", "Level 38", "Trade"],
+  ["ponyta", "rapidash", "Level 40"],
+  ["slowpoke", "slowbro", "Level 37"],
+  ["magnemite", "magneton", "Level 30"],
+  ["doduo", "dodrio", "Level 31"],
+  ["seel", "dewgong", "Level 34"],
+  ["grimer", "muk", "Level 38"],
+  ["shellder", "cloyster", "Water Stone"],
+  ["gastly", "haunter", "Level 25"],
+  ["haunter", "gengar", "Level 42", "Trade"],
+  ["drowzee", "hypno", "Level 26"],
+  ["krabby", "kingler", "Level 28"],
+  ["voltorb", "electrode", "Level 30"],
+  ["exeggcute", "exeggutor", "Leaf Stone"],
+  ["cubone", "marowak", "Level 28"],
+  ["koffing", "weezing", "Level 35"],
+  ["rhyhorn", "rhydon", "Level 42"],
+  ["horsea", "seadra", "Level 32"],
+  ["goldeen", "seaking", "Level 33"],
+  ["staryu", "starmie", "Water Stone"],
+  ["magikarp", "gyarados", "Level 20"],
+  ["eevee", "vaporeon", "Water Stone"],
+  ["eevee", "jolteon", "Thunder Stone"],
+  ["eevee", "flareon", "Fire Stone"],
+  ["omanyte", "omastar", "Level 40"],
+  ["kabuto", "kabutops", "Level 40"],
+  ["dratini", "dragonair", "Level 30"],
+  ["dragonair", "dragonite", "Level 55"],
 ];
+
+// Keyed by the evolved Pokemon: how it is obtained from its pre-evolution.
+const EVOLUTION_REQUIREMENTS = new Map(
+  GEN1_EVOLUTIONS.map(([from, to, method, vanillaMethod]) => [
+    to,
+    {
+      from: getGen1DisplayName(from),
+      method: vanillaMethod ? `${method} (${vanillaMethod} in original Yellow)` : method,
+      target: getGen1DisplayName(to),
+    },
+  ])
+);
 
 const SPECIES_INDEX_TO_SLUG = new Map([
   [1, "rhydon"],
@@ -561,6 +513,8 @@ const SPECIES_INDEX_TO_SLUG = new Map([
   [190, "victreebel"],
 ]);
 
+// English Gen 1 text encoding (Bulbapedia "Character encoding (Generation I)";
+// pret/pokeyellow constants/charmap.asm). Letters and digits are added below.
 const GEN1_CHAR_MAP = new Map([
   [0x7f, " "],
   [0x50, ""],
@@ -585,9 +539,12 @@ const GEN1_CHAR_MAP = new Map([
   [0xe6, "?"],
   [0xe7, "!"],
   [0xe8, "."],
+  [0xef, "\u2642"], // ♂
+  [0xf1, "\u00d7"], // ×
   [0xf2, "."],
   [0xf3, "/"],
   [0xf4, ","],
+  [0xf5, "\u2640"], // ♀
 ]);
 
 const STATUS_FLAG_LABELS = [
@@ -626,124 +583,61 @@ const GEN1_TYPE_NAMES = new Map([
   [0x1A, "Dragon"],
 ]);
 
-
-const buildEvolutionRequirements = (rawEntries) => {
-  const map = new Map();
-  rawEntries.forEach((entry) => {
-    const tokens = String(entry || "")
-      .split("~-/-~")
-      .map((token) => token.trim())
-      .filter(Boolean);
-    if (tokens.length < 3) return;
-    const names = [];
-    const methods = [];
-    tokens.forEach((token, index) => {
-      if (index % 2 === 0) {
-        names.push(token);
-      } else {
-        methods.push(token);
-      }
-    });
-    if (names.length < 2) return;
-
-    for (let i = 1; i < names.length; i++) {
-      const targetName = names[i];
-      const method = methods[i - 1] || "";
-      const slug = normalizeLegacyPokemonName(targetName);
-      if (!slug) continue;
-      if (!map.has(slug)) {
-        map.set(slug, {
-          method,
-          target: targetName,
-        });
-      }
-    }
-  });
-  return map;
-};
-
-const EVOLUTION_REQUIREMENTS = buildEvolutionRequirements(RAW_EVOLUTION_DATA);
-
+// Party list layout (Bulbapedia "Full Party Data"; pret macros/ram.asm party_struct):
+// +0x000 count, +0x001 species IDs (6 + 0xFF terminator), +0x008 6 x 44-byte mons,
+// +0x110 6 x 11-byte OT names, +0x152 6 x 11-byte nicknames. Multi-byte values are big-endian.
 function parsePartyPokemon(data) {
-  for (const offset of PARTY_DATA_OFFSETS) {
-    if (offset + 1 >= data.length) continue;
-    const count = data[offset];
-    if (!Number.isFinite(count) || count < 0 || count > PARTY_MAX_SIZE) {
-      continue;
-    }
-    if (offset + 1 + PARTY_MAX_SIZE > data.length) {
-      continue;
-    }
-
-    const entries = [];
-    const speciesBuffer = Array.from(data.slice(offset + 1, offset + 1 + PARTY_MAX_SIZE));
-    const partyDataOffset = offset + 0x08;
-    const otNamesOffset = offset + 0x110;
-    const nicknameOffset = offset + 0x152;
-
-    for (let i = 0; i < Math.min(count, speciesBuffer.length); i++) {
-      const speciesInternalId = speciesBuffer[i];
-      if (!Number.isFinite(speciesInternalId) || speciesInternalId <= 0 || speciesInternalId === 0xff) {
-        continue;
-      }
-
-      const pokemonDataOffset = partyDataOffset + i * 0x2C;
-      if (pokemonDataOffset + 0x2C > data.length) {
-        continue;
-      }
-
-      const slug = SPECIES_INDEX_TO_SLUG.get(speciesInternalId) || null;
-      const dexId = slug ? GEN1_SLUG_TO_POKEDEX_ID.get(slug) || null : null;
-      const currentHp = readUint16(data, pokemonDataOffset + 0x01);
-      const maxHp = readUint16(data, pokemonDataOffset + 0x22);
-      const level = data[pokemonDataOffset + 0x21] || data[pokemonDataOffset + 0x03] || null;
-      const status = data[pokemonDataOffset + 0x04] || 0;
-      const type1 = resolveTypeName(data[pokemonDataOffset + 0x05]);
-      const type2 = resolveTypeName(data[pokemonDataOffset + 0x06]);
-      const trainerId = readUint16(data, pokemonDataOffset + 0x0C);
-      const attack = readUint16(data, pokemonDataOffset + 0x24);
-      const defense = readUint16(data, pokemonDataOffset + 0x26);
-      const speed = readUint16(data, pokemonDataOffset + 0x28);
-      const special = readUint16(data, pokemonDataOffset + 0x2A);
-
-      const otBytes =
-        otNamesOffset + (i * 11) + 11 <= data.length
-          ? data.slice(otNamesOffset + i * 11, otNamesOffset + i * 11 + 11)
-          : null;
-      const nicknameBytes =
-        nicknameOffset + (i * 11) + 11 <= data.length
-          ? data.slice(nicknameOffset + i * 11, nicknameOffset + i * 11 + 11)
-          : null;
-
-      entries.push({
-        slot: i + 1,
-        speciesInternalId,
-        slug,
-        dexId,
-        currentHp,
-        maxHp,
-        level,
-        status,
-        statusText: interpretStatus(status),
-        types: type1 === type2 ? [type1] : [type1, type2],
-        stats: {
-          attack,
-          defense,
-          speed,
-          special,
-        },
-        originalTrainerId: trainerId,
-        originalTrainerIdFormatted: String(trainerId).padStart(5, "0"),
-        originalTrainerName: otBytes ? decodeGen1String(otBytes) : null,
-        nickname: nicknameBytes ? decodeGen1String(nicknameBytes) : null,
-      });
-    }
-
-    if (entries.length > 0 || count === 0) {
-      return entries;
-    }
+  const offset = PARTY_DATA_OFFSET;
+  const count = data[offset];
+  if (!Number.isInteger(count) || count > PARTY_MAX_SIZE) {
+    return [];
   }
-  return [];
+
+  const entries = [];
+  const partyDataOffset = offset + 0x08;
+  const otNamesOffset = offset + 0x110;
+  const nicknameOffset = offset + 0x152;
+
+  for (let i = 0; i < count; i++) {
+    const speciesInternalId = data[offset + 1 + i];
+    if (!speciesInternalId || speciesInternalId === 0xff) {
+      continue;
+    }
+
+    const pokemonDataOffset = partyDataOffset + i * PARTY_MON_SIZE;
+    const slug = SPECIES_INDEX_TO_SLUG.get(speciesInternalId) || null;
+    const dexId = slug ? GEN1_SLUG_TO_POKEDEX_ID.get(slug) || null : null;
+    const status = data[pokemonDataOffset + 0x04] || 0;
+    const type1 = resolveTypeName(data[pokemonDataOffset + 0x05]);
+    const type2 = resolveTypeName(data[pokemonDataOffset + 0x06]);
+    const trainerId = readUint16(data, pokemonDataOffset + 0x0C);
+    const otStart = otNamesOffset + i * PARTY_NAME_LENGTH;
+    const nicknameStart = nicknameOffset + i * PARTY_NAME_LENGTH;
+
+    entries.push({
+      slot: i + 1,
+      speciesInternalId,
+      slug,
+      dexId,
+      currentHp: readUint16(data, pokemonDataOffset + 0x01),
+      maxHp: readUint16(data, pokemonDataOffset + 0x22),
+      level: data[pokemonDataOffset + 0x21] || data[pokemonDataOffset + 0x03] || null,
+      status,
+      statusText: interpretStatus(status),
+      types: type1 === type2 ? [type1] : [type1, type2],
+      stats: {
+        attack: readUint16(data, pokemonDataOffset + 0x24),
+        defense: readUint16(data, pokemonDataOffset + 0x26),
+        speed: readUint16(data, pokemonDataOffset + 0x28),
+        special: readUint16(data, pokemonDataOffset + 0x2A),
+      },
+      originalTrainerId: trainerId,
+      originalTrainerIdFormatted: String(trainerId).padStart(5, "0"),
+      originalTrainerName: decodeGen1String(data.subarray(otStart, otStart + PARTY_NAME_LENGTH)),
+      nickname: decodeGen1String(data.subarray(nicknameStart, nicknameStart + PARTY_NAME_LENGTH)),
+    });
+  }
+  return entries;
 }
 
 function formatLegacyLocationName(raw) {
@@ -831,16 +725,6 @@ function summarizeLevelRange(levelValues) {
   return min === max ? `Lv${min}` : `Lv${min}-${max}`;
 }
 
-function summarizeChanceRange(chanceValues) {
-  const sorted = chanceValues.filter((value) => Number.isFinite(value)).sort((a, b) => b - a);
-  if (sorted.length === 0) return "";
-  if (sorted.length === 1) return formatPercent(sorted[0]);
-  if (sorted.length <= 3) {
-    return sorted.map((value) => formatPercent(value)).join(" / ");
-  }
-  return `Up to ${formatPercent(sorted[0])}`;
-}
-
 function buildLegacyEncounterMap(csvText) {
   if (!csvText) return new Map();
   const lines = csvText
@@ -865,7 +749,7 @@ function buildLegacyEncounterMap(csvText) {
       if (!rawCell) continue;
       const parsedCell = parseEncounterCell(rawCell);
       if (!parsedCell) continue;
-      const slug = normalizeLegacyPokemonName(parsedCell.rawName);
+      const slug = normalizeSpeciesSlug(parsedCell.rawName);
       if (!slug) continue;
       const meta = columnMeta[columnIndex] || { methodLabel: DEFAULT_METHOD_LABEL, methodType: "land", chance: null };
 
@@ -883,7 +767,9 @@ function buildLegacyEncounterMap(csvText) {
           methodLabel: meta.methodLabel || DEFAULT_METHOD_LABEL,
           methodType: meta.methodType || "land",
           levels: new Set(),
-          chances: new Set(),
+          // A species can fill several encounter slots in one area; its odds are the sum.
+          chanceTotal: 0,
+          hasChance: false,
         };
         pokemonMap.set(bucketKey, bucket);
       }
@@ -892,7 +778,8 @@ function buildLegacyEncounterMap(csvText) {
         bucket.levels.add(parsedCell.level);
       }
       if (Number.isFinite(meta.chance)) {
-        bucket.chances.add(meta.chance);
+        bucket.chanceTotal += meta.chance;
+        bucket.hasChance = true;
       }
     }
   }
@@ -903,15 +790,16 @@ function buildLegacyEncounterMap(csvText) {
       .sort((a, b) => a.order - b.order)
       .map((bucket) => {
         const levelValues = Array.from(bucket.levels).sort((x, y) => x - y);
-        const chanceValues = Array.from(bucket.chances).sort((x, y) => y - x);
+        // Column headers carry rounded slot rates, so a full table can sum to 100.1%.
+        const chanceTotal = bucket.hasChance ? Math.min(100, bucket.chanceTotal) : null;
         return {
           location: bucket.location,
           methodLabel: bucket.methodLabel,
           methodType: bucket.methodType,
           levelSummary: summarizeLevelRange(levelValues),
-          chanceSummary: summarizeChanceRange(chanceValues),
+          chanceSummary: chanceTotal != null ? formatPercent(chanceTotal) : "",
           levelValues,
-          chanceValues,
+          chanceTotal,
         };
       });
     encounterMap.set(slug, entries);
@@ -1099,84 +987,124 @@ function buildLazarusLocationEntries(record) {
   return { entries, evolutionRequirement };
 }
 
-async function loadLegacyEncounterData() {
-  if (legacyEncounterCache) {
-    return legacyEncounterCache;
-  }
-  if (!legacyEncounterPromise) {
-    legacyEncounterPromise = fetch(resolveLegacyCsvUrl())
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Failed to load encounter data (${response.status})`);
-        }
-        return response.text();
-      })
-      .then((text) => {
-        legacyEncounterCache = buildLegacyEncounterMap(text);
-        return legacyEncounterCache;
-      })
-      .finally(() => {
-        legacyEncounterPromise = null;
-      });
-  }
-  return legacyEncounterPromise;
+function loadLegacyEncounterData() {
+  return loadStaticResource(LEGACY_CSV_FILENAME, async (response) =>
+    buildLegacyEncounterMap(await response.text())
+  );
 }
 
+function loadYellowReference() {
+  return loadStaticResource(YELLOW_REFERENCE_FILENAME, async (response) => {
+    const records = await response.json();
+    const map = new Map();
+    (Array.isArray(records) ? records : []).forEach((record) => {
+      if (record?.slug) {
+        map.set(record.slug, record);
+      }
+    });
+    return map;
+  });
+}
+
+let slugToNationalIdCache = null;
+
+function getSlugToNationalId() {
+  if (!slugToNationalIdCache) {
+    slugToNationalIdCache = new Map();
+    Object.entries(NATIONAL_ID_TO_SLUG || {}).forEach(([id, slug]) => {
+      const numericId = Number(id);
+      const normalizedSlug = normalizeSpeciesSlug(slug);
+      if (normalizedSlug && Number.isFinite(numericId)) {
+        slugToNationalIdCache.set(normalizedSlug, numericId);
+      }
+    });
+  }
+  return slugToNationalIdCache;
+}
+
+function loadLazarusReference() {
+  return loadStaticResource(LAZARUS_REFERENCE_FILENAME, async (response) => {
+    const records = await response.json();
+    const slugToNationalId = getSlugToNationalId();
+    const list = (Array.isArray(records) ? records : []).map((record) => {
+      const normalizedSlug = normalizeSpeciesSlug(record?.slug || record?.name);
+      const nationalId = normalizedSlug ? slugToNationalId.get(normalizedSlug) ?? null : null;
+      return {
+        ...record,
+        slug: normalizedSlug || record?.slug || null,
+        nationalId,
+      };
+    });
+    list.sort((a, b) => {
+      const idA = Number.isFinite(a?.id) ? a.id : Number.MAX_SAFE_INTEGER;
+      const idB = Number.isFinite(b?.id) ? b.id : Number.MAX_SAFE_INTEGER;
+      return idA - idB || String(a?.name || "").localeCompare(String(b?.name || ""));
+    });
+    return list;
+  });
+}
+
+function computeGen1Checksum(data) {
+  let sum = 0;
+  for (let i = GEN1_CHECKSUM_START; i <= GEN1_CHECKSUM_END; i++) {
+    sum = (sum + data[i]) & 0xff;
+  }
+  return ~sum & 0xff;
+}
+
+function looksLikeGen3Save(data) {
+  for (let offset = 0; offset + 0x1000 <= data.length && offset < 0x20000; offset += 0x1000) {
+    const signatureOffset = offset + 0xff8;
+    const signature =
+      (data[signatureOffset] |
+        (data[signatureOffset + 1] << 8) |
+        (data[signatureOffset + 2] << 16) |
+        (data[signatureOffset + 3] << 24)) >>>
+      0;
+    if (signature === GEN3_SECTION_SIGNATURE) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const NOT_GEN1_SAVE_MESSAGE =
+  "This doesn't look like a Gen 1 (Red/Blue/Yellow) save. Choose the .sav or .srm file of an English Pokémon Red, Blue, Yellow or Yellow Legacy game that has been saved in-game at least once.";
+
 /**
- * Parse Pokemon Yellow .sav or .srm file to extract caught Pokemon
- * @param {ArrayBuffer} arrayBuffer - The .sav or .srm file data
- * @returns {{caughtPokemon: Array<number>, sourceOffset: number, sourceLabel: string, offsetResults: Array}}
+ * Parse an English Gen 1 (Red/Blue/Yellow, Yellow Legacy) .sav/.srm file.
+ * Throws an Error with a user-facing message when the file isn't a valid Gen 1 save.
+ * @param {ArrayBuffer} arrayBuffer
+ * @returns {{caughtPokemon: Array<number>, partyMembers: Array<object>}}
  */
 function parseSavFile(arrayBuffer) {
   const data = new Uint8Array(arrayBuffer);
 
-  const availableLocations = POKEDEX_DATA_LOCATIONS.filter(
-    ({ offset }) => offset + POKEDEX_FLAG_BYTES <= data.length
-  );
-
-  if (availableLocations.length === 0) {
-    throw new Error("Save file is too small to contain the Pokédex owned flags.");
+  if (data.length < GEN1_SAVE_SIZE) {
+    throw new Error(
+      `${NOT_GEN1_SAVE_MESSAGE} (The file is ${data.length.toLocaleString()} bytes; Gen 1 saves are 32 KB.)`
+    );
+  }
+  if (computeGen1Checksum(data) !== data[GEN1_CHECKSUM_OFFSET]) {
+    if (looksLikeGen3Save(data)) {
+      throw new Error(
+        "This is a Game Boy Advance save (for example Pokémon Lazarus or FireRed). The save reader can only read Gen 1 (Red/Blue/Yellow) saves."
+      );
+    }
+    throw new Error(`${NOT_GEN1_SAVE_MESSAGE} (Its checksum doesn't match.)`);
   }
 
-  const parseAtOffset = (offset) => {
-    const caughtPokemon = [];
-
-    for (let pokemonIndex = 0; pokemonIndex < GEN1_POKEMON_COUNT; pokemonIndex++) {
-      const byteIndex = offset + Math.floor(pokemonIndex / 8);
-      const bitPosition = pokemonIndex % 8;
-
-      if (byteIndex >= data.length) {
-        break;
-      }
-
-      const isCaught = ((data[byteIndex] >> bitPosition) & 1) !== 0;
-      if (isCaught) {
-        caughtPokemon.push(pokemonIndex + 1);
-      }
+  const caughtPokemon = [];
+  for (let pokemonIndex = 0; pokemonIndex < GEN1_POKEMON_COUNT; pokemonIndex++) {
+    const flags = data[GEN1_POKEDEX_OWNED_OFFSET + (pokemonIndex >> 3)];
+    if ((flags >> (pokemonIndex & 7)) & 1) {
+      caughtPokemon.push(pokemonIndex + 1);
     }
-
-    return caughtPokemon;
-  };
-
-  const offsetResults = availableLocations.map(({ offset, label }) => {
-    const bytes = Array.from(data.slice(offset, offset + POKEDEX_FLAG_BYTES));
-    return {
-      offset,
-      label,
-      bytes,
-      caughtPokemon: parseAtOffset(offset),
-    };
-  });
-
-  // Prefer the first location that shows progress; otherwise fall back to the first entry.
-  const bestResult =
-    offsetResults.find((entry) => entry.caughtPokemon.length > 0) ?? offsetResults[0];
+  }
 
   return {
-    caughtPokemon: bestResult.caughtPokemon,
-    sourceOffset: bestResult.offset,
-    sourceLabel: bestResult.label,
-    offsetResults,
+    caughtPokemon,
+    partyMembers: parsePartyPokemon(data),
   };
 }
 
@@ -1185,8 +1113,8 @@ export default function SavPage() {
   const [caughtPokemon, setCaughtPokemon] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Only set once a save has been parsed successfully.
   const [fileName, setFileName] = useState(null);
-  const [fileData, setFileData] = useState(null);
   const [partyMembers, setPartyMembers] = useState([]);
   const [legacyEncounters, setLegacyEncounters] = useState(null);
   const [legacyEncountersReady, setLegacyEncountersReady] = useState(false);
@@ -1196,94 +1124,24 @@ export default function SavPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [showCaught, setShowCaught] = useState(true);
-  const [showOnlyCaught, setShowOnlyCaught] = useState(false);
-  const [lazarusDex, setLazarusDex] = useState([]);
+  const [lazarusDex, setLazarusDex] = useState(null);
   const [lazarusDexError, setLazarusDexError] = useState(null);
-  const speciesSlugLookup = useMemo(() => {
-    const map = new Map();
-    Object.entries(NATIONAL_ID_TO_SLUG || {}).forEach(([id, slug]) => {
-      if (!slug) return;
-      const numericId = Number(id);
-      if (Number.isFinite(numericId)) {
-        map.set(numericId, normalizeSpeciesSlug(slug));
-      }
-    });
-    return map;
-  }, []);
-  const slugToNationalId = useMemo(() => {
-    const map = new Map();
-    speciesSlugLookup.forEach((slug, id) => {
-      if (slug) {
-        map.set(slug, Number(id));
-      }
-    });
-    return map;
-  }, [speciesSlugLookup]);
-  const lazarusReferenceReady = lazarusDex.length > 0;
-  const lazarusDexByCustomId = useMemo(() => {
-    const map = new Map();
-    lazarusDex.forEach((record) => {
-      if (record?.id != null) {
-        map.set(Number(record.id), record);
-      }
-    });
-    return map;
-  }, [lazarusDex]);
-  const lazarusDexBySlug = useMemo(() => {
-    const map = new Map();
-    lazarusDex.forEach((record) => {
-      const slug = normalizeSpeciesSlug(record?.slug || record?.name);
-      if (slug) {
-        map.set(slug, record);
-      }
-    });
-    return map;
-  }, [lazarusDex]);
-  const lazarusDexByNationalId = useMemo(() => {
-    const map = new Map();
-    lazarusDex.forEach((record) => {
-      const slug = normalizeSpeciesSlug(record?.slug || record?.name);
-      if (!slug) return;
-      const nationalId = slugToNationalId.get(slug);
-      if (nationalId != null) {
-        map.set(nationalId, record);
-      }
-    });
-    return map;
-  }, [lazarusDex, slugToNationalId]);
+  const [openDexEntryKey, setOpenDexEntryKey] = useState(null);
+  const showingYellow = gameKey === "yellow";
+  const lazarusRecords = lazarusDex ?? EMPTY_LIST;
+  const lazarusReferenceReady = Array.isArray(lazarusDex);
 
-  useEffect(() => {
-    try {
-      const url = new URL(window.location.href);
-      const basePath = (import.meta.env.BASE_URL || "/").replace(/\/+$|^$/, "/");
-      const expectedPath = basePath === "/" ? "/save" : `${basePath}save`;
-      
-      // Redirect hash-based #/sav to path-based /save
-      if (url.hash === "#/sav" || url.hash.startsWith("#/sav")) {
-        url.pathname = expectedPath;
-        url.hash = "";
-        window.history.replaceState({}, "", url);
-        return;
-      }
-      
-      // Ensure path is /save
-      if (url.pathname !== expectedPath && !url.pathname.endsWith("/save")) {
-        url.pathname = expectedPath;
-        url.hash = "";
-        window.history.replaceState({}, "", url);
-      }
-    } catch {
-      // Ignore browsers that cannot update the URL/hash
-      return;
-    }
-  }, []);
+  // URL routing (including legacy #/sav redirects) is handled centrally in src/router.js.
 
+  // Reference data is fetched only for the game currently shown.
   useEffect(() => {
+    if (!showingYellow || legacyEncountersReady) return undefined;
     let cancelled = false;
     loadLegacyEncounterData()
       .then((encounterMap) => {
         if (cancelled) return;
         setLegacyEncounters(encounterMap);
+        setLegacyEncounterError(null);
         setLegacyEncountersReady(true);
       })
       .catch((err) => {
@@ -1297,25 +1155,14 @@ export default function SavPage() {
     return () => {
       cancelled = true;
     };
-  }, [slugToNationalId]);
+  }, [showingYellow, legacyEncountersReady]);
 
   useEffect(() => {
+    if (!showingYellow || yellowReference) return undefined;
     let cancelled = false;
-    fetch(resolveYellowReferenceUrl())
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Failed to load Yellow reference data (${response.status})`);
-        }
-        return response.json();
-      })
-      .then((records) => {
+    loadYellowReference()
+      .then((map) => {
         if (cancelled) return;
-        const map = new Map();
-        (Array.isArray(records) ? records : []).forEach((record) => {
-          if (record?.slug) {
-            map.set(record.slug, record);
-          }
-        });
         setYellowReference(map);
         setYellowReferenceError(null);
       })
@@ -1329,39 +1176,20 @@ export default function SavPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showingYellow, yellowReference]);
 
   useEffect(() => {
+    if (showingYellow || lazarusReferenceReady) return undefined;
     let cancelled = false;
-    fetch(resolveLazarusReferenceUrl())
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Failed to load Lazarus reference data (${response.status})`);
-        }
-        return response.json();
-      })
-      .then((records) => {
+    loadLazarusReference()
+      .then((list) => {
         if (cancelled) return;
-        const list = (Array.isArray(records) ? records : []).map((record) => {
-          const normalizedSlug = normalizeSpeciesSlug(record?.slug || record?.name);
-          const nationalId = normalizedSlug ? slugToNationalId.get(normalizedSlug) ?? null : null;
-          return {
-            ...record,
-            slug: normalizedSlug || record?.slug || null,
-            nationalId,
-          };
-        });
-        list.sort((a, b) => {
-          const idA = Number.isFinite(a?.id) ? a.id : Number.MAX_SAFE_INTEGER;
-          const idB = Number.isFinite(b?.id) ? b.id : Number.MAX_SAFE_INTEGER;
-          return idA - idB || String(a?.name || "").localeCompare(String(b?.name || ""));
-        });
         setLazarusDex(list);
         setLazarusDexError(null);
       })
       .catch((err) => {
         if (cancelled) return;
-        setLazarusDex([]);
+        setLazarusDex(EMPTY_LIST);
         setLazarusDexError(
           `Pokemon Lazarus reference data is unavailable right now (${err?.message || "unknown error"}).`
         );
@@ -1369,200 +1197,125 @@ export default function SavPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showingYellow, lazarusReferenceReady]);
 
-  const prepareForNewUpload = useCallback((targetGame) => {
-    setGameKey(targetGame);
-    setCaughtPokemon([]);
-    setPartyMembers([]);
-    setError(null);
+  // Close the open Pokedex panel on Escape or a click/tap outside its row.
+  useEffect(() => {
+    if (openDexEntryKey == null) return undefined;
+    const handlePointerDown = (event) => {
+      const row = event.target instanceof Element ? event.target.closest("[data-dex-entry-key]") : null;
+      if (row?.getAttribute("data-dex-entry-key") !== openDexEntryKey) {
+        setOpenDexEntryKey(null);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setOpenDexEntryKey(null);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openDexEntryKey]);
+
+  const resetResultFilters = useCallback(() => {
     setLocationFilter("");
     setSearchTerm("");
     setShowCaught(true);
-    setShowOnlyCaught(false);
+    setOpenDexEntryKey(null);
   }, []);
 
-  const handleYellowFileChange = useCallback((event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    const fileNameLower = file.name.toLowerCase();
-    if (!fileNameLower.endsWith('.sav') && !fileNameLower.endsWith('.srm')) {
-      setError("Please select a .sav or .srm file");
-      return;
-    }
-
-    prepareForNewUpload("yellow");
-    setLoading(true);
-    setFileName(file.name);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const arrayBuffer = e.target.result;
-        const data = new Uint8Array(arrayBuffer);
-        const { caughtPokemon: caught } = parseSavFile(arrayBuffer);
-        
-        setFileData(data);
-        
-        const party = parsePartyPokemon(data);
-
-        setCaughtPokemon(caught);
-        setPartyMembers(party);
-        setError(null);
-      } catch (err) {
-        setError(`Error parsing save file: ${err.message}`);
-        setCaughtPokemon([]);
-        setPartyMembers([]);
-        setFileData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    reader.onerror = () => {
-      setError("Error reading file");
-      setLoading(false);
-    };
-
-    reader.readAsArrayBuffer(file);
-  }, [prepareForNewUpload]);
-
-  const handleLazarusFileChange = useCallback(
-    (event) => {
-      const file = event.target.files?.[0];
+  const handleYellowFileChange = useCallback(
+    async (event) => {
+      const input = event.target;
+      const file = input.files?.[0];
+      // Reset the input so choosing the same file again (e.g. after an error) fires onChange.
+      input.value = "";
       if (!file) {
         return;
       }
 
       const fileNameLower = file.name.toLowerCase();
       if (!fileNameLower.endsWith(".sav") && !fileNameLower.endsWith(".srm")) {
-        setError("Please select a .sav or .srm file");
+        setError(`"${file.name}" isn't a .sav or .srm file.`);
         return;
       }
-      if (!lazarusReferenceReady) {
-        setError("Pokemon Lazarus data is still loading. Please try again in a moment.");
+      if (file.size > MAX_SAVE_FILE_BYTES) {
+        setError(`"${file.name}" is too large to be a Game Boy save file.`);
         return;
       }
 
-      prepareForNewUpload("lazarus");
+      setError(null);
       setLoading(true);
-      setFileName(file.name);
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const arrayBuffer = e.target.result;
-          const data = new Uint8Array(arrayBuffer);
-          const { caughtPokemon: caught, partyMembers: party } = parseLazarusSavFile(arrayBuffer, {
-            recordsByNationalId: lazarusDexByNationalId,
-            recordsBySlug: lazarusDexBySlug,
-            slugByNationalId: speciesSlugLookup,
-          });
-          setFileData(data);
-          setCaughtPokemon(caught);
-          setPartyMembers(party);
-          setError(null);
-        } catch (err) {
-          setError(`Error parsing Pokemon Lazarus save file: ${err.message}`);
-          setCaughtPokemon([]);
-          setPartyMembers([]);
-          setFileData(null);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      reader.onerror = () => {
-        setError("Error reading file");
+      try {
+        const { caughtPokemon: caught, partyMembers: party } = parseSavFile(await file.arrayBuffer());
+        setGameKey("yellow");
+        resetResultFilters();
+        setCaughtPokemon(caught);
+        setPartyMembers(party);
+        setFileName(file.name);
+      } catch (err) {
+        setError(`Couldn't read "${file.name}": ${err?.message || "unknown error"}`);
+      } finally {
         setLoading(false);
-      };
-
-      reader.readAsArrayBuffer(file);
+      }
     },
-    [lazarusDexByNationalId, lazarusDexBySlug, lazarusReferenceReady, prepareForNewUpload, speciesSlugLookup]
+    [resetResultFilters]
   );
 
   const caughtSet = useMemo(() => new Set(caughtPokemon), [caughtPokemon]);
-  const hasSaveData = fileData instanceof Uint8Array;
-  const showingYellow = gameKey === "yellow";
-  // Create a mapping from caught pokemon IDs to dex entries for more robust matching
-  const caughtIdToDexEntry = useMemo(() => {
-    if (showingYellow) return new Map();
-    const map = new Map();
-    lazarusDex.forEach((record) => {
-      const recordId = Number.isFinite(record?.id) ? Number(record.id) : null;
-      const nationalId = record?.nationalId != null ? Number(record.nationalId) : null;
-      // Map both Lazarus custom ID and National Dex ID to this record
-      if (recordId != null) {
-        map.set(recordId, record);
-      }
-      if (nationalId != null) {
-        map.set(nationalId, record);
-      }
-    });
-    return map;
-  }, [lazarusDex, showingYellow]);
+  const hasSaveData = fileName != null;
   const legacyMapReady = showingYellow ? legacyEncountersReady && legacyEncounters instanceof Map : true;
   const yellowReferenceReady = yellowReference instanceof Map;
   const activeGameLabel = showingYellow ? "Pokémon Yellow Legacy" : "Pokémon Lazarus";
   const referenceReady = showingYellow ? yellowReferenceReady : lazarusReferenceReady;
   const referenceError = showingYellow ? yellowReferenceError : lazarusDexError;
+  const dexPanelLabel = showingYellow ? "Pokédex entry" : "Pokédex data";
   const combinedResults = useMemo(() => {
     if (!showingYellow) {
-      return lazarusDex.map((record, index) => {
+      return lazarusRecords.map((record, index) => {
         const { entries: visibleEntries, evolutionRequirement } = buildLazarusLocationEntries(record);
         const recordSlug = normalizeSpeciesSlug(record?.slug || record?.name);
         const entryId = Number.isFinite(record?.id) ? Number(record.id) : index + 1;
-        const entryKey = `${entryId}-${recordSlug || record?.name || "entry"}-${index}`;
+        const entryKey = `${entryId}-${recordSlug || "entry"}-${index}`;
         const recordId = Number.isFinite(record?.id) ? Number(record.id) : null;
         const nationalId = record?.nationalId != null ? Number(record.nationalId) : null;
-        // Check if this record is caught by matching either its Lazarus custom ID or National Dex ID
-        const isCaughtById = (recordId != null && caughtSet.has(recordId)) || 
-                             (nationalId != null && caughtSet.has(nationalId));
-        // Also check reverse mapping: if any caught ID maps to this record (for reverse lookup)
-        // This handles cases where the caught IDs might not directly match record.id or record.nationalId
-        const isCaughtByMapping = Array.from(caughtSet).some((caughtId) => {
-          const mappedRecord = caughtIdToDexEntry.get(Number(caughtId));
-          // Compare by key properties to ensure we match the same record
-          // Use id and slug to uniquely identify records
-          if (!mappedRecord) return false;
-          const mappedId = Number.isFinite(mappedRecord?.id) ? Number(mappedRecord.id) : null;
-          const mappedSlug = normalizeSpeciesSlug(mappedRecord?.slug || mappedRecord?.name);
-          const currentRecordId = Number.isFinite(record?.id) ? Number(record.id) : null;
-          const currentRecordSlug = normalizeSpeciesSlug(record?.slug || record?.name);
-          return mappedId === currentRecordId && mappedSlug === currentRecordSlug;
-        });
+        const name = record?.name || `Pokemon ${entryId}`;
         return {
           entryKey,
           id: entryId,
-          name: record?.name || `Pokemon ${entryId}`,
+          name,
+          displayName: toTitleCase(name),
           slug: recordSlug || null,
-          nationalId: record?.nationalId ?? null,
-          caught: isCaughtById || isCaughtByMapping,
+          nationalId,
+          // Matches either the Lazarus custom ID or the National Dex ID.
+          caught:
+            (recordId != null && caughtSet.has(recordId)) ||
+            (nationalId != null && caughtSet.has(nationalId)),
           visibleEntries,
           evolutionRequirement,
           record,
         };
       });
     }
-    return GEN1_POKEMON_NAMES.map((name, index) => {
+    return GEN1_POKEMON_NAMES.map((slug, index) => {
       const pokemonId = index + 1;
-      const slug = normalizeLegacyPokemonName(name);
       const encounterEntries = legacyMapReady ? legacyEncounters.get(slug) || [] : [];
       return {
         entryKey: `gen1-${pokemonId}`,
         id: pokemonId,
-        name,
+        name: slug,
+        displayName: getGen1DisplayName(slug),
         slug,
         caught: caughtSet.has(pokemonId),
         visibleEntries: encounterEntries,
         evolutionRequirement: EVOLUTION_REQUIREMENTS.get(slug) || null,
       };
     });
-  }, [caughtSet, lazarusDex, legacyEncounters, legacyMapReady, showingYellow]);
+  }, [caughtSet, lazarusRecords, legacyEncounters, legacyMapReady, showingYellow]);
   const { totalDexCount, caughtCount } = useMemo(() => {
     const total = combinedResults.length || (showingYellow ? GEN1_POKEMON_COUNT : 0);
     const caught = combinedResults.reduce((sum, entry) => (entry.caught ? sum + 1 : sum), 0);
@@ -1585,7 +1338,7 @@ export default function SavPage() {
         }
       }
     } else {
-      lazarusDex.forEach((record) => {
+      lazarusRecords.forEach((record) => {
         const segments = getLazarusLocationSegments(record);
         segments.forEach((segment) => {
           const baseName = extractBaseLocationName(segment);
@@ -1596,29 +1349,31 @@ export default function SavPage() {
       });
     }
     return Array.from(names).sort((a, b) => LOCATION_COLLATOR.compare(a, b));
-  }, [lazarusDex, legacyEncounters, showingYellow]);
+  }, [lazarusRecords, legacyEncounters, showingYellow]);
 
   const filteredResults = useMemo(() => {
     const search = String(searchTerm || "").trim().toLowerCase();
+    const searchSlug = normalizeSpeciesSlug(search);
     const locationValue = String(locationFilter || "").trim();
-    const hasData = fileData instanceof Uint8Array;
     return combinedResults.filter((entry) => {
-      // If showOnlyCaught is true and we have save data, only show caught Pokemon
-      if (showOnlyCaught && hasData && !entry.caught) return false;
       if (locationValue) {
         const matchesLocation = entry.visibleEntries.some((loc) => loc.location === locationValue);
         if (!matchesLocation) return false;
       }
       if (!showCaught && entry.caught) return false;
       if (!search) return true;
-      return entry.name.toLowerCase().includes(search);
+      return (
+        entry.displayName.toLowerCase().includes(search) ||
+        entry.name.toLowerCase().includes(search) ||
+        Boolean(searchSlug && entry.slug?.includes(searchSlug))
+      );
     });
-  }, [combinedResults, locationFilter, searchTerm, showCaught, showOnlyCaught, fileData]);
+  }, [combinedResults, locationFilter, searchTerm, showCaught]);
 
   const locationPokemonLookup = useMemo(() => {
     if (!showingYellow) {
       const aggregator = new Map();
-      lazarusDex.forEach((record) => {
+      lazarusRecords.forEach((record) => {
         const locationSegments = getLazarusLocationSegments(record);
         if (locationSegments.length === 0) {
           return;
@@ -1631,7 +1386,7 @@ export default function SavPage() {
             slugMap = new Map();
             aggregator.set(baseLocationName, slugMap);
           }
-          const slug = record?.slug || record?.name || baseLocationName;
+          const slug = normalizeSpeciesSlug(record?.slug || record?.name) || baseLocationName;
           if (!slugMap.has(slug)) {
             slugMap.set(slug, {
               name: record?.name || slug,
@@ -1657,7 +1412,7 @@ export default function SavPage() {
     }
     const aggregator = new Map();
     for (const [slug, entries] of legacyEncounters.entries()) {
-      const displayName = SLUG_TO_TITLE_NAME.get(slug) || toTitleCase(slug);
+      const displayName = getGen1DisplayName(slug);
       if (!displayName) continue;
       const pokemonId = GEN1_SLUG_TO_POKEDEX_ID.get(slug);
       const isCaught = pokemonId ? caughtSet.has(pokemonId) : false;
@@ -1684,39 +1439,29 @@ export default function SavPage() {
       result.set(locationName, shared);
     }
     return result;
-  }, [caughtSet, lazarusDex, legacyEncounters, legacyMapReady, showingYellow]);
-
-  const hasFileSelected = Boolean(fileName);
+  }, [caughtSet, lazarusRecords, legacyEncounters, legacyMapReady, showingYellow]);
 
   const handleClearSave = useCallback(() => {
     setGameKey("yellow");
-    setFileData(null);
     setFileName(null);
     setCaughtPokemon([]);
     setPartyMembers([]);
     setError(null);
-    setLegacyEncounterError(null);
-    setLocationFilter("");
-    setSearchTerm("");
-    setShowCaught(true);
-    setShowOnlyCaught(false);
+    resetResultFilters();
     setLoading(false);
-  }, []);
+  }, [resetResultFilters]);
 
-  const handlePreviewPokedex = useCallback((gameType) => {
-    // Set the game key if not already set
-    if (gameKey !== gameType) {
+  const handlePreviewPokedex = useCallback(
+    (gameType) => {
       setGameKey(gameType);
-    }
-    // Clear search and location filters
-    setSearchTerm("");
-    setLocationFilter("");
-    // Show caught Pokemon - only filter to caught if there's save data
-    setShowCaught(true);
-    // Only show caught Pokemon if we have save data loaded
-    const hasData = fileData instanceof Uint8Array;
-    setShowOnlyCaught(hasData && caughtPokemon.length > 0);
-  }, [gameKey, fileData, caughtPokemon.length]);
+      resetResultFilters();
+    },
+    [resetResultFilters]
+  );
+
+  const toggleDexEntry = useCallback((entryKey) => {
+    setOpenDexEntryKey((current) => (current === entryKey ? null : entryKey));
+  }, []);
 
   return (
     <div className="app-shell sav-page">
@@ -1738,8 +1483,9 @@ export default function SavPage() {
           </h1>
           <div className="sav-page__subtitle-wrapper">
             <p className="subtitle sav-page__subtitle">
-              Import a <strong>Pokemon Yellow Legacy</strong> or <strong>Pokemon Lazarus</strong>{" "}
-              <span className="sav-page__subtitle-emphasis">.sav / .srm</span> file to view your save data entirely in the browser.
+              Import a <strong>Pokemon Yellow Legacy</strong>{" "}
+              <span className="sav-page__subtitle-emphasis">.sav / .srm</span> file to view your save data entirely in the
+              browser, or preview the <strong>Pokemon Lazarus</strong> Pokedex.
             </p>
             <CategoryToggle />
           </div>
@@ -1747,7 +1493,7 @@ export default function SavPage() {
       </header>
       <main className="container sav-page__content">
         <section className="sav-page__grid">
-          {!hasFileSelected && (
+          {!hasSaveData && (
             <>
               <article className="sav-card sav-card--primary">
                 <div className="sav-card__header sav-card__header--with-actions">
@@ -1778,13 +1524,16 @@ export default function SavPage() {
                     disabled={loading}
                   />
                   <p className="sav-meta">Processing happens locally in the browser. No files are uploaded.</p>
-                  {fileName && (
-                    <p className="sav-meta" aria-live="polite">
-                      <strong>Selected:</strong> {fileName}
+                  {loading && (
+                    <p className="sav-status" role="status">
+                      Processing save file...
                     </p>
                   )}
-                  {loading && gameKey === "yellow" && <p className="sav-status">Processing save file...</p>}
-                  {error && gameKey === "yellow" && <div className="sav-alert sav-alert--error">{error}</div>}
+                  {error && (
+                    <div className="sav-alert sav-alert--error" role="alert">
+                      {error}
+                    </div>
+                  )}
                 </div>
               </article>
               <article className="sav-card sav-card--primary">
@@ -1808,8 +1557,9 @@ export default function SavPage() {
                 <div className="sav-card__body sav-card__info-panel-body">
                   <h3 className="sav-card__info-heading">Save Reader Notes</h3>
                   <p>
-                    This reader currently supports <strong>Pokemon Yellow Legacy</strong> and{" "}
-                    <strong>Pokemon Lazarus</strong> saves. If you are using a different ROM, parsing results may be inaccurate.
+                    This reader currently supports <strong>Pokemon Yellow Legacy</strong> saves (English Red, Blue and
+                    Yellow saves use the same format, but locations and evolutions shown are Yellow Legacy&apos;s).{" "}
+                    <strong>Pokemon Lazarus</strong> saves can&apos;t be read yet, but you can preview its Pokedex.
                   </p>
                   <p>
                     Learn more about the Legacy ROMs at{" "}
@@ -1848,6 +1598,9 @@ export default function SavPage() {
                 <p className="sav-card__description">
                   These are the Pokémon currently stored in your party slots.
                 </p>
+                <p className="sav-meta">
+                  <strong>Loaded:</strong> {fileName}
+                </p>
               </div>
               <button type="button" className="sav-card__reset-button" onClick={handleClearSave}>
                 Clear information
@@ -1870,8 +1623,7 @@ export default function SavPage() {
 
                     const displayName =
                       slot.nickname ||
-                      slot.displayName ||
-                      (slot.slug ? toTitleCase(slot.slug) : `Species #${slot.speciesInternalId}`);
+                      (slot.slug ? getGen1DisplayName(slot.slug) : `Species #${slot.speciesInternalId}`);
                     const hpPercent =
                       slot.maxHp && slot.maxHp > 0
                         ? Math.max(0, Math.min(100, (slot.currentHp / slot.maxHp) * 100))
@@ -1881,48 +1633,21 @@ export default function SavPage() {
                     const hasSecondaryType = Boolean(secondaryType);
                     const pokedexNumber =
                       slot.dexId != null ? `No. ${String(slot.dexId).padStart(3, "0")}` : "No. ---";
-                    const pokedexUrl = slot.slug ? buildPokemonPath(slot.slug) : null;
-                    const spriteNationalId = showingYellow
-                      ? slot.dexId ?? slot.speciesInternalId ?? null
-                      : slot.nationalId ?? null;
-                    const slotSlugForSprite = slot.slug || normalizeSpeciesSlug(displayName);
-                    const slotSpriteOverride =
-                      !showingYellow && slotSlugForSprite
-                        ? LAZARUS_SPRITE_OVERRIDES.get(slotSlugForSprite)
-                        : null;
-                    // For non-override sprites, use National Dex ID (numeric) for proper sprite lookup
-                    const defaultSlotIdentifier = showingYellow
-                      ? slot.dexId ?? slot.speciesInternalId ?? 0
-                      : spriteNationalId ?? slot.dexId ?? slot.speciesInternalId ?? 0;
-                    const spriteIdentifier = showingYellow
-                      ? slot.dexId ?? slot.speciesInternalId ?? 0
-                      : slotSpriteOverride ?? defaultSlotIdentifier;
-
-                    const partySpriteProps = showingYellow
-                      ? {
-                          gameSpritePath: "generation-i/yellow/transparent/",
-                          style: {
-                            width: "192px",
-                            height: "192px",
-                            imageRendering: "pixelated",
-                            transform: "scaleX(-1)",
-                          },
-                        }
-                      : {
-                          style: {
-                            width: "192px",
-                            height: "192px",
-                          },
-                          speciesId: spriteNationalId ?? undefined,
-                          formName: slot.slug || slot.displayName || undefined,
-                        };
+                    // Only Gen 1 saves can be loaded, so party slots always use Yellow sprites.
+                    const pokedexUrl = slot.dexId != null ? buildPokemonPath(slot.slug) : null;
+                    const spriteIdentifier = slot.dexId ?? 0;
                     return (
                       <div key={`party-slot-${index}`} className="sav-party-slot has-pokemon">
                         <div className="sav-party-slot__content">
                           <div className="sav-party-slot__sprite-area">
                             <div className="sav-party-slot__sprite-panel">
                               <div className="sav-party-slot__sprite-wrapper">
-                                <SpriteImage id={spriteIdentifier} alt={displayName} {...partySpriteProps} />
+                                <SpriteImage
+                                  id={spriteIdentifier}
+                                  alt={displayName}
+                                  gameSpritePath="generation-i/yellow/transparent/"
+                                  style={PARTY_SPRITE_STYLE}
+                                />
                               </div>
                             </div>
                           </div>
@@ -1965,12 +1690,12 @@ export default function SavPage() {
                           <div className="sav-party-slot__stats-area">
                             <div className="sav-party-slot__number">{pokedexNumber}</div>
                             <div className="sav-party-slot__stat-grid">
+                              {/* Gen 1 (including Yellow Legacy) has a single Special stat. */}
                               {[
                                 ["ATTACK", slot.stats?.attack],
                                 ["DEFENSE", slot.stats?.defense],
-                                ["SP. ATK", slot.stats?.spAttack ?? slot.stats?.special],
-                                ["SP. DEF", slot.stats?.spDefense ?? slot.stats?.special],
                                 ["SPEED", slot.stats?.speed],
+                                ["SPECIAL", slot.stats?.special],
                               ].map(([label, value]) => (
                                 <div key={label} className="sav-party-slot__stat-row">
                                   <span>{label}</span>
@@ -2000,12 +1725,6 @@ export default function SavPage() {
                                   {secondaryType || "\u00A0"}
                                 </span>
                               </div>
-                              {slot.nature && (
-                                <div className="sav-party-slot__meta-line">
-                                  <span className="sav-party-slot__meta-label">NATURE</span>
-                                  <span className="sav-party-slot__meta-value">{slot.nature}</span>
-                                </div>
-                              )}
                               <div className="sav-party-slot__meta-line">
                                 <span className="sav-party-slot__meta-label">IDNo</span>
                                 <span className="sav-party-slot__meta-value">
@@ -2073,10 +1792,7 @@ export default function SavPage() {
                 <button
                   type="button"
                   className={`sav-results-controls__toggle ${showCaught ? "is-active" : ""}`}
-                  onClick={() => {
-                    setShowCaught((prev) => !prev);
-                    setShowOnlyCaught(false);
-                  }}
+                  onClick={() => setShowCaught((prev) => !prev)}
                 >
                   {showCaught ? "Hide caught" : "Show caught"}
                 </button>
@@ -2087,17 +1803,26 @@ export default function SavPage() {
               {showingYellow && legacyEncounterError && (
                 <div className="sav-alert sav-alert--error">{legacyEncounterError}</div>
               )}
+              {!showingYellow && lazarusDexError && (
+                <div className="sav-alert sav-alert--error">{lazarusDexError}</div>
+              )}
               <div className="sav-results-list">
-                {filteredResults.length > 0 ? (
+                {!showingYellow && !lazarusReferenceReady ? (
+                  <div className="sav-location-empty" role="status">
+                    Loading Pokémon Lazarus data...
+                  </div>
+                ) : filteredResults.length > 0 ? (
                   <>
                     {filteredResults.map((entry) => {
-                    const pokemonName = toTitleCase(entry.name);
-                    const pokemonSlug = entry.slug || normalizeLegacyPokemonName(entry.name);
+                    const pokemonName = entry.displayName;
+                    const pokemonSlug = entry.slug || normalizeSpeciesSlug(entry.name);
                     const referenceRecord = showingYellow
                       ? yellowReferenceReady
                         ? yellowReference.get(pokemonSlug)
                         : null
-                      : entry.record || lazarusDexByCustomId.get(entry.id);
+                      : entry.record;
+                    const isDexOpen = openDexEntryKey === entry.entryKey;
+                    const dexPanelId = `sav-dex-panel-${entry.entryKey}`;
                     const speciesLabel = showingYellow
                       ? referenceRecord?.species || "Species unknown"
                       : null;
@@ -2111,14 +1836,11 @@ export default function SavPage() {
                       "sav-result-row",
                       entry.caught ? "is-caught" : "is-uncaught",
                       hasLocationInfo ? "sav-result-row--has-locations" : "",
+                      isDexOpen ? "is-dex-open" : "",
                     ]
                       .filter(Boolean)
                       .join(" ");
-                    const pokedexUrl = showingYellow
-                      ? `/?p=${encodeURIComponent(pokemonSlug || entry.id)}`
-                      : entry.slug
-                      ? buildPokemonPath(entry.slug)
-                      : null;
+                    const pokedexUrl = pokemonSlug ? buildPokemonPath(pokemonSlug) : null;
                     const spriteNationalId = showingYellow ? entry.id : entry.nationalId ?? null;
                     const entrySlugForSprite = entry.slug || pokemonSlug;
                     const spriteOverride =
@@ -2178,17 +1900,29 @@ export default function SavPage() {
                           ["SP. ATK", lazarusStats.spAttack],
                           ["SP. DEF", lazarusStats.spDefense],
                           ["SPEED", lazarusStats.speed],
-                        ].filter(([_, value]) => value != null)
+                        ].filter(([, value]) => value != null)
                       : [];
                     const lazarusTypes = referenceRecord?.types || [];
                     const lazarusAbilities = referenceRecord?.abilities || [];
 
                   return (
-                    <div key={entry.entryKey || entry.id} className={cardClassNames}>
+                    <div
+                      key={entry.entryKey || entry.id}
+                      className={cardClassNames}
+                      data-dex-entry-key={entry.entryKey}
+                    >
                       <div className="sav-result-row__pokemon">
-                        <div className="sav-result-row__sprite">
-                          <SpriteImage id={spriteIdentifier} alt={pokemonName} {...resultSpriteProps} />
-                        </div>
+                        <button
+                          type="button"
+                          className="sav-result-row__sprite sav-result-row__dex-toggle"
+                          aria-expanded={isDexOpen}
+                          aria-controls={dexPanelId}
+                          aria-label={`${isDexOpen ? "Hide" : "Show"} ${dexPanelLabel} for ${pokemonName}`}
+                          title={`${dexPanelLabel}: ${pokemonName}`}
+                          onClick={() => toggleDexEntry(entry.entryKey)}
+                        >
+                          <SpriteImage id={spriteIdentifier} alt="" {...resultSpriteProps} />
+                        </button>
                         <div className="sav-result-row__meta">
                           <div className="sav-result-row__nameblock">
                             <div className="sav-result-row__number">#{String(entry.id).padStart(3, "0")}</div>
@@ -2254,7 +1988,7 @@ export default function SavPage() {
                                   const sharedPokemon =
                                     locationPokemonLookup.get(locationEntry.location) || [];
                                   const sharedOthers = sharedPokemon.filter(
-                                    (item) => item.name !== pokemonName
+                                    (item) => item.slug !== pokemonSlug
                                   );
                                   const caughtEntries = sharedOthers.filter((item) => item.caught);
                                   const missingEntries = sharedOthers.filter((item) => !item.caught);
@@ -2354,7 +2088,13 @@ export default function SavPage() {
                             <div className="sav-location-empty">Loading encounter data...</div>
                           )}
                         </div>
-                        <div className="sav-result-row__yellow-hover-panel" aria-hidden="true">
+                        <div
+                          id={dexPanelId}
+                          className="sav-result-row__yellow-hover-panel"
+                          role="region"
+                          aria-label={`${dexPanelLabel}: ${pokemonName}`}
+                          aria-hidden={!isDexOpen}
+                        >
                           {referenceReady ? (
                             referenceRecord ? (
                               showingYellow ? (
@@ -2468,10 +2208,22 @@ export default function SavPage() {
                           >
                             <div className="sav-evolution__label">Evolution</div>
                             <div className="sav-evolution__chain">
+                              {entry.evolutionRequirement.from && (
+                                <>
+                                  <span className="sav-evolution__stage">
+                                    {entry.evolutionRequirement.from}
+                                  </span>
+                                  <span className="sav-evolution__arrow-icon" aria-hidden="true">
+                                    →
+                                  </span>
+                                </>
+                              )}
                               <span className="sav-evolution__method">
                                 {entry.evolutionRequirement.method}
                               </span>
-                              <span className="sav-evolution__arrow-icon">→</span>
+                              <span className="sav-evolution__arrow-icon" aria-hidden="true">
+                                →
+                              </span>
                               <span className="sav-evolution__stage">
                                 {entry.evolutionRequirement.target}
                               </span>

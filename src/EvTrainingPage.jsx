@@ -1,436 +1,830 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 import GameFilters from "./sections/GameFilters.jsx";
-import { NATIONAL_GAME_OPTIONS } from "./constants/games.js";
-import { GAME_LOGO_LOOKUP } from "./constants/games.js";
+import { NATIONAL_GAME_OPTIONS, GAME_LOGO_LOOKUP } from "./constants/games.js";
+import {
+	EV_PANEL_FEATHERS,
+	EV_PANEL_POWER_ITEMS,
+	EV_PANEL_VITAMINS,
+	GRIT_ITEMS,
+	getPowerItemBonus,
+} from "./constants/evItems.js";
 import SpriteImage from "./components/SpriteImage.jsx";
+import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
+import { formatPokemonName } from "./utils/pokemonNames.js";
 
-// Simple name -> id cache for sprite lookup
-const NAME_TO_ID_CACHE = new Map();
+/*
+ * Facts on this page were checked against Bulbapedia ("Effort values", "Effort level", "Go Power",
+ * the per-generation "List of Pokémon by effort value yield" pages, item pages and location pages)
+ * and PokeAPI encounter data.
+ */
 
-function usePokemonIdByName(name) {
-    const lower = String(name || "").toLowerCase().trim();
-    const [id, setId] = useState(() => {
-        try {
-            if (!lower) return null;
-            const cached = localStorage.getItem(`pokeIdByName:${lower}`);
-            if (cached) return Number(cached);
-        } catch {}
-        if (NAME_TO_ID_CACHE.has(lower)) return NAME_TO_ID_CACHE.get(lower);
-        return null;
-    });
-    useEffect(() => {
-        let ignore = false;
-        if (!lower || Number.isFinite(id)) return;
-        const cachedMap = NAME_TO_ID_CACHE.get(lower);
-        if (Number.isFinite(cachedMap)) {
-            setId(cachedMap);
-            return;
-        }
-        const cachedLs = (() => {
-            try {
-                const v = localStorage.getItem(`pokeIdByName:${lower}`);
-                return v != null ? Number(v) : null;
-            } catch {
-                return null;
-            }
-        })();
-        if (Number.isFinite(cachedLs)) {
-            NAME_TO_ID_CACHE.set(lower, cachedLs);
-            setId(cachedLs);
-            return;
-        }
-        fetch(`https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(lower)}`)
-            .then((r) => r.json())
-            .then((data) => {
-                if (ignore) return;
-                const nextId = Number(data?.id);
-                if (Number.isFinite(nextId)) {
-                    NAME_TO_ID_CACHE.set(lower, nextId);
-                    try {
-                        localStorage.setItem(`pokeIdByName:${lower}`, String(nextId));
-                    } catch {}
-                    setId(nextId);
-                }
-            })
-            .catch(() => {});
-        return () => {
-            ignore = true;
-        };
-    }, [lower, id]);
-    return id;
+/* ------------------------------------------------------------------------------- game rules */
+
+// system: "statexp" (Gen I-II Stat Experience), "ev" (modern EVs), "av" (Let's Go AVs),
+// "el" (Legends: Arceus Effort Levels).
+// feathers: true | false | "dlc" (Legends: Z-A only sells them in the Mega Dimension DLC).
+// pokerus / catchEvs / machoBrace: true | false | null (null = not stated for that game).
+const GAME_RULES = {
+	"red-blue-yellow": { gen: 1, system: "statexp" },
+	"gold-silver-crystal": { gen: 2, system: "statexp" },
+	"ruby-sapphire-emerald": { gen: 3, system: "ev", pokerus: true, machoBrace: true },
+	"firered-leafgreen": { gen: 3, system: "ev", pokerus: true, machoBrace: true },
+	"diamond-pearl": { gen: 4, system: "ev", pokerus: true, machoBrace: true },
+	platinum: { gen: 4, system: "ev", pokerus: true, machoBrace: true },
+	"heartgold-soulsilver": { gen: 4, system: "ev", pokerus: true, machoBrace: true },
+	"black-white": { gen: 5, system: "ev", feathers: true, pokerus: true, machoBrace: true },
+	"black-2-white-2": { gen: 5, system: "ev", feathers: true, pokerus: true, machoBrace: true },
+	"x-y": { gen: 6, system: "ev", feathers: true, pokerus: true, catchEvs: true, machoBrace: true },
+	"omega-ruby-alpha-sapphire": { gen: 6, system: "ev", feathers: true, pokerus: true, catchEvs: true, machoBrace: true },
+	"sun-moon": { gen: 7, system: "ev", feathers: true, pokerus: true, catchEvs: true, machoBrace: false },
+	"ultra-sun-ultra-moon": { gen: 7, system: "ev", feathers: true, pokerus: true, catchEvs: true, machoBrace: false },
+	"lets-go": { gen: 7, system: "av" },
+	"sword-shield": { gen: 8, system: "ev", feathers: true, pokerus: true, catchEvs: true, machoBrace: true },
+	"brilliant-diamond-shining-pearl": { gen: 8, system: "ev", feathers: false, pokerus: true, catchEvs: true, machoBrace: true },
+	"legends-arceus": { gen: 8, system: "el" },
+	"scarlet-violet": { gen: 9, system: "ev", feathers: true, pokerus: false, catchEvs: true, machoBrace: false },
+	"legends-za": { gen: 9, system: "ev", feathers: "dlc", pokerus: null, catchEvs: null, machoBrace: false },
+};
+
+const perStatCap = (gen) => (gen >= 6 ? 252 : 255);
+
+function getEvBasics(rules) {
+	if (!rules) {
+		return [
+			"From Generation III on, a Pokémon can hold 510 EVs in total. The per-stat cap is 255 in Generations III–V and 252 from Generation VI; either way only 252 count toward the stat.",
+			"Every 4 EVs in a stat add 1 point to it at level 100 (proportionally less at lower levels).",
+			"Defeating a Pokémon grants its species' EV yield; from Generation VI, catching one does too.",
+			"Vitamins add 10 EVs each. Through Generation VII they stop working once the stat has 100 EVs; from Generation VIII they work all the way to 252. Feathers (called Wings before Sword & Shield) add 1 EV each.",
+			"Power Items add +4 (Generations IV–VI) or +8 (Generation VII on) EVs of their stat per Pokémon defeated, and Pokérus doubles EVs from battles (it doesn't exist in Let's Go or Scarlet & Violet).",
+			"Generations I–II use Stat Experience, Let's Go uses Awakening Values and Legends: Arceus uses Effort Levels — pick a game for the details.",
+			"Natures modify final stats by ±10%; pair your EV spread with a matching nature to squeeze the most value out of each point.",
+		];
+	}
+	const { gen } = rules;
+	const bonus = getPowerItemBonus(gen);
+	const items = [];
+	items.push(
+		gen <= 5
+			? `Each Pokémon can hold up to 510 EVs overall and ${perStatCap(gen)} in a single stat, but only 252 of those count (stats use EVs ÷ 4).`
+			: "Each Pokémon can hold up to 510 EVs overall, with no more than 252 in a single stat."
+	);
+	items.push("Every 4 EVs in a stat translate to +1 stat point at level 100 (less at lower levels).");
+	const gainWho = gen <= 5
+		? "Only Pokémon that took part in the battle (or hold the Exp. Share) receive them."
+		: rules.catchEvs === null
+			? ""
+			: "Every party member that receives Exp. through the Exp. Share also gets the full EVs.";
+	items.push(`Defeating${rules.catchEvs ? " or catching" : ""} a Pokémon grants its species' EV yield. ${gainWho}`.trim());
+	const boosts = [];
+	if (rules.pokerus) boosts.push("Pokérus doubles EVs earned in battle");
+	if (bonus) boosts.push(`a Power Item adds +${bonus} EVs of its stat per Pokémon defeated`);
+	if (rules.machoBrace) boosts.push("the Macho Brace doubles battle EVs");
+	if (rules.pokerus === false) boosts.push("Pokérus has no effect in this game");
+	if (boosts.length) {
+		const text = boosts.join("; ");
+		items.push(`${text.charAt(0).toUpperCase()}${text.slice(1)}.`);
+	}
+	const featherName = gen <= 7 ? "Wings" : "Feathers";
+	const featherLabel = rules.feathers === "dlc" ? `${featherName} (Mega Dimension DLC)` : featherName;
+	const featherText = rules.feathers ? ` ${featherLabel} add 1 EV each, up to the ${perStatCap(gen)} cap.` : "";
+	items.push(
+		gen >= 8
+			? `Vitamins add 10 EVs each and work all the way to 252 (the old 100-EV limit was removed in Generation VIII), so 26 bottles max out a stat.${featherText}`
+			: `Vitamins add 10 EVs each but can't be used once that stat already has 100 EVs.${featherText}`
+	);
+	items.push("Natures modify final stats by ±10%; pair your EV spread with a matching nature to squeeze the most value out of each point.");
+	return items;
 }
+
+/* ------------------------------------------------------------------------- per-game guides */
+
+const box = (title, items) => ({ title, items });
+
+const GEN3_CAPS = "510 EVs in total and up to 255 in one stat (only 252 count); vitamins stop working once a stat has 100 EVs.";
+const GEN4_CAPS = GEN3_CAPS;
+const GEN3_4_PARTY = "Only Pokémon that battle (or hold the Exp. Share) gain EVs, so lead with your trainee and switch out, or give it the Exp. Share.";
+const GEN8_VITAMINS = "Vitamins add 10 EVs each with no 100-EV limit (new in Generation VIII), so 26 bottles max out a stat.";
+
+const GUIDES = {
+	"red-blue-yellow": [
+		box("Generation I (RBY): Stat Experience", [
+			"No modern EVs: each stat has its own Stat Experience, up to 65,535, with no overall cap.",
+			"Defeating a Pokémon adds its base stats to the Stat Exp of the Pokémon that battled (split between them if several took part).",
+			"Vitamins add 2,560 Stat Exp each and are refused once that stat has 25,600 or more.",
+			"Stats update on level-up, or when the Pokémon is withdrawn from the PC (the box trick).",
+			"There is a single Special stat; Calcium raises it.",
+		]),
+		box("EV Items and where to buy", [
+			"Vitamins (HP Up, Protein, Iron, Carbos, Calcium): Celadon Department Store, for cash.",
+			"Power Items, the Macho Brace, Wings/Feathers, EV-reducing berries and Pokérus don't exist yet.",
+		]),
+	],
+	"gold-silver-crystal": [
+		box("Generation II (GSC): Stat Experience + Pokérus", [
+			"Same Stat Exp system as Generation I: up to 65,535 per stat and no 510 total cap.",
+			"Sp. Atk and Sp. Def share one Special Stat Exp value (gained from the foe's Sp. Atk base stat), so Calcium raises both; Zinc doesn't exist until Generation III.",
+			"Pokérus debuts and doubles Stat Exp from battles; the effect stays even after the Pokémon is cured.",
+			"Vitamins add 2,560 Stat Exp each until that stat reaches 25,600; EV-reducing berries do not exist yet.",
+		]),
+		box("EV Items and where to buy", [
+			"Vitamins (HP Up, Protein, Iron, Carbos, Calcium): Goldenrod Department Store and Celadon Department Store, for cash.",
+			"Power Items, the Macho Brace and Wings/Feathers don't exist yet.",
+		]),
+	],
+	"ruby-sapphire-emerald": [
+		box("Ruby, Sapphire & Emerald: Quick Setup", [
+			GEN3_CAPS,
+			"Get the Macho Brace from the Winstrate family on Route 111: it doubles battle EVs, and Pokérus doubles them again (4×).",
+			"Power Items do not exist yet, so track knockouts manually.",
+		]),
+		box("Shopping Notes", [
+			"Buy vitamins from Lilycove Department Store or the Energy Guru in Slateport Market.",
+			"Emerald only: Pomeg, Kelpsy, Qualot, Hondew, Grepa and Tamato Berries lower a stat by 10 EVs (the Berry Master on Route 123 hands them out). In Ruby and Sapphire they can't be used on Pokémon.",
+			GEN3_4_PARTY,
+		]),
+	],
+	"firered-leafgreen": [
+		box("FireRed & LeafGreen: Quick Setup", [
+			GEN3_CAPS,
+			"The Macho Brace is an item in Viridian Gym; Power Items don't exist yet.",
+			"Pokérus can't be caught here (the games have no clock) and doesn't spread; only Pokémon traded in already infected have it.",
+			"Use the Vs. Seeker to rematch trainers, or stay in spots dominated by a single species.",
+		]),
+		box("Shopping Notes", [
+			"Stock up on vitamins at the Celadon Department Store.",
+			"EV-reducing berries do nothing in FireRed and LeafGreen; that effect started with Emerald.",
+			GEN3_4_PARTY,
+		]),
+	],
+	"heartgold-soulsilver": [
+		box("HeartGold & SoulSilver: Quick Setup", [
+			GEN4_CAPS,
+			"Power Items (+4 EVs per KO, doubled by Pokérus) cost 16 BP at the Battle Frontier.",
+			"The Macho Brace is held by the Machop you receive in an in-game trade at Goldenrod Department Store.",
+			"Plan sessions around rematch trainers, Safari Zone blocks, or tall-grass loops.",
+		]),
+		box("Shopping Notes", [
+			"Vitamins are sold in the Goldenrod and Celadon Department Stores.",
+			"EV-reducing berries lower a stat by 10 EVs, or straight to 100 if it was above 110; grow extras in the Berry Pots.",
+			GEN3_4_PARTY,
+		]),
+	],
+	"diamond-pearl": [
+		box("Diamond, Pearl & Platinum: Quick Setup", [
+			GEN4_CAPS,
+			"Power Items (+4 EVs per KO, doubled by Pokérus) cost 16 BP at the Battle Park's Exchange Service Corner (Diamond/Pearl) or the Battle Frontier (Platinum).",
+			"The Macho Brace is found in Pastoria City.",
+			"Use the Vs. Seeker or Poké Radar chains to repeat encounters efficiently.",
+		]),
+		box("Shopping Notes", [
+			"Buy vitamins at Veilstone Department Store.",
+			"EV-reducing berries lower a stat by 10 EVs, or straight to 100 if it was above 110; the Berry Master's house on Route 208 gives them out.",
+			"Use the Pokétch Counter app to track knockouts per stat.",
+		]),
+	],
+	"black-white": [
+		box("Black & White: Quick Setup", [
+			"510 EVs in total and up to 255 per stat (only 252 count); vitamins stop at 100 EVs, but Wings (+1 each) keep working up to 255.",
+			"Power Items (+4 EVs per KO) cost 16 BP at the Battle Subway in Nimbasa City.",
+			"Audino in shaking grass give 2 HP EVs plus plenty of Exp.",
+		]),
+		box("Shopping Notes", [
+			"Vitamins are sold at Shopping Mall Nine on Route 9.",
+			"The Macho Brace is in Nimbasa City's eastern gate.",
+			"Investigate the bird shadows on Driftveil Drawbridge and Marvelous Bridge for Wings to top off stats.",
+		]),
+	],
+	"black-2-white-2": [
+		box("Black 2 & White 2: Quick Setup", [
+			"Power Items (+4 EVs per KO) cost 16 BP at the Battle Subway or the Pokémon World Tournament.",
+			"Join Avenue's Market sells vitamins by the dozen, and its Dojo, Beauty Salon and Café can raise or lower EVs for a fee.",
+			"Wings from Driftveil Drawbridge and Marvelous Bridge (and Black Tower/White Treehollow) fine-tune leftover points.",
+		]),
+		box("Shopping Notes", [
+			"Buy vitamins at Shopping Mall Nine or Join Avenue's Market.",
+			"The Macho Brace is in Nimbasa City's eastern gate.",
+			"After the Champion, Bianca (via Xtransceiver) tells you when a party Pokémon has 510 EVs or 252 in a stat.",
+		]),
+	],
+	"x-y": [
+		box("X & Y: Quick Setup", [
+			"Horde battles give five Pokémon's EVs at once, and Power Items add their bonus for each one; use Sweet Scent or Honey where hordes appear (in clear weather).",
+			"Super Training raises individual stats, and a Reset Bag wipes all of a Pokémon's EVs.",
+			"Power Items (+4 EVs per KO) cost 16 BP at the Battle Maison in Kiloude City.",
+		]),
+		box("Shopping Notes", [
+			"Buy vitamins at the Laverre City Poké Mart for 9,800 Pokédollars each.",
+			"The Macho Brace is on Route 15.",
+			"The Juice Shoppe in Lumiose City sells and blends EV juices.",
+		]),
+	],
+	"omega-ruby-alpha-sapphire": [
+		box("Omega Ruby & Alpha Sapphire: Quick Setup", [
+			"Horde encounters (Sweet Scent or Honey) give five Pokémon's EVs at once.",
+			"Power Items (+4 EVs per KO) cost 16 BP at the Battle Maison in the Battle Resort.",
+			"Super Training raises individual stats, and a Reset Bag wipes all EVs.",
+		]),
+		box("Shopping Notes", [
+			"Vitamins are available in Lilycove Department Store or from the Energy Guru in Slateport Market.",
+			"The Macho Brace is on Route 111; it or a Power Item stacks with Pokérus.",
+			"Use the DexNav to find specific species quickly.",
+		]),
+	],
+	"sun-moon": [
+		box("Sun, Moon, Ultra Sun & Ultra Moon: Quick Setup", [
+			"Allies called in SOS battles give double EVs. Adrenaline Orbs make wild Pokémon call for help more often (in Ultra Sun/Ultra Moon they only call once per battle without one).",
+			"Power Items now add +8 EVs per KO; they cost 16 BP at the Battle Royal Dome. The Macho Brace isn't obtainable.",
+			"Isle Evelup in Poké Pelago trains boxed Pokémon passively, and Festival Plaza Bouncy Houses and Food Stalls can adjust EVs.",
+		]),
+		box("Shopping Notes", [
+			"Buy vitamins at the Mount Hokulani Poké Mart for 10,000 Pokédollars each.",
+			"EV-reducing berries come from the berry piles on Route 10.",
+			"Keep a False Swipe user with lots of PP to maintain SOS chains easily; press Y on the Summary screen to see the EV graph.",
+		]),
+	],
+	"lets-go": [
+		box("Let's Go (LGPE): Awakening Values (AVs)", [
+			"There are no EVs: stats grow through Awakening Values, up to 200 in each stat.",
+			"Every level-up adds 1 AV to a random stat; Candy raises the stat you choose.",
+			"Vitamins, Feathers, Power Items and Pokérus aren't part of these games.",
+		]),
+		box("AV Candy and how to get it", [
+			"Stat Candy: Health (HP), Mighty (Attack), Tough (Defense), Smart (Sp. Atk), Courage (Sp. Def) and Quick (Speed), each also in L and XL sizes.",
+			"Each use adds 1 AV, but higher AVs need more Candy; larger sizes count for more, and past certain AV thresholds only the larger sizes work.",
+			"Get Candy by catching wild Pokémon (longer Catch Combos give more and bigger Candy) or by transferring Pokémon to Professor Oak; species Candy raises all of that Pokémon's AVs by 1.",
+		]),
+	],
+	"legends-arceus": [
+		box("Legends: Arceus: Effort Levels (ELs)", [
+			"Stats use Effort Levels (0–10 per stat) instead of EVs. Starting ELs come from IVs: IV 20–25 gives EL 1, 26–30 gives EL 2 and 31 gives EL 3.",
+			"Each EL adds a bonus straight onto the stat, scaled by the Pokémon's base stat and level.",
+			"Natures still modify stats. Battles still award hidden EVs, but they only matter after a transfer via HOME, and ELs don't carry over.",
+			"ELs are raised only by using Grit items.",
+		]),
+		box("How to get Grit", [
+			"Defeat wild Pokémon in battle; alpha Pokémon are the best source.",
+			"Release Pokémon from your pastures (mass releases add up quickly).",
+			"Trade 10 of one Grit tier for 1 of the next with Zisu at the training grounds in Jubilife Village.",
+			"Many requests and missions also reward Grit.",
+		]),
+	],
+	"sword-shield": [
+		box("Sword & Shield: Quick Setup", [
+			`${GEN8_VITAMINS} Buy them at Wyndon's southern Poké Mart or for 2 BP in Hammerlocke.`,
+			"Power Items (+8 EVs per KO) and the Macho Brace cost 10 BP at Hammerlocke's BP shop.",
+			"Every party member gains EXP and EVs, so bench anyone already trained. Max Raid Battles give no EVs, but Hammerlocke University seminars (Poké Jobs) raise EVs while you're away.",
+		]),
+		box("Fast Cash & BP", [
+			"Earn BP at the Battle Tower in Wyndon and spend it at Hammerlocke's BP shop.",
+			"Rematch the Champion Cup at Wyndon Stadium for big prize money; an Amulet Coin or G-Max Gold Rush adds more.",
+			"Farm Max Raid dens for Watts and pay the Digging Duo at Bridge Field (across from the Nursery) 500 Watts to dig up items such as Bottle Caps.",
+		]),
+	],
+	"brilliant-diamond-shining-pearl": [
+		box("Brilliant Diamond & Shining Pearl: Quick Setup", [
+			GEN8_VITAMINS,
+			"Power Items (+8 EVs per KO) cost 10 BP at the Battle Park's Exchange Service Corner; the Macho Brace is found in Pastoria City. Wings/Feathers aren't available.",
+			"Use Poké Radar chains or Grand Underground hideaways to isolate single-stat species.",
+		]),
+		box("Shopping Notes", [
+			"Vitamins are sold at Veilstone Department Store.",
+			"EV-reducing berries come from the Berry Master's house on Route 208 or are picked up by walking Pokémon.",
+			"Press X on the Summary screen to see the EV graph, and use the Pokétch Counter app to track KOs.",
+		]),
+	],
+	"scarlet-violet": [
+		box("Scarlet & Violet: Quick Start", [
+			"Power Items add +8 EVs; 1 EV foes give 9 EVs total, so 28 KOs hits 252.",
+			"2 EV foes (e.g., Cyclizar) give 10 EVs; only 26 KOs needed.",
+			"Your whole party gains EVs from battles, so box anything you don't want training.",
+			"Let's Go auto battles (R button) give no EVs; battle manually.",
+			`${GEN8_VITAMINS} Pokérus doesn't work in Scarlet & Violet.`,
+		]),
+		box("Shop Cheat Sheet", [
+			"Power Items: Delibird Presents (Mesagoza/Levincia/Cascarrafa) for 10,000₽.",
+			"Vitamins: Chansey Supply for 10,000₽ each once you have 3 Gym Badges.",
+			"Feathers & EV-reducing berries: Porto Marinada auctions, Tera Raid Battles and sparkling overworld items.",
+			"Press L on the moves-and-stats screen to see the EV graph; a Fresh-Start Mochi (The Teal Mask) resets all EVs.",
+		]),
+	],
+	"legends-za": [
+		box("Legends: Z-A: EV Training", [
+			"Farm EVs by battling in Wild Zones. Each Wild Zone mixes several species, so pick zones where your target stat dominates.",
+			"Vitamins are sold at every Pokémon Center (5,000₽ each) and work up to 252; Power Items come from Side Mission 072 or Quasartico Inc. (180 Mega Shards).",
+			"Smashing Mega Crystals gives Exp. but no EVs, even with a Power Item.",
+			"Lady Clear in the Rust Syndicate Office lobby resets EVs for 5 Mega Shards; EV-reducing berries are sold in Magenta Sector 1, Magenta Sector 6 and Jaune Plaza.",
+			"Feathers are only available with the Mega Dimension DLC (Vert Sector 7, 60 Mega Shards).",
+		]),
+	],
+};
+GUIDES.platinum = GUIDES["diamond-pearl"];
+GUIDES["ultra-sun-ultra-moon"] = GUIDES["sun-moon"];
+
+/* ------------------------------------------------------------------------- go-to targets */
+
+// One entry per species group: `ev` is the per-KO yield of every species in `species`.
+// Yields: Bulbapedia's per-generation EV yield lists (cross-checked with PokeAPI). Locations:
+// PokeAPI encounter data (Gen III-VI) and Bulbapedia location pages (Gen VII-IX).
+const t = (stat, ev, species, location) => ({ stat, ev, species, location });
+
+const TARGETS_BY_GAME = {
+	"ruby-sapphire-emerald": [
+		t("HP", 1, ["whismur"], "Rusturf Tunnel"),
+		t("Attack", 1, ["shuppet"], "Mt. Pyre (Sapphire/Emerald)"),
+		t("Defense", 1, ["aron"], "Granite Cave B1F/B2F"),
+		t("Sp. Atk", 1, ["spinda"], "Route 113"),
+		t("Sp. Def", 1, ["tentacool"], "Surfing on most Hoenn sea routes"),
+		t("Speed", 1, ["zubat"], "Meteor Falls / Granite Cave"),
+	],
+	"firered-leafgreen": [
+		t("HP", 2, ["jigglypuff"], "Route 3"),
+		t("Attack", 1, ["mankey"], "Route 22"),
+		t("Attack", 2, ["primeape"], "Route 23 / Victory Road"),
+		t("Defense", 1, ["geodude", "onix"], "Victory Road"),
+		t("Sp. Atk", 1, ["gastly"], "Pokémon Tower"),
+		t("Sp. Def", 1, ["tentacool"], "Routes 19–21 (surf)"),
+		t("Speed", 1, ["diglett"], "Diglett's Cave"),
+		t("Speed", 2, ["dugtrio"], "Diglett's Cave"),
+	],
+	"heartgold-soulsilver": [
+		t("HP", 1, ["wooper"], "Union Cave 1F/B1F (surf)"),
+		t("HP", 2, ["quagsire"], "Union Cave 1F/B1F (surf)"),
+		t("Attack", 1, ["mankey"], "Route 42 (HeartGold)"),
+		t("Attack", 1, ["machop"], "Mt. Mortar"),
+		t("Defense", 1, ["geodude"], "Route 45"),
+		t("Defense", 2, ["graveler"], "Route 45"),
+		t("Sp. Atk", 1, ["gastly"], "Sprout/Bell Tower (night)"),
+		t("Sp. Def", 1, ["tentacool"], "Route 41 (surf)"),
+		t("Sp. Def", 2, ["tentacruel"], "Route 41 (surf)"),
+		t("Speed", 1, ["diglett"], "Diglett's Cave"),
+		t("Speed", 2, ["pidgeotto"], "Route 43 (morning/day)"),
+	],
+	"diamond-pearl": [
+		t("HP", 1, ["wooper"], "Great Marsh"),
+		t("HP", 2, ["quagsire"], "Great Marsh"),
+		t("Attack", 2, ["gyarados"], "Super Rod (e.g. Route 218)"),
+		t("Attack", 2, ["bibarel"], "Route 209"),
+		t("Defense", 1, ["geodude"], "Iron Island"),
+		t("Defense", 2, ["graveler"], "Iron Island"),
+		t("Sp. Atk", 1, ["gastly"], "Old Chateau"),
+		t("Sp. Def", 2, ["tentacruel"], "Route 223 (surf)"),
+		t("Speed", 1, ["starly"], "Route 201"),
+		t("Speed", 2, ["staravia"], "Route 209 / Route 212 north (day)"),
+	],
+	"black-white": [
+		t("HP", 2, ["audino"], "Shaking grass (e.g. Routes 1–3)"),
+		t("Attack", 1, ["lillipup"], "Route 1 (grass)"),
+		t("Attack", 2, ["herdier"], "Route 1 dark grass (west, needs Surf)"),
+		t("Defense", 1, ["roggenrola"], "Wellspring Cave"),
+		t("Sp. Atk", 1, ["litwick", "elgyem"], "Celestial Tower"),
+		t("Sp. Def", 1, ["frillish"], "Driftveil City / Route 17 (surf)"),
+		t("Speed", 2, ["basculin"], "Surfing or fishing (e.g. Route 3)"),
+	],
+	"black-2-white-2": [
+		t("HP", 2, ["audino"], "Shaking grass (Floccesy Ranch)"),
+		t("Attack", 1, ["sandile"], "Desert Resort / Route 4"),
+		t("Defense", 2, ["swadloon"], "Lostlorn Forest"),
+		t("Sp. Atk", 1, ["litwick", "elgyem"], "Celestial Tower"),
+		t("Sp. Def", 1, ["frillish"], "Route 4 (surf)"),
+		t("Sp. Def", 2, ["jellicent"], "Humilau City (rippling water)"),
+		t("Speed", 2, ["basculin"], "Surfing or fishing (e.g. Floccesy Ranch)"),
+	],
+	"x-y": [
+		t("HP", 1, ["gulpin"], "Route 5 (hordes)"),
+		t("Attack", 1, ["bellsprout"], "Route 14 (hordes)"),
+		t("Attack", 2, ["weepinbell"], "Route 19 (hordes)"),
+		t("Defense", 1, ["nosepass"], "Route 10 (hordes)"),
+		t("Defense", 2, ["durant"], "Terminus Cave (hordes)"),
+		t("Sp. Atk", 1, ["vanillite"], "Frost Cavern (hordes)"),
+		t("Sp. Def", 1, ["hoppip"], "Route 7 (hordes)"),
+		t("Speed", 1, ["wingull"], "Route 8 / Azure Bay (hordes)"),
+		t("Speed", 2, ["floatzel"], "Victory Road (hordes)"),
+	],
+	"omega-ruby-alpha-sapphire": [
+		t("HP", 1, ["whismur"], "Rusturf Tunnel (hordes)"),
+		t("Attack", 1, ["shuppet"], "Mt. Pyre interior (hordes)"),
+		t("Defense", 1, ["sandshrew"], "Route 111 desert (hordes)"),
+		t("Sp. Atk", 1, ["spinda"], "Route 113 (hordes)"),
+		t("Sp. Def", 1, ["swablu"], "Route 115 (hordes)"),
+		t("Speed", 1, ["zubat"], "Meteor Falls (hordes)"),
+	],
+	"sun-moon": [
+		t("HP", 1, ["caterpie"], "Route 1"),
+		t("Attack", 1, ["yungoos"], "Route 1 (day)"),
+		t("Defense", 1, ["roggenrola"], "Ten Carat Hill"),
+		t("Sp. Atk", 1, ["gastly"], "Hau'oli Cemetery"),
+		t("Sp. Def", 1, ["dewpider"], "Brooklet Hill (day)"),
+		t("Speed", 1, ["zubat"], "Verdant Cavern"),
+	],
+	"sword-shield": [
+		t("HP", 2, ["wobbuffet", "diggersby", "noctowl"], "Hammerlocke Hills / Giant's Cap"),
+		t("Attack", 2, ["perrserker"], "Route 7"),
+		t("Defense", 2, ["torkoal", "carkol"], "Giant's Cap (harsh sunlight)"),
+		t("Sp. Atk", 2, ["maractus"], "Route 6 / Stony Wilderness (harsh sunlight)"),
+		t("Sp. Def", 1, ["duskull"], "Watchtower Ruins"),
+		t("Speed", 2, ["liepard", "galvantula"], "Route 7"),
+	],
+	"brilliant-diamond-shining-pearl": [
+		t("HP", 1, ["wooper"], "Route 212 south (surf)"),
+		t("HP", 2, ["quagsire"], "Route 212 south (surf)"),
+		t("Attack", 2, ["gyarados"], "Super Rod (e.g. Route 218)"),
+		t("Attack", 2, ["bibarel"], "Route 209"),
+		t("Defense", 1, ["geodude"], "Iron Island"),
+		t("Defense", 2, ["graveler"], "Iron Island"),
+		t("Sp. Atk", 1, ["gastly"], "Old Chateau / Lost Tower"),
+		t("Sp. Def", 2, ["tentacruel"], "Route 223 (surf)"),
+		t("Speed", 1, ["starly"], "Route 201"),
+		t("Speed", 2, ["staravia"], "Route 209 / Route 212 north"),
+	],
+	// The Scarlet/Violet maps already name the area, so these entries carry no location text.
+	"scarlet-violet": [
+		t("HP", 2, ["gastrodon"]),
+		t("HP", 3, ["azumarill"]),
+		t("Attack", 2, ["heracross", "bisharp", "lokix"]),
+		t("Attack", 3, ["luxray"]),
+		t("Defense", 1, ["bergmite"]),
+		t("Defense", 2, ["avalugg", "slowbro"]),
+		t("Sp. Atk", 2, ["flaaffy", "girafarig"]),
+		t("Sp. Def", 1, ["swablu"]),
+		t("Sp. Def", 2, ["sliggoo", "altaria"]),
+		t("Speed", 1, ["murkrow", "deerling", "rookidee", "wattrel"]),
+		t("Speed", 2, ["corvisquire", "cyclizar"]),
+	],
+	"legends-za": [
+		t("HP", 1, ["snorunt"], "Wild Zone 12"),
+		t("HP", 2, ["gogoat"], "Wild Zone 12"),
+		t("Attack", 1, ["scyther", "phantump"], "Wild Zone 13"),
+		t("Attack", 2, ["weepinbell", "pinsir", "heracross"], "Wild Zone 13"),
+		t("Defense", 1, ["onix", "aron"], "Wild Zone 14"),
+		t("Defense", 2, ["lairon"], "Wild Zone 14"),
+		t("Sp. Atk", 2, ["lampent", "pyroar"], "Wild Zone 17"),
+		t("Sp. Def", 1, ["swablu"], "Wild Zone 18"),
+		t("Sp. Def", 2, ["altaria"], "Wild Zone 18"),
+		t("Speed", 1, ["espurr"], "Wild Zone 3"),
+		t("Speed", 2, ["pikachu"], "Wild Zone 3"),
+	],
+};
+TARGETS_BY_GAME.platinum = TARGETS_BY_GAME["diamond-pearl"];
+TARGETS_BY_GAME["ultra-sun-ultra-moon"] = TARGETS_BY_GAME["sun-moon"];
+
+// Map screenshots exist for these games; Scarlet/Violet screenshots already show the area name.
+const MAP_FOLDERS = {
+	"scarlet-violet": "scarletviolet",
+	"legends-za": "legendsza",
+	"sword-shield": "swordshield",
+};
+const MAP_FILE_BY_STAT = {
+	HP: "hp",
+	Attack: "attack",
+	Defense: "defense",
+	"Sp. Atk": "spattack",
+	"Sp. Def": "spdef",
+	Speed: "speed",
+};
+const SHOW_LOCATION_PILL = new Set(["legends-za", "sword-shield"]);
+
+/* ------------------------------------------------------------------------------ sprites */
+
+const SLUG_TO_NATIONAL_ID = new Map(
+	Object.entries(NATIONAL_ID_TO_SLUG).map(([id, slug]) => [slug, Number(id)])
+);
 
 function NameSprite({ name, size = 56 }) {
-    const id = usePokemonIdByName(name);
-    if (!Number.isFinite(id)) {
-        return (
-            <div style={{ width: size, height: size, borderRadius: 8, background: "rgba(255,255,255,0.06)" }} aria-label={name} />
-        );
-    }
-    return (
-        <SpriteImage
-            id={id}
-            alt={name}
-            width={size}
-            height={size}
-            className="ev-target-sprite"
-        />
-    );
+	const id = SLUG_TO_NATIONAL_ID.get(String(name || "").toLowerCase().trim());
+	if (!Number.isFinite(id)) {
+		return <div style={{ width: size, height: size, borderRadius: 8, background: "rgba(255,255,255,0.06)" }} aria-hidden="true" />;
+	}
+	return <SpriteImage id={id} alt="" width={size} height={size} className="ev-target-sprite" />;
 }
 
-function getMapCandidatesForStat(statLabel) {
-    const base = String(statLabel || "").toLowerCase().trim();
-    if (!base) return [];
-    const aliases = [
-        base,
-        base.replace(/\s+/g, "-"),
-        base.replace(/\./g, ""),
-        base.replace(/\s+|\./g, ""),
-        base.replace(/[^a-z0-9]+/g, "-")
-    ];
-    const uniq = Array.from(new Set(aliases.filter(Boolean)));
-    const files = [];
-    uniq.forEach((t) => {
-        files.push(`/maps/${t}.png`);
-        files.push(`/maps/${t}.jpg`);
-        files.push(`/maps/${t}.jpeg`);
-    });
-    return files;
+function SpeciesRow({ name }) {
+	const label = formatPokemonName(name);
+	return (
+		<div className="ev-target-sprite-wrap" title={label}>
+			<NameSprite name={name} />
+			<div className="ev-target-species">{label}</div>
+		</div>
+	);
 }
 
-function MapImage({ statLabel = null, src = null, onOpen, overlayLeft = null, overlayRight = null, overlayTopRight = null }) {
-    const inferred = useMemo(() => (src ? [src] : getMapCandidatesForStat(statLabel)), [statLabel, src]);
-    const [index, setIndex] = useState(0);
-    if (inferred.length === 0) return null;
-    const current = inferred[Math.min(index, inferred.length - 1)];
-    const handleError = () => setIndex((i) => (i + 1 < inferred.length ? i + 1 : i));
-    const handleClick = () => onOpen?.(current);
-    return (
-        <div className="ev-map-wrap">
-            <img className="ev-map" src={current} alt={`${statLabel || "map"} map`} onError={handleError} onClick={handleClick} loading="lazy" />
+/* --------------------------------------------------------------------------------- maps */
+
+function MapImage({ src, statLabel, onOpen, overlayLeft = null, overlayRight = null, overlayTopRight = null }) {
+	if (!src) return null;
+	const label = `${statLabel} EV training map`;
+	return (
+		<div className="ev-map-wrap">
+			<button type="button" className="ev-map-button" onClick={() => onOpen?.({ src, label })} aria-label={`Enlarge ${label}`}>
+				<img className="ev-map" src={src} alt={label} loading="lazy" />
+			</button>
 			{overlayTopRight}
-            {(overlayLeft || overlayRight) ? (
-                <div className="ev-map-overlay" aria-hidden="true">
-                    <div className="ev-map-overlay-left">{overlayLeft}</div>
-                    <div className="ev-map-overlay-right">{overlayRight}</div>
-                </div>
-            ) : null}
-        </div>
-    );
+			{overlayLeft || overlayRight ? (
+				<div className="ev-map-overlay" aria-hidden="true">
+					<div className="ev-map-overlay-left">{overlayLeft}</div>
+					<div className="ev-map-overlay-right">{overlayRight}</div>
+				</div>
+			) : null}
+		</div>
+	);
 }
 
-function getTargetsForGame(gameKey) {
-    switch (gameKey) {
-        case "ruby-sapphire-emerald":
-            return [
-                { stat: "HP", species: ["whismur"], ev: "+1 HP each", location: "Rusturf Tunnel" },
-                { stat: "Attack", species: ["shuppet"], ev: "+1 Attack each", location: "Mt. Pyre" },
-                { stat: "Defense", species: ["geodude", "aron"], ev: "+1 Defense each", location: "Granite Cave" },
-                { stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each", location: "Route 113" },
-                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Coastlines of Hoenn" },
-                { stat: "Speed", species: ["zubat"], ev: "+1 Speed each", location: "Granite Cave" },
-            ];
-        case "firered-leafgreen":
-            return [
-                { stat: "HP", species: ["drowzee"], ev: "+2 HP each", location: "Route 11" },
-                { stat: "Attack", species: ["primeape"], ev: "+2 Attack each", location: "Route 23 / Sevii Islands (trainers)" },
-                { stat: "Defense", species: ["onix", "graveler"], ev: "+2 Defense each", location: "Victory Road" },
-                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Pokémon Tower" },
-                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Routes 19–21 (surf)" },
-                { stat: "Speed", species: ["diglett", "dugtrio"], ev: "+1–2 Speed each", location: "Diglett's Cave" },
-            ];
-        case "heartgold-soulsilver":
-            return [
-                { stat: "HP", species: ["wooper", "quagsire"], ev: "+1–2 HP each", location: "Union Cave B2F (surf)" },
-                { stat: "Attack", species: ["mankey", "primeape"], ev: "+1–2 Attack each", location: "Route 42 rematches" },
-                { stat: "Defense", species: ["graveler", "onix"], ev: "+2 Defense each", location: "Route 45" },
-                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Sprout/Bell Tower (night)" },
-                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Route 41 (surf)" },
-                { stat: "Speed", species: ["diglett", "pidgeotto"], ev: "+1–2 Speed each", location: "Diglett's Cave / Route 43" },
-            ];
-        case "diamond-pearl":
-        case "platinum":
-            return [
-                { stat: "HP", species: ["bibarel"], ev: "+2 HP each", location: "Route 212 (south)" },
-                { stat: "Attack", species: ["gyarados"], ev: "+2 Attack each", location: "Surf (Resort Area / Route 218)" },
-                { stat: "Defense", species: ["geodude", "graveler"], ev: "+1–2 Defense each", location: "Iron Island" },
-                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Old Chateau" },
-                { stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
-                { stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Route 201" },
-            ];
-        case "black-2-white-2":
-            return [
-                { stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Floccesy Ranch)" },
-                { stat: "Attack", species: ["sandile"], ev: "+1 Attack each", location: "Desert Resort" },
-                { stat: "Defense", species: ["boldore"], ev: "+2 Defense each", location: "Clay Tunnel" },
-                { stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
-                { stat: "Sp. Def", species: ["frillish", "jellicent"], ev: "+1–2 Sp. Def each", location: "Route 4 / Undella Bay (surf)" },
-                { stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
-            ];
-        case "black-white":
-            return [
-                { stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Unova)" },
-                { stat: "Attack", species: ["lillipup", "herdier"], ev: "+1–2 Attack each", location: "Route 1" },
-                { stat: "Defense", species: ["roggenrola"], ev: "+1 Defense each", location: "Wellspring Cave" },
-                { stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
-                { stat: "Sp. Def", species: ["frillish"], ev: "+1 Sp. Def each", location: "Undella Bay (surf)" },
-                { stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
-            ];
-        case "omega-ruby-alpha-sapphire":
-            return [
-                { stat: "HP", species: ["whismur"], ev: "+1 HP each (hordes)", location: "Rusturf Tunnel" },
-                { stat: "Attack", species: ["shuppet"], ev: "+1 Attack each (hordes)", location: "Route 121" },
-                { stat: "Defense", species: ["geodude"], ev: "+1 Defense each (hordes)", location: "Granite Cave" },
-                { stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each (hordes)", location: "Route 113" },
-                { stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Surf (Hoenn routes)" },
-                { stat: "Speed", species: ["zubat"], ev: "+1 Speed each (hordes)", location: "Granite Cave" },
-            ];
-        case "x-y":
-            return [
-                { stat: "HP", species: ["gulpin"], ev: "+1 HP each (hordes)", location: "Route 5" },
-                { stat: "Attack", species: ["axew"], ev: "+1 Attack each (hordes)", location: "Route 10" },
-                { stat: "Defense", species: ["nosepass"], ev: "+1 Defense each (hordes)", location: "Route 8 cliffs" },
-                { stat: "Sp. Atk", species: ["psyduck"], ev: "+1 Sp. Atk each (hordes)", location: "Route 7" },
-                { stat: "Sp. Def", species: ["tentacool"], ev: "+1 Sp. Def each", location: "Route 12 (fishing)" },
-                { stat: "Speed", species: ["fletchling"], ev: "+1 Speed each (hordes)", location: "Route 5" },
-            ];
-        case "sun-moon":
-        case "ultra-sun-ultra-moon":
-            return [
-                { stat: "HP", species: ["caterpie", "metapod"], ev: "+1 HP each (SOS)", location: "Route 1" },
-                { stat: "Attack", species: ["yungoos", "gumshoos"], ev: "+1–2 Attack each (SOS)", location: "Route 1 (night)" },
-                { stat: "Defense", species: ["roggenrola"], ev: "+1 Defense each (SOS)", location: "Ten Carat Hill" },
-                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each (SOS)", location: "Hau'oli Cemetery" },
-                { stat: "Sp. Def", species: ["dewpider"], ev: "+1 Sp. Def each (SOS)", location: "Brooklet Hill" },
-                { stat: "Speed", species: ["zubat"], ev: "+1 Speed each (SOS)", location: "Verdant Cavern" },
-            ];
-        case "sword-shield":
-            return [
-                { stat: "Attack", species: ["perrserker"], ev: "+2 Attack", location: "Route 7" },
-                { stat: "Defense", species: ["torkoal", "carkol"], ev: "+2 Defense", location: "Wild Area" },
-                { stat: "Speed", species: ["liepard", "galvantula"], ev: "+2 Speed", location: "Route 7" },
-                { stat: "Sp. Atk", species: ["maractus"], ev: "+2 Sp. Atk", location: "Wild Area / Route 6" },
-                { stat: "Sp. Def", species: ["duskull"], ev: "+1 Sp. Def", location: "Wild Area" },
-                { stat: "HP", species: ["wobbuffet", "diggersby", "noctowl"], ev: "+2 HP", location: "Wild Area" },
-            ];
-        case "brilliant-diamond-shining-pearl":
-            return [
-                { stat: "HP", species: ["bibarel"], ev: "+2 HP each", location: "Route 212" },
-                { stat: "Attack", species: ["gyarados"], ev: "+2 Attack each", location: "Surf (Route 218)" },
-                { stat: "Defense", species: ["graveler"], ev: "+2 Defense each", location: "Iron Island / Grand Underground" },
-                { stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Lost Tower" },
-                { stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
-                { stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Near Sandgem Town" },
-            ];
-        case "scarlet-violet":
-            return [
-                { stat: "HP", species: ["marill", "azumarill"], ev: "+2 HP" },
-                { stat: "HP", species: ["azumarill"], ev: "+3 HP" },
-                { stat: "Attack", species: ["heracross", "bisharp", "lokix"], ev: "+2 Attack" },
-                { stat: "Attack", species: ["luxray"], ev: "+3 Attack" },
-                { stat: "Defense", species: ["bergmite"], ev: "+1 Defense" },
-                { stat: "Defense", species: ["avalugg", "slowbro"], ev: "+2 Defense" },
-                { stat: "Sp. Atk", species: ["flaaffy", "girafarig"], ev: "+2 Sp. Atk" },
-                { stat: "Sp. Def", species: ["goomy", "sliggoo"], ev: "+1 Sp. Def" },
-                { stat: "Sp. Def", species: ["swablu", "altaria"], ev: "+2 Sp. Def" },
-                { stat: "Speed", species: ["murkrow", "pawmi", "deerling", "rookidee", "wattrel"], ev: "+1 Speed" },
-                { stat: "Speed", species: ["corvisquire", "cyclizar"], ev: "+2 Speed" },
-            ];
-        case "legends-za":
-            return [
-                // HP — Wild Zone 12
-                { stat: "HP", species: ["snorunt"], ev: "+1 HP", location: "Wild Zone 12" },
-                { stat: "HP", species: ["gogoat"], ev: "+2 HP", location: "Wild Zone 12" },
-                // Attack — Wild Zone 13
-                { stat: "Attack", species: ["scyther", "phantump"], ev: "+1 Attack", location: "Wild Zone 13" },
-                { stat: "Attack", species: ["weepinbell", "pinsir", "heracross"], ev: "+2 Attack", location: "Wild Zone 13" },
-                // Defense — Wild Zone 14
-                { stat: "Defense", species: ["onix", "aron"], ev: "+1 Defense", location: "Wild Zone 14" },
-                { stat: "Defense", species: ["lairon"], ev: "+2 Defense", location: "Wild Zone 14" },
-                // Sp. Atk — Wild Zone 17
-                { stat: "Sp. Atk", species: ["lampent", "pyroar"], ev: "+2 Sp. Atk", location: "Wild Zone 17" },
-                // Sp. Def — Wild Zone 18
-                { stat: "Sp. Def", species: ["swablu"], ev: "+1 Sp. Def", location: "Wild Zone 18" },
-                { stat: "Sp. Def", species: ["altaria"], ev: "+2 Sp. Def", location: "Wild Zone 18" },
-                // Speed — Wild Zone 3
-                { stat: "Speed", species: ["fletchling", "espurr"], ev: "+1 Speed", location: "Wild Zone 3" },
-                { stat: "Speed", species: ["pikachu"], ev: "+2 Speed", location: "Wild Zone 3" },
-            ];
-        default:
-            return null;
-    }
-}
-function parseSimpleEvNumber(evText) {
-    const raw = String(evText || "").toLowerCase();
-    // ignore ranges like "+1–2" or "+1-2"
-    if (/[+]\d+\s*[–-]\s*\d+/.test(raw)) return null;
-    const m = raw.match(/[+]\s*(\d+)/);
-    if (!m) return null;
-    const n = Number(m[1]);
-    return Number.isFinite(n) ? n : null;
+function MapModal({ map, onClose }) {
+	const closeRef = useRef(null);
+	useEffect(() => {
+		const previouslyFocused = document.activeElement;
+		closeRef.current?.focus();
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				onClose();
+			} else if (event.key === "Tab") {
+				// The close button is the only focusable element: keep focus inside the dialog.
+				event.preventDefault();
+				closeRef.current?.focus();
+			}
+		};
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("keydown", onKeyDown);
+			if (previouslyFocused && typeof previouslyFocused.focus === "function") previouslyFocused.focus();
+		};
+	}, [onClose]);
+	return (
+		<div className="ev-map-modal" onClick={onClose}>
+			<div
+				className="ev-map-modal-inner"
+				role="dialog"
+				aria-modal="true"
+				aria-label={map.label}
+				onClick={(event) => event.stopPropagation()}
+			>
+				<img src={map.src} alt={map.label} />
+				<button ref={closeRef} type="button" className="ev-map-close ev-badge ev-badge-top" onClick={onClose} aria-label="Close map">
+					×
+				</button>
+			</div>
+		</div>
+	);
 }
 
-function renderGoToTargets(items, onOpenMap, getMapSrc, getOverlayTopRight) {
-    if (!Array.isArray(items) || items.length === 0) return null;
-    // Group by stat label
-    const groups = new Map();
-    items.forEach((it) => {
-        const key = String(it.stat || "").trim();
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(it);
-    });
+/* ------------------------------------------------------------------------ targets panel */
 
-    const renderTopRight = (locations, keyPrefix) => {
-        if (!locations || locations.length === 0) return null;
-        const lines = locations
-            .map((s) => String(s || "").trim())
-            .filter(Boolean);
-        if (lines.length === 0) return null;
-        return (
-            <div className="ev-topline-right">
-                {lines.map((line, i) => (
-                    <div key={`${keyPrefix}-loc-${i}`} className="ev-location-line">{line}</div>
-                ))}
-            </div>
-        );
-    };
+const uniqueStrings = (values) => Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean)));
 
-    const cards = [];
-    let groupIndex = 0;
-    for (const [statLabel, list] of groups.entries()) {
-        // Determine distinct simple EV values in this stat
-        const evNums = Array.from(
-            new Set(
-                list
-                    .map((it) => parseSimpleEvNumber(it.ev))
-                    .filter((v) => v != null)
-            )
-        ).sort((a, b) => a - b);
+function LocationLines({ lines }) {
+	if (!lines.length) return null;
+	return (
+		<div className="ev-topline-right">
+			{lines.map((line) => (
+				<div key={line} className="ev-location-line">{line}</div>
+			))}
+		</div>
+	);
+}
 
-        if (evNums.length === 2) {
-            const [low, high] = evNums;
-            const leftItems = list.filter((it) => parseSimpleEvNumber(it.ev) === low);
-            const rightItems = list.filter((it) => parseSimpleEvNumber(it.ev) === high);
-            const leftSpecies = leftItems.flatMap((it) => Array.isArray(it.species) ? it.species : []).filter(Boolean);
-            const rightSpecies = rightItems.flatMap((it) => Array.isArray(it.species) ? it.species : []).filter(Boolean);
-            const leftLocs = Array.from(new Set(leftItems.map((it) => it.location).filter(Boolean))).map((loc) => String(loc).split(" / ").map((s) => s.trim()).filter(Boolean).join(" / ")).filter(Boolean);
-            const rightLocs = Array.from(new Set(rightItems.map((it) => it.location).filter(Boolean))).map((loc) => String(loc).split(" / ").map((s) => s.trim()).filter(Boolean).join(" / ")).filter(Boolean);
-			const shouldShowTopRight = !getOverlayTopRight;
+function GoToTargets({ gameKey, onOpenMap }) {
+	const items = TARGETS_BY_GAME[gameKey];
+	if (!items || items.length === 0) return null;
+	const mapFolder = MAP_FOLDERS[gameKey];
+	const showPill = SHOW_LOCATION_PILL.has(gameKey);
+	const mapSrcFor = (stat) => (mapFolder && MAP_FILE_BY_STAT[stat] ? `/maps/${mapFolder}/${MAP_FILE_BY_STAT[stat]}.webp` : null);
+	const locationPill = (locations) => {
+		const text = uniqueStrings(locations).join(" / ");
+		return showPill && text ? <span className="ev-badge ev-location-badge ev-badge-top">{text}</span> : null;
+	};
+
+	const groups = new Map();
+	items.forEach((item) => {
+		if (!groups.has(item.stat)) groups.set(item.stat, []);
+		groups.get(item.stat).push(item);
+	});
+
+	const cards = [];
+	for (const [stat, list] of groups.entries()) {
+		const mapSrc = mapSrcFor(stat);
+		const evValues = Array.from(new Set(list.map((it) => it.ev))).sort((a, b) => a - b);
+
+		if (evValues.length === 2) {
+			const [low, high] = evValues;
+			const lowItems = list.filter((it) => it.ev === low);
+			const highItems = list.filter((it) => it.ev === high);
+			const lowLocs = uniqueStrings(lowItems.map((it) => it.location));
+			const highLocs = uniqueStrings(highItems.map((it) => it.location));
+			const lowBadge = <span className="ev-badge">{`+${low} ${stat}`}</span>;
+			const highBadge = <span className="ev-badge">{`+${high} ${stat}`}</span>;
 			cards.push(
-                <div key={`g-${groupIndex++}-${statLabel}`} className="ev-target" role="listitem">
-                    {getMapSrc ? (
-                        <MapImage
-                            src={getMapSrc(statLabel)}
-                            onOpen={onOpenMap}
-                            overlayLeft={<span className="ev-badge">{`+${low} ${statLabel}`}</span>}
-							overlayRight={<span className="ev-badge">{`+${high} ${statLabel}`}</span>}
-							overlayTopRight={
-								typeof getOverlayTopRight === "function"
-									? getOverlayTopRight({
-											type: "split",
-											statLabel,
-											leftLocs,
-											rightLocs,
-									  })
-									: null
-							}
-                        />
-                    ) : null}
-					{shouldShowTopRight ? renderTopRight([
-						leftLocs.join(" / "),
-						rightLocs.join(" / "),
-					].filter(Boolean), `g-${groupIndex}`) : null}
-                    <div className="ev-split">
-                        <div className="ev-split-col">
-                            {leftSpecies.map((name) => (
-                                <div key={`L-${name}`} className="ev-target-sprite-wrap" title={name} aria-label={name}>
-                                    <NameSprite name={name} />
-                                    <div className="ev-target-species">{name.charAt(0).toUpperCase() + name.slice(1)}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="ev-split-col">
-                            {rightSpecies.map((name) => (
-                                <div key={`R-${name}`} className="ev-target-sprite-wrap" title={name} aria-label={name}>
-                                    <NameSprite name={name} />
-                                    <div className="ev-target-species">{name.charAt(0).toUpperCase() + name.slice(1)}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            );
-            continue;
-        }
+				<div key={`${stat}-split`} className="ev-target" role="listitem">
+					{mapSrc ? (
+						<MapImage
+							src={mapSrc}
+							statLabel={stat}
+							onOpen={onOpenMap}
+							overlayLeft={lowBadge}
+							overlayRight={highBadge}
+							overlayTopRight={locationPill([...lowLocs, ...highLocs])}
+						/>
+					) : (
+						<>
+							<LocationLines lines={uniqueStrings([lowLocs.join(" / "), highLocs.join(" / ")])} />
+							<div className="ev-split ev-split-badges">
+								{lowBadge}
+								{highBadge}
+							</div>
+						</>
+					)}
+					<div className="ev-split">
+						<div className="ev-split-col">
+							{lowItems.flatMap((it) => it.species).map((name) => <SpeciesRow key={`L-${name}`} name={name} />)}
+						</div>
+						<div className="ev-split-col">
+							{highItems.flatMap((it) => it.species).map((name) => <SpeciesRow key={`R-${name}`} name={name} />)}
+						</div>
+					</div>
+				</div>
+			);
+			continue;
+		}
 
-		// Fallback: render each entry as its own card
-        list.forEach((it, idx) => {
-            const locLines = Array.isArray(it.location) ? it.location : String(it.location || "").split(" / ").map((s) => s.trim()).filter(Boolean);
-			const shouldShowTopRight = !getOverlayTopRight;
-            cards.push(
-                <div key={`g-${groupIndex}-${statLabel}-${idx}`} className="ev-target" role="listitem">
-                    {getMapSrc ? (
-                        <MapImage
-                            src={getMapSrc(it.stat)}
-                            onOpen={onOpenMap}
-                            overlayLeft={<span className="ev-badge">{String(it.ev || "").replace(/\s*each\b/gi, "")}</span>}
-							overlayTopRight={
-								typeof getOverlayTopRight === "function"
-									? getOverlayTopRight({
-											type: "single",
-											statLabel: it.stat,
-											locLines,
-									  })
-									: null
-							}
-                        />
-                    ) : null}
-					{shouldShowTopRight ? renderTopRight(locLines, `g-${groupIndex}-${idx}`) : null}
-                    <div className="ev-target-sprites">
-                        {(it.species || []).map((name) => (
-                            <div key={name} className="ev-target-sprite-wrap" title={name} aria-label={name}>
-                                <NameSprite name={name} />
-                                <div className="ev-target-species">{name.charAt(0).toUpperCase() + name.slice(1)}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        });
-        groupIndex++;
-    }
+		// One card per entry when a stat has a single yield (or more than two different yields).
+		list.forEach((it, idx) => {
+			const badge = <span className="ev-badge">{`+${it.ev} ${stat}`}</span>;
+			const locs = uniqueStrings([it.location]);
+			cards.push(
+				<div key={`${stat}-${idx}`} className="ev-target" role="listitem">
+					{mapSrc ? (
+						<MapImage src={mapSrc} statLabel={stat} onOpen={onOpenMap} overlayLeft={badge} overlayTopRight={locationPill(locs)} />
+					) : (
+						<>
+							<LocationLines lines={locs} />
+							<div className="ev-split-badges">{badge}</div>
+						</>
+					)}
+					<div className="ev-target-sprites">
+						{it.species.map((name) => <SpeciesRow key={name} name={name} />)}
+					</div>
+				</div>
+			);
+		});
+	}
 
-    return (
-        <div className="ev-targets-grid" role="list">
-            {cards}
-        </div>
-    );
+	return (
+		<div className="matchup-box">
+			<div className="matchup-title">Go-To Targets</div>
+			<div className="ev-targets-grid" role="list">
+				{cards}
+			</div>
+		</div>
+	);
+}
+
+/* -------------------------------------------------------------------------- items panel */
+
+function ItemList({ entries }) {
+	return (
+		<ul className="game-modal-method-description vitamin-list">
+			{entries.map((entry) => (
+				<li key={entry.name} className="vitamin-item">
+					<img className="vitamin-icon" src={entry.image} alt="" loading="lazy" />
+					<div>
+						<strong>{entry.name}</strong>
+						<div>{entry.effect}</div>
+					</div>
+				</li>
+			))}
+		</ul>
+	);
+}
+
+// Columns for the right-hand items panel, based on what exists in the selected game.
+function getItemColumns(rules) {
+	if (rules && rules.system !== "ev" && rules.system !== "statexp") return [];
+	const gen = rules?.gen ?? null;
+	const columns = [];
+
+	if (rules?.system === "statexp") {
+		columns.push({
+			title: "Vitamins",
+			note: "Refused once that stat has 25,600 Stat Exp.",
+			entries: EV_PANEL_VITAMINS.filter((v) => !v.introduced || v.introduced <= gen).map((v) => ({
+				name: v.name,
+				image: v.image,
+				effect: `+2,560 ${v.statGen1to2 || v.stat} Stat Exp`,
+			})),
+		});
+		return columns;
+	}
+
+	columns.push({
+		title: "Vitamins",
+		note: gen == null
+			? "Gen 3–7: refused once the stat has 100 EVs. Gen 8+: works up to 252."
+			: gen >= 8
+				? "Works all the way to 252 EVs."
+				: "Refused once that stat has 100 EVs.",
+		entries: EV_PANEL_VITAMINS.map((v) => ({ name: v.name, image: v.image, effect: `+10 ${v.stat}` })),
+	});
+
+	if (gen == null || rules.feathers) {
+		const useWings = gen != null && gen <= 7;
+		columns.push({
+			title: useWings ? "Wings" : "Feathers",
+			note: rules?.feathers === "dlc" ? "Mega Dimension DLC only." : gen == null ? "Called Wings before Sword & Shield (Gen 5+)." : null,
+			entries: EV_PANEL_FEATHERS.map((f) => ({ name: useWings ? f.wingName : f.name, image: f.image, effect: `+1 ${f.stat}` })),
+		});
+	}
+
+	const bonus = gen == null ? 8 : getPowerItemBonus(gen);
+	if (bonus) {
+		columns.push({
+			title: "Power Items",
+			note: gen == null ? "Per KO; +4 in Gen 4–6." : "Per Pokémon defeated, on top of its yield.",
+			entries: EV_PANEL_POWER_ITEMS.map((p) => ({ name: p.name, image: p.image, effect: `+${bonus} ${p.stat}` })),
+		});
+	}
+	return columns;
+}
+
+function ItemsPanel({ rules }) {
+	const columns = getItemColumns(rules);
+	if (columns.length === 0) return null;
+	return (
+		<div className="matchup-box">
+			<div className={`vitamin-columns ev-item-cols-${columns.length}`}>
+				{columns.map((column) => (
+					<div key={column.title} className="vitamin-column">
+						<div className="vitamin-column-title">{column.title}</div>
+						{column.note ? <div className="ev-item-note">{column.note}</div> : null}
+						<ItemList entries={column.entries} />
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+function GritPanel() {
+	return (
+		<div className="matchup-box grit-items-panel">
+			<div className="vitamin-columns">
+				<div className="vitamin-column">
+					<div className="vitamin-column-title">Grit Items</div>
+					<ul className="game-modal-method-description vitamin-list">
+						{GRIT_ITEMS.map((item) => (
+							<li key={item.name} className="vitamin-item">
+								<span className="grit-icon-wrap">
+									<img className="vitamin-icon grit-icon" src={item.image} alt="" loading="lazy" />
+								</span>
+								<div>
+									<strong>{item.name}</strong>
+									<div>{item.effect}</div>
+								</div>
+							</li>
+						))}
+					</ul>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/* --------------------------------------------------------------------------------- page */
+
+function GuideBoxes({ gameKey }) {
+	const boxes = GUIDES[gameKey];
+	if (!boxes) return null;
+	return (
+		<div className="matchup-grid">
+			{boxes.map((guideBox) => (
+				<div key={guideBox.title} className="matchup-box">
+					<div className="matchup-title">{guideBox.title}</div>
+					<ul className="game-modal-method-description">
+						{guideBox.items.map((item) => (
+							<li key={item}>{item}</li>
+						))}
+					</ul>
+				</div>
+			))}
+		</div>
+	);
 }
 
 export default function EvTrainingPage() {
 	const [selectedGame, setSelectedGame] = useState(null);
-	const [openMapSrc, setOpenMapSrc] = useState(null);
-	const isLegendsArceus = selectedGame === "legends-arceus";
+	const [openMap, setOpenMap] = useState(null);
+	const rules = selectedGame ? GAME_RULES[selectedGame] || null : null;
+	const isLegendsArceus = rules?.system === "el";
+	const showEvBasics = !rules || rules.system === "ev";
 
-	const availableGames = useMemo(() => NATIONAL_GAME_OPTIONS, []);
-	const selectedDex = "national";
-	const showFilters = true;
+	const availableGames = NATIONAL_GAME_OPTIONS;
 	const showGameFilters = availableGames.length > 0;
 
 	// Sort games newest → oldest (left to right)
-	const nationalOrderIndex = useMemo(() => new Map(availableGames.map((g, idx) => [g.key, idx])), [availableGames]);
 	const sortedAvailableGames = useMemo(() => {
-		return availableGames.slice().sort((a, b) => {
-			const ia = nationalOrderIndex.get(a?.key);
-			const ib = nationalOrderIndex.get(b?.key);
-			if (ia == null && ib == null) return 0;
-			if (ia == null) return 1;
-			if (ib == null) return -1;
-			return ib - ia; // newest first
-		});
-	}, [availableGames, nationalOrderIndex]);
+		const orderIndex = new Map(availableGames.map((g, idx) => [g.key, idx]));
+		return availableGames.slice().sort((a, b) => (orderIndex.get(b?.key) ?? -1) - (orderIndex.get(a?.key) ?? -1));
+	}, [availableGames]);
 
 	const onGameClick = useCallback((gameKey) => {
 		setSelectedGame((prev) => (prev === gameKey ? null : gameKey));
@@ -441,526 +835,8 @@ export default function EvTrainingPage() {
 		return logos.map((f) => GAME_LOGO_LOOKUP.get(f)).filter(Boolean);
 	}, []);
 
-	const gameLabelLookup = useMemo(() => {
-		const map = new Map();
-		for (const g of availableGames) {
-			map.set(g.key, g.label);
-		}
-		return map;
-	}, [availableGames]);
+	const closeMap = useCallback(() => setOpenMap(null), []);
 
-	const renderGuideFor = (gameKey) => {
-		if (!gameKey) return null;
-		// Group games by mechanics differences
-		const gen1 = ["red-blue-yellow"];
-		const gen2 = ["gold-silver-crystal"];
-		const gen3 = ["ruby-sapphire-emerald", "firered-leafgreen"];
-		const gen4 = ["diamond-pearl", "platinum", "heartgold-soulsilver"];
-		const gen5 = ["black-white", "black-2-white-2"];
-		const gen6 = ["x-y", "omega-ruby-alpha-sapphire"];
-		const gen7_standard = ["sun-moon", "ultra-sun-ultra-moon"];
-		const lgpe = ["lets-go"]; // Awakening Values
-		const gen8_standard = ["sword-shield", "brilliant-diamond-shining-pearl"];
-		const pla = ["legends-arceus"]; // Effort Levels
-		const gen9 = ["scarlet-violet", "legends-za"]; // ZA TBD
-
-		const inList = (list) => list.includes(gameKey);
-
-		if (inList(gen1)) {
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Generation I (RBY): Stat Experience</div>
-						<ul className="game-modal-method-description">
-							<li>No modern EVs. Uses Stat Experience per stat (up to 65,535 each).</li>
-							<li>Stat EXP is earned based on foes' base stats, no 510 total cap.</li>
-							<li>Vitamins raise Stat EXP (capped by per-stat max), no EV-reducing berries.</li>
-							<li>Changes apply on level up; box deposit/withdraw also recalculates.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">EV Items and where to buy</div>
-						<ul className="game-modal-method-description">
-							<li>Vitamins (HP Up, Protein, Iron, Calcium, Carbos): Celadon Department Store (5F), cash.</li>
-							<li>Power Items/Macho Brace/Feathers/Berries: Not available in Gen I.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen2)) {
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Generation II (GSC): Stat Experience + Pokérus</div>
-						<ul className="game-modal-method-description">
-							<li>Still uses per-stat Stat EXP (no 510 cap).</li>
-							<li>Pokérus introduced, doubling Stat EXP gains while active.</li>
-							<li>Vitamins raise Stat EXP; EV-reducing berries do not exist yet.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">EV Items and where to buy</div>
-						<ul className="game-modal-method-description">
-							<li>Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos): Goldenrod Department Store (Johto) and Celadon Department Store (Kanto), cash.</li>
-							<li>Power Items/Macho Brace/Feathers: Not available for purchase in Gen II.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen3)) {
-			return (
-				<div className="matchup-grid">
-					{gameKey === "ruby-sapphire-emerald" ? (
-						<>
-							<div className="matchup-box">
-								<div className="matchup-title">Ruby, Sapphire & Emerald: Quick Setup</div>
-								<ul className="game-modal-method-description">
-									<li>Modern 510 EV cap with 252 per stat; vitamins stop boosting once a stat hits 100 EVs.</li>
-									<li>Grab the Macho Brace from the Winstrate family and combine with Pokérus for doubled gains.</li>
-									<li>Power Items do not exist yet, so track knockouts manually.</li>
-								</ul>
-							</div>
-							<div className="matchup-box">
-								<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-								{ stat: "HP", species: ["whismur"], ev: "+1 HP each", location: "Rusturf Tunnel" },
-								{ stat: "Attack", species: ["shuppet"], ev: "+1 Attack each", location: "Mt. Pyre" },
-								{ stat: "Defense", species: ["geodude", "aron"], ev: "+1 Defense each", location: "Granite Cave" },
-								{ stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each", location: "Route 113" },
-								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Coastlines of Hoenn" },
-								{ stat: "Speed", species: ["zubat"], ev: "+1 Speed each", location: "Granite Cave" },
-						], setOpenMapSrc)}
-							</div>
-							<div className="matchup-box">
-								<div className="matchup-title">Shopping Notes</div>
-								<ul className="game-modal-method-description">
-									<li>Buy vitamins from Lilycove Department Store or Slateport's Energy Guru.</li>
-									<li>Harvest EV-reducing berries from the Berry Master to fix mistakes.</li>
-									<li>Keep only trainees in your party because every participant gains EVs.</li>
-								</ul>
-							</div>
-						</>
-					) : (
-						<>
-							<div className="matchup-box">
-								<div className="matchup-title">FireRed & LeafGreen: Quick Setup</div>
-								<ul className="game-modal-method-description">
-									<li>510 total EVs with 252 per stat; vitamins stop after 100 EVs until you battle.</li>
-									<li>No Macho Brace or Power Items for sale, so rely on Pokérus and careful counting.</li>
-									<li>Use the Vs. Seeker to refresh trainer battles or stay in single-species tall grass.</li>
-								</ul>
-							</div>
-							<div className="matchup-box">
-								<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-								{ stat: "HP", species: ["drowzee"], ev: "+2 HP each", location: "Route 11" },
-								{ stat: "Attack", species: ["primeape"], ev: "+2 Attack each", location: "Route 23 / Sevii Islands (trainers)" },
-								{ stat: "Defense", species: ["onix", "graveler"], ev: "+2 Defense each", location: "Victory Road" },
-								{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Pokémon Tower" },
-								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Routes 19–21 (surf)" },
-								{ stat: "Speed", species: ["diglett", "dugtrio"], ev: "+1–2 Speed each", location: "Diglett's Cave" },
-						], setOpenMapSrc)}
-							</div>
-							<div className="matchup-box">
-								<div className="matchup-title">Shopping Notes</div>
-								<ul className="game-modal-method-description">
-									<li>Stock up on vitamins at the Celadon Department Store.</li>
-									<li>Collect EV-reducing berries in Berry Forest each day.</li>
-									<li>Withdraw benched Pokémon into the PC so they do not gain stray EVs.</li>
-								</ul>
-							</div>
-						</>
-					)}
-				</div>
-			);
-		}
-		if (inList(gen4)) {
-			if (gameKey === "heartgold-soulsilver") {
-				return (
-					<div className="matchup-grid">
-						<div className="matchup-box">
-							<div className="matchup-title">HeartGold & SoulSilver: Quick Setup</div>
-							<ul className="game-modal-method-description">
-								<li>Plan sessions around rematch trainers, Safari Zone blocks, or tall-grass loops.</li>
-								<li>Power Items cost 16 BP at the Battle Frontier and stack with Pokérus.</li>
-								<li>Macho Brace is rewarded in Goldenrod, offering a simple 2x boost early on.</li>
-							</ul>
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-								{ stat: "HP", species: ["wooper", "quagsire"], ev: "+1–2 HP each", location: "Union Cave B2F (surf)" },
-								{ stat: "Attack", species: ["mankey", "primeape"], ev: "+1–2 Attack each", location: "Route 42 rematches" },
-								{ stat: "Defense", species: ["graveler", "onix"], ev: "+2 Defense each", location: "Route 45" },
-								{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Sprout/Bell Tower (night)" },
-								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Route 41 (surf)" },
-								{ stat: "Speed", species: ["diglett", "pidgeotto"], ev: "+1–2 Speed each", location: "Diglett's Cave / Route 43" },
-						], setOpenMapSrc)}
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Shopping Notes</div>
-							<ul className="game-modal-method-description">
-								<li>Vitamins sold in Goldenrod and Celadon Department Stores.</li>
-								<li>Grow EV-reducing berries with the portable Berry Pots between sessions.</li>
-								<li>Keep extra party members boxed so they do not pick up stray EVs.</li>
-							</ul>
-						</div>
-					</div>
-				);
-			}
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Diamond, Pearl & Platinum: Quick Setup</div>
-						<ul className="game-modal-method-description">
-							<li>510 EV cap with vitamins topping out at 100 EVs until you battle again.</li>
-							<li>Power Items cost 16 BP at the Battle Tower or Frontier; stack with Pokérus.</li>
-							<li>Use the Vs. Seeker or cycling loops to chain encounters efficiently.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-							{ stat: "HP", species: ["bibarel"], ev: "+2 HP each", location: "Route 212 (south)" },
-							{ stat: "Attack", species: ["gyarados"], ev: "+2 Attack each", location: "Surf (Resort Area / Route 218)" },
-							{ stat: "Defense", species: ["geodude", "graveler"], ev: "+1–2 Defense each", location: "Iron Island" },
-							{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Old Chateau" },
-							{ stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
-							{ stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Route 201" },
-						], setOpenMapSrc)}
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Shopping Notes</div>
-						<ul className="game-modal-method-description">
-							<li>Buy vitamins at Veilstone Department Store.</li>
-							<li>Stock Power Items at the Battle Tower or Frontier for 16 BP.</li>
-							<li>Use the Pokétch Counter app to track knockouts per stat.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen5)) {
-			if (gameKey === "black-2-white-2") {
-				return (
-					<div className="matchup-grid">
-						<div className="matchup-box">
-							<div className="matchup-title">Black 2 & White 2: Quick Setup</div>
-							<ul className="game-modal-method-description">
-								<li>Power Items cost 16 BP at the Battle Subway or Pokémon World Tournament.</li>
-								<li>Join Avenue shops can discount vitamins and offer EV-reset services.</li>
-								<li>Wings from Driftveil Drawbridge help fine-tune leftover points.</li>
-							</ul>
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-								{ stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Floccesy Ranch)" },
-								{ stat: "Attack", species: ["sandile"], ev: "+1 Attack each", location: "Desert Resort" },
-								{ stat: "Defense", species: ["boldore"], ev: "+2 Defense each", location: "Clay Tunnel" },
-								{ stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
-								{ stat: "Sp. Def", species: ["frillish", "jellicent"], ev: "+1–2 Sp. Def each", location: "Route 4 / Undella Bay (surf)" },
-								{ stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
-						], setOpenMapSrc)}
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Shopping Notes</div>
-							<ul className="game-modal-method-description">
-								<li>Buy vitamins at Shopping Mall Nine or through Join Avenue vendors.</li>
-								<li>Power Items are also sold for BP at the Pokémon World Tournament counter.</li>
-								<li>Use the medal box or a notebook to track remaining EV totals.</li>
-							</ul>
-						</div>
-					</div>
-				);
-			}
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Black & White: Quick Setup</div>
-						<ul className="game-modal-method-description">
-							<li>Power Items cost 16 BP at the Battle Subway in Nimbasa City.</li>
-							<li>Feathers from Driftveil and Marvelous Bridges add +1 EV for easy cleanup.</li>
-							<li>Audino in shaking grass give HP EVs plus experience for leveling.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-							{ stat: "HP", species: ["audino"], ev: "+2 HP each", location: "Shaking grass (Unova)" },
-							{ stat: "Attack", species: ["lillipup", "herdier"], ev: "+1–2 Attack each", location: "Route 1" },
-							{ stat: "Defense", species: ["roggenrola"], ev: "+1 Defense each", location: "Wellspring Cave" },
-							{ stat: "Sp. Atk", species: ["litwick"], ev: "+1 Sp. Atk each", location: "Celestial Tower" },
-							{ stat: "Sp. Def", species: ["frillish"], ev: "+1 Sp. Def each", location: "Undella Bay (surf)" },
-							{ stat: "Speed", species: ["basculin"], ev: "+2 Speed each", location: "Fishing (various)" },
-						], setOpenMapSrc)}
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Shopping Notes</div>
-						<ul className="game-modal-method-description">
-							<li>Vitamins sold at Shopping Mall Nine on Route 9.</li>
-							<li>Pick up the Macho Brace from Anville Town for an early 2x boost.</li>
-							<li>Feathers respawn daily on the drawbridges, perfect for topping off stats.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen6)) {
-			if (gameKey === "omega-ruby-alpha-sapphire") {
-				return (
-					<div className="matchup-grid">
-						<div className="matchup-box">
-							<div className="matchup-title">Omega Ruby & Alpha Sapphire: Quick Setup</div>
-							<ul className="game-modal-method-description">
-								<li>Horde battles and DexNav chains deliver fast EVs once you unlock the Mach Bike.</li>
-								<li>Power Items cost 16 BP at the Battle Maison on the Battle Resort.</li>
-								<li>Secret Base trainers or Blissey bases can level new Pokémon between sessions.</li>
-							</ul>
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-								{ stat: "HP", species: ["whismur"], ev: "+1 HP each (hordes)", location: "Rusturf Tunnel" },
-								{ stat: "Attack", species: ["shuppet"], ev: "+1 Attack each (hordes)", location: "Route 121" },
-								{ stat: "Defense", species: ["geodude"], ev: "+1 Defense each (hordes)", location: "Granite Cave" },
-								{ stat: "Sp. Atk", species: ["spinda"], ev: "+1 Sp. Atk each (hordes)", location: "Route 113" },
-								{ stat: "Sp. Def", species: ["tentacool", "tentacruel"], ev: "+1–2 Sp. Def each", location: "Surf (Hoenn routes)" },
-								{ stat: "Speed", species: ["zubat"], ev: "+1 Speed each (hordes)", location: "Granite Cave" },
-						], setOpenMapSrc)}
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Shopping Notes</div>
-							<ul className="game-modal-method-description">
-								<li>Vitamins available in Lilycove Department Store or Slateport's Energy Guru.</li>
-								<li>Power Items and Macho Brace stack with Pokérus for massive horde gains.</li>
-								<li>Use the DexNav search counter to maintain chains for rarer EV targets.</li>
-							</ul>
-						</div>
-					</div>
-				);
-			}
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">X & Y: Quick Setup</div>
-						<ul className="game-modal-method-description">
-							<li>Horde battles yield five EV payouts at once; combine with Power Items for big gains.</li>
-							<li>Super Training lets you top off or reset individual stats quickly.</li>
-							<li>Power Items cost 16 BP at the Battle Maison in Kiloude City.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-							{ stat: "HP", species: ["gulpin"], ev: "+1 HP each (hordes)", location: "Route 5" },
-							{ stat: "Attack", species: ["axew"], ev: "+1 Attack each (hordes)", location: "Route 10" },
-							{ stat: "Defense", species: ["nosepass"], ev: "+1 Defense each (hordes)", location: "Route 8 cliffs" },
-							{ stat: "Sp. Atk", species: ["psyduck"], ev: "+1 Sp. Atk each (hordes)", location: "Route 7" },
-							{ stat: "Sp. Def", species: ["tentacool"], ev: "+1 Sp. Def each", location: "Route 12 (fishing)" },
-							{ stat: "Speed", species: ["fletchling"], ev: "+1 Speed each (hordes)", location: "Route 5" },
-						], setOpenMapSrc)}
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Shopping Notes</div>
-						<ul className="game-modal-method-description">
-							<li>Buy vitamins at Lumiose City Poké Marts for 10,000 Pokédollars.</li>
-							<li>Power Items and reset bags drop from the Battle Maison and Super Training.</li>
-							<li>Use O-Powers to replenish PP and speed up encounter loops.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen7_standard)) {
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Sun, Moon, Ultra Sun & Ultra Moon: Quick Setup</div>
-						<ul className="game-modal-method-description">
-							<li>SOS chains plus Adrenaline Orbs spawn endless single-stat targets.</li>
-							<li>Power Items cost 16 BP at the Battle Tree and stack with Pokérus.</li>
-							<li>Use Poke Pelago's Isle Evelup or Festival Plaza shops for passive EV tweaks.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-							{ stat: "HP", species: ["caterpie", "metapod"], ev: "+1 HP each (SOS)", location: "Route 1" },
-							{ stat: "Attack", species: ["yungoos", "gumshoos"], ev: "+1–2 Attack each (SOS)", location: "Route 1 (night)" },
-							{ stat: "Defense", species: ["roggenrola"], ev: "+1 Defense each (SOS)", location: "Ten Carat Hill" },
-							{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each (SOS)", location: "Hau'oli Cemetery" },
-							{ stat: "Sp. Def", species: ["dewpider"], ev: "+1 Sp. Def each (SOS)", location: "Brooklet Hill" },
-							{ stat: "Speed", species: ["zubat"], ev: "+1 Speed each (SOS)", location: "Verdant Cavern" },
-						], setOpenMapSrc)}
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Shopping Notes</div>
-						<ul className="game-modal-method-description">
-							<li>Buy vitamins at Hau'oli City's shopping mall or Thrifty Megamart for 10,000 Pokédollars.</li>
-							<li>Power Items and EV-reset berries sold for BP at the Battle Tree.</li>
-							<li>Keep a False Swipe user with lots of PP to maintain SOS chains easily.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(lgpe)) {
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Let's Go (LGPE): Awakening Values (AVs)</div>
-						<ul className="game-modal-method-description">
-							<li>Traditional EVs are replaced by Awakening Values (0–200 per stat).</li>
-							<li>Use Candies to raise AVs; Power Items, feathers, Pokérus do not apply.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">EV/AV Items and where to buy</div>
-						<ul className="game-modal-method-description">
-							<li>Candies (Health/Mighty/Smart/Clever/Swift, etc.): Earn via catch combos, GO Park transfers, and in-game rewards; not sold in standard Poké Marts.</li>
-							<li>Vitamins/Power Items/Feathers: Not part of the LGPE AV system via shops.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(pla)) {
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Legends: Arceus: Effort Levels (ELs)</div>
-						<ul className="game-modal-method-description">
-							<li>No IVs or traditional EV training; stats use Effort Levels (ELs) per stat.</li>
-							<li>ELs are 0–10 and increase stats directly; base stats are comparative, not formulaic.</li>
-							<li>Natures still modify stats; battles do not grant EVs like mainline games.</li>
-							<li>ELs are raised only by using Grit items.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">How to get Grit</div>
-						<ul className="game-modal-method-description">
-							<li>Defeat or capture Alpha Pokémon.</li>
-							<li>Mass release Pokémon from Pastures (most efficient).</li>
-							<li>Defeat or capture Pokémon after reaching 5th Star Rank.</li>
-							<li>Release Pokémon to receive Grit.</li>
-							<li>Trade lower-tier Grit for higher at the Training Area (Zisu) (pricey exchange rate).</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen8_standard)) {
-			if (gameKey === "sword-shield") {
-				return (
-					<div className="matchup-grid">
-						<div className="matchup-box">
-							<div className="matchup-title">Sword & Shield: Quick Setup</div>
-							<ul className="game-modal-method-description">
-								<li>Vitamins raise a stat straight to 252 EVs; grab them in Wyndon.</li>
-								<li>Power Items cost 10 BP at Hammerlocke's BP Shop or the Battle Tower.</li>
-								<li>Every party member gains EXP and EVs, so bench anyone already trained.</li>
-							</ul>
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Fast Cash & BP</div>
-							<ul className="game-modal-method-description">
-								<li>Farm Max Raid dens for Watts, buy Luxury Balls, and sell them for profit.</li>
-								<li>Run Champion Cup rematches with Gigantamax Meowth to earn about 300,000 Pokédollars per run.</li>
-								<li>Visit the Digging Duo near the Wild Area Nursery for sellable treasures and Bottle Caps.</li>
-							</ul>
-						</div>
-						<div className="matchup-box">
-							<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-								{ stat: "HP", species: ["skwovet"], ev: "+1 HP each", location: "Route 1" },
-								{ stat: "Attack", species: ["timburr"], ev: "+1 Attack each", location: "Galar Mine No. 1" },
-								{ stat: "Defense", species: ["rolycoly"], ev: "+1 Defense each", location: "Route 3" },
-								{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Watchtower Ruins" },
-								{ stat: "Sp. Def", species: ["duskull"], ev: "+1 Sp. Def each", location: "Watchtower Ruins (night)" },
-								{ stat: "Speed", species: ["rookidee"], ev: "+1 Speed each", location: "Route 2" },
-						], setOpenMapSrc)}
-						</div>
-					</div>
-				);
-			}
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Brilliant Diamond & Shining Pearl: Quick Setup</div>
-						<ul className="game-modal-method-description">
-							<li>Vitamins instantly reach 252 EVs just like in modern titles.</li>
-							<li>Power Items cost 10 BP at the Fight Area Battle Tower.</li>
-							<li>Use Poké Radar chains or Grand Underground rooms to isolate single-stat species.</li>
-						</ul>
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Go-To Targets</div>
-						{renderGoToTargets([
-							{ stat: "HP", species: ["bibarel"], ev: "+2 HP each", location: "Route 212" },
-							{ stat: "Attack", species: ["gyarados"], ev: "+2 Attack each", location: "Surf (Route 218)" },
-							{ stat: "Defense", species: ["graveler"], ev: "+2 Defense each", location: "Iron Island / Grand Underground" },
-							{ stat: "Sp. Atk", species: ["gastly"], ev: "+1 Sp. Atk each", location: "Lost Tower" },
-							{ stat: "Sp. Def", species: ["tentacruel"], ev: "+2 Sp. Def each", location: "Route 223" },
-							{ stat: "Speed", species: ["starly", "staravia"], ev: "+1–2 Speed each", location: "Near Sandgem Town" },
-						], setOpenMapSrc)}
-					</div>
-					<div className="matchup-box">
-						<div className="matchup-title">Shopping Notes</div>
-						<ul className="game-modal-method-description">
-							<li>Vitamins restocked at Veilstone Department Store.</li>
-							<li>Power Items sold for BP at the Battle Tower front desk.</li>
-							<li>Use the Pokétch Counter app or pokechart to track remaining KOs.</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		if (inList(gen9)) {
-			if (gameKey === "scarlet-violet") {
-				return (
-					<div className="matchup-grid">
-						<div className="matchup-box">
-							<div className="matchup-title">Scarlet & Violet: Quick Start</div>
-							<ul className="game-modal-method-description">
-								<li>Power Items add +8 EVs; 1 EV foes give 9 EVs total, so 28 KOs hits 252.</li>
-								<li>2 EV foes (e.g., Cyclizar) give 10 EVs; only 26 KOs needed.</li>
-								<li>Your whole party gains EVs from battles, so box anything you don't want training.</li>
-								<li>Auto-battles (R button) give zero EVs; battle manually.</li>
-								<li>Vitamins jump straight to 252 in a stat if you prefer spending cash/LP.</li>
-							</ul>
-						</div>
-						{/* Go-To Targets are rendered in the right column via the main layout */}
-						<div className="matchup-box">
-							<div className="matchup-title">Shop Cheat Sheet</div>
-							<ul className="game-modal-method-description">
-								<li>Power Items: Delibird Presents (Mesagoza/Levincia/Cascarrafa) for 10,000₽.</li>
-								<li>Vitamins & Feathers: Chansey Supply (same cities) for 10,000₽ per vitamin.</li>
-								<li>Feathers & EV berries also show up via Porto Marinada auctions and overworld pickups.</li>
-								<li>Track KOs via move PP or the in-game EV graph to stay on script.</li>
-							</ul>
-						</div>
-					</div>
-				);
-			}
-			// Legends: Z-A
-			return (
-				<div className="matchup-grid">
-					<div className="matchup-box">
-						<div className="matchup-title">Legends: Z-A: EV Training</div>
-						<ul className="game-modal-method-description">
-							<li>Farm EVs by battling in Wild Zones. Each Wild Zone concentrates species that award the same stat.</li>
-							<li>Several zones offer +1 to +2 EVs per KO across many species; focus on zones with dense spawns.</li>
-							<li>Use wide-coverage or AoE moves to clear aggressive packs efficiently (e.g., in Wild Zone 8).</li>
-						</ul>
-					</div>
-				</div>
-			);
-		}
-		return null;
-	};
 	return (
 		<div className="app-shell">
 			<a
@@ -973,18 +849,18 @@ export default function EvTrainingPage() {
 				Feedback · Discord
 			</a>
 			<header className="app-header">
-		<div className="container">
-			<h1 className="title">EV Training</h1>
-			<p className="subtitle">Effort Values (EVs): quick primer</p>
+				<div className="container">
+					<h1 className="title">EV Training</h1>
+					<p className="subtitle">Effort Values (EVs): quick primer</p>
 					<CategoryToggle />
 				</div>
 			</header>
 			<main className="container">
-				{showFilters && showGameFilters && (
+				{showGameFilters && (
 					<GameFilters
-						showFilters={showFilters}
+						showFilters
 						showGameFilters={showGameFilters}
-						selectedDex={selectedDex}
+						selectedDex="national"
 						gameFiltersRef={null}
 						availableGames={sortedAvailableGames}
 						selectedGame={selectedGame}
@@ -994,306 +870,32 @@ export default function EvTrainingPage() {
 				)}
 				<section className={`content ev-layout${isLegendsArceus ? " pla-layout" : ""}`} style={{ paddingTop: 16 }}>
 					<div className="ev-col-left">
-						{!isLegendsArceus && (
+						{showEvBasics && (
 							<div className="matchup-box">
 								<div className="matchup-title">EV Basics</div>
 								<ul className="game-modal-method-description">
-									<li>Each Pokémon can invest up to 510 EVs overall, with no more than 252 EVs in a single stat.</li>
-									<li>Every 4 EVs in a stat translate to roughly +1 actual stat point at level 100 (less at lower levels).</li>
-									<li>Defeating or catching a Pokémon grants EVs based on its species; battling with Pokérus or Power Items multiplies those gains.</li>
-									<li>Vitamins instantly add 10 EVs per use (up to the 252 cap), while feathers and Power Items give precise +1 or +8 boosts.</li>
-									<li>Natures modify final stats by ±10%; pair your EV spread with a matching nature to squeeze the most value out of each point.</li>
+									{getEvBasics(rules).map((item) => (
+										<li key={item}>{item}</li>
+									))}
 								</ul>
 							</div>
 						)}
 						{selectedGame ? (
-							renderGuideFor(selectedGame)
+							<GuideBoxes gameKey={selectedGame} />
 						) : (
 							<div className="matchup-box">
 								<div className="matchup-title">Select a Game</div>
-								<p style={{ margin: 0 }}>
-									Choose a game above to see EV training specifics for that version.
-								</p>
+								<p style={{ margin: 0 }}>Choose a game above to see EV training specifics for that version.</p>
 							</div>
 						)}
 					</div>
 					<div className="ev-col-right">
-						{!isLegendsArceus && (
-							<div className="matchup-box">
-								<div className="vitamin-columns">
-						<div className="vitamin-column">
-							<div className="vitamin-column-title">Vitamins</div>
-							<ul className="game-modal-method-description vitamin-list">
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/hpup.png" alt="HP Up" loading="lazy" />
-									<div>
-										<strong>HP Up</strong>
-										<div>+10 HP</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/protein.png" alt="Protein" loading="lazy" />
-									<div>
-										<strong>Protein</strong>
-										<div>+10 Attack</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/iron.png" alt="Iron" loading="lazy" />
-									<div>
-										<strong>Iron</strong>
-										<div>+10 Defense</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/calcium.png" alt="Calcium" loading="lazy" />
-									<div>
-										<strong>Calcium</strong>
-										<div>+10 Sp. Atk</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/zinc.png" alt="Zinc" loading="lazy" />
-									<div>
-										<strong>Zinc</strong>
-										<div>+10 Sp. Def</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/carbos.png" alt="Carbos" loading="lazy" />
-									<div>
-										<strong>Carbos</strong>
-										<div>+10 Speed</div>
-									</div>
-								</li>
-							</ul>
-						</div>
-						<div className="vitamin-column">
-							<div className="vitamin-column-title">Feathers</div>
-							<ul className="game-modal-method-description vitamin-list">
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/healthfeather.png" alt="Health Feather" loading="lazy" />
-									<div>
-										<strong>Health Feather</strong>
-										<div>+1 HP</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/musclefeather.png" alt="Muscle Feather" loading="lazy" />
-									<div>
-										<strong>Muscle Feather</strong>
-										<div>+1 Attack</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/resistfeather.png" alt="Resist Feather" loading="lazy" />
-									<div>
-										<strong>Resist Feather</strong>
-										<div>+1 Defense</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/geniusfeather.png" alt="Genius Feather" loading="lazy" />
-									<div>
-										<strong>Genius Feather</strong>
-										<div>+1 Sp. Atk</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/cleverfeather.png" alt="Clever Feather" loading="lazy" />
-									<div>
-										<strong>Clever Feather</strong>
-										<div>+1 Sp. Def</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/swiftfeather.png" alt="Swift Feather" loading="lazy" />
-									<div>
-										<strong>Swift Feather</strong>
-										<div>+1 Speed</div>
-									</div>
-								</li>
-							</ul>
-						</div>
-						<div className="vitamin-column">
-							<div className="vitamin-column-title">Power Items</div>
-							<ul className="game-modal-method-description vitamin-list">
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/powerweight.png" alt="Power Weight" loading="lazy" />
-									<div>
-										<strong>Power Weight</strong>
-										<div>+8 HP</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/powerbracer.png" alt="Power Bracer" loading="lazy" />
-									<div>
-										<strong>Power Bracer</strong>
-										<div>+8 Attack</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/powerbelt.png" alt="Power Belt" loading="lazy" />
-									<div>
-										<strong>Power Belt</strong>
-										<div>+8 Defense</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/powerlens.png" alt="Power Lens" loading="lazy" />
-									<div>
-										<strong>Power Lens</strong>
-										<div>+8 Sp. Atk</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/powerband.png" alt="Power Band" loading="lazy" />
-									<div>
-										<strong>Power Band</strong>
-										<div>+8 Sp. Def</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<img className="vitamin-icon" src="/items/images/poweranklet.png" alt="Power Anklet" loading="lazy" />
-									<div>
-										<strong>Power Anklet</strong>
-										<div>+8 Speed</div>
-									</div>
-								</li>
-							</ul>
-						</div>
-								</div>
-							</div>
-						)}
-						{isLegendsArceus && (
-							<div className="matchup-box grit-items-panel">
-								<div className="vitamin-columns">
-						<div className="vitamin-column">
-							<div className="vitamin-column-title">Grit Items</div>
-							<ul className="game-modal-method-description vitamin-list">
-								<li className="vitamin-item">
-									<span className="grit-icon-wrap">
-										<img className="vitamin-icon grit-icon" src="/items/images/gritdust.png" alt="Grit Dust" loading="lazy" />
-									</span>
-									<div>
-										<strong>Grit Dust</strong>
-										<div>Raises EL up to 3</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<span className="grit-icon-wrap">
-										<img className="vitamin-icon grit-icon" src="/items/images/gritgravel.png" alt="Grit Gravel" loading="lazy" />
-									</span>
-									<div>
-										<strong>Grit Gravel</strong>
-										<div>Raises EL up to 5</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<span className="grit-icon-wrap">
-										<img className="vitamin-icon grit-icon" src="/items/images/gritpebble.png" alt="Grit Pebble" loading="lazy" />
-									</span>
-									<div>
-										<strong>Grit Pebble</strong>
-										<div>Raises EL up to 8</div>
-									</div>
-								</li>
-								<li className="vitamin-item">
-									<span className="grit-icon-wrap">
-										<img className="vitamin-icon grit-icon" src="/items/images/gritrock.png" alt="Grit Rock" loading="lazy" />
-									</span>
-									<div>
-										<strong>Grit Rock</strong>
-										<div>Raises EL up to 9</div>
-									</div>
-								</li>
-							</ul>
-						</div>
-								</div>
-							</div>
-						)}
-						{selectedGame ? (() => {
-							const items = getTargetsForGame(selectedGame);
-							if (!items || items.length === 0) return null;
-									const mapFn = (["scarlet-violet", "legends-za", "sword-shield"]).includes(selectedGame)
-										? (stat) => {
-											if (selectedGame === "scarlet-violet" || selectedGame === "legends-za") {
-												if (selectedGame === "scarlet-violet") {
-													const sv = new Map([
-														["HP", "/maps/scarletviolet/hp.webp"],
-														["Attack", "/maps/scarletviolet/attack.webp"],
-														["Defense", "/maps/scarletviolet/defense.webp"],
-														["Sp. Atk", "/maps/scarletviolet/spattack.webp"],
-														["Sp. Def", "/maps/scarletviolet/spdef.webp"],
-														["Speed", "/maps/scarletviolet/speed.webp"],
-													]);
-													return sv.get(String(stat));
-												}
-												if (selectedGame === "legends-za") {
-													const za = new Map([
-														["HP", "/maps/legendsza/hp.webp"],
-														["Attack", "/maps/legendsza/attack.webp"],
-														["Defense", "/maps/legendsza/defense.webp"],
-														["Sp. Atk", "/maps/legendsza/spattack.webp"],
-														["Sp. Def", "/maps/legendsza/spdef.webp"],
-														["Speed", "/maps/legendsza/speed.webp"],
-													]);
-													return za.get(String(stat));
-												}
-											}
-											if (selectedGame === "sword-shield") {
-												const swsh = new Map([
-													["HP", "/maps/swordshield/hp.webp"],
-													["Attack", "/maps/swordshield/attack.webp"],
-													["Defense", "/maps/swordshield/defense.webp"],
-													["Sp. Atk", "/maps/swordshield/spattack.webp"],
-													["Sp. Def", "/maps/swordshield/spdef.webp"],
-													["Speed", "/maps/swordshield/speed.webp"],
-												]);
-												return swsh.get(String(stat));
-											}
-											return undefined;
-										}
-										: undefined;
-							const overlayTopRightFn = (selectedGame && selectedGame !== "scarlet-violet" && mapFn)
-								? (ctx) => {
-										// Build location text
-										let locText = "";
-										if (ctx?.type === "split") {
-											const combined = [...(ctx.leftLocs || []), ...(ctx.rightLocs || [])]
-												.map((s) => String(s || "").trim())
-												.filter(Boolean);
-											const unique = Array.from(new Set(combined));
-											locText = unique.join(" / ");
-										} else {
-											locText = String((ctx.locLines || []).join(" / ")).trim();
-										}
-										if (!locText) return null;
-										// Render location pill at top-right of the image
-										return <span className="ev-badge ev-location-badge ev-badge-top">{locText}</span>;
-								  }
-								: undefined;
-							return (
-							<div className="matchup-box">
-								<div className="matchup-title">Go-To Targets</div>
-								{renderGoToTargets(items, setOpenMapSrc, mapFn, overlayTopRightFn)}
-							</div>
-						);
-						})() : null}
+						{isLegendsArceus ? <GritPanel /> : <ItemsPanel rules={rules} />}
+						{selectedGame ? <GoToTargets gameKey={selectedGame} onOpenMap={setOpenMap} /> : null}
 					</div>
 				</section>
 			</main>
-			{openMapSrc ? (
-				<div className="ev-map-modal" onClick={() => setOpenMapSrc(null)}>
-					<div className="ev-map-modal-inner" onClick={(e) => e.stopPropagation()}>
-						<img src={openMapSrc} alt="Full map" />
-						<button className="ev-map-close ev-badge ev-badge-top" onClick={() => setOpenMapSrc(null)} aria-label="Close map">×</button>
-					</div>
-				</div>
-			) : null}
+			{openMap ? <MapModal map={openMap} onClose={closeMap} /> : null}
 		</div>
 	);
 }
-
-
-

@@ -1,340 +1,119 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import "./App.css";
+import CategoryToggle from "./CategoryToggle.jsx";
 import SpriteImage from "./components/SpriteImage.jsx";
 import { ALT_FORM_HIDE_FLAGS } from "./constants/forms.js";
+import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
+import { loadPokemonList } from "./data/staticData.js";
+import { formatPokemonName } from "./utils/pokemonNames.js";
 import "./HomePage.css";
 
-const FALLBACK_TOTAL_POKEMON = 1025;
+const MAX_DEX_NUMBER = 1025;
+const FIRST_FORM_ID = 10000; // PokeAPI ids >= 10000 are alternate forms
 const SLOTS_PER_PAGE = 30;
-const NATIONAL_DEX_URL = "https://pokeapi.co/api/v2/pokedex/national";
-const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 
-// Known Pokemon with regional forms (by national dex number)
-const REGIONAL_FORMS_MAP = {
-  alolan: [19, 20, 26, 27, 28, 37, 38, 50, 51, 52, 53, 74, 75, 76, 88, 89, 103, 105],
-  galarian: [52, 77, 78, 79, 80, 83, 110, 122, 144, 145, 146, 222, 263, 264, 554, 555, 562, 618, 859, 860, 861, 865, 866, 867, 868, 869],
-  hisuian: [58, 59, 100, 101, 157, 211, 215, 503, 549, 550, 570, 571, 628, 705, 706, 713, 724],
-  paldean: [194, 128, 1029, 1030, 1031, 1032],
-};
-const REGIONAL_FORM_KEYS = ["alolan", "galarian", "hisuian", "paldean"];
-const FORM_FETCH_KEYS = ["unown", ...REGIONAL_FORM_KEYS];
+// Regional variants are named "<species>-<region>[-<form>]" in PokeAPI ("rattata-alola",
+// "darmanitan-galar-zen", "tauros-paldea-aqua-breed").
+const REGIONAL_TOKENS = new Set(["alola", "galar", "hisui", "paldea"]);
+// These carry a region token but aren't regional forms ("pikachu-alola-cap", "raticate-totem-alola").
+const NON_REGIONAL_TOKENS = new Set(["cap", "totem"]);
 
 const formatDexNumber = (value) => String(value).padStart(4, "0");
 
-const toTitleCase = (value) =>
+const normalizeSearchText = (value) =>
   String(value || "")
     .toLowerCase()
-    .split(/[-_\s]+/g)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
 
 const getIdFromUrl = (url) => {
-  if (!url) return null;
-  const parts = String(url)
-    .split("/")
-    .filter(Boolean);
-  const last = parts[parts.length - 1];
-  const numeric = Number.parseInt(last, 10);
-  return Number.isFinite(numeric) ? numeric : null;
+  const match = /\/(\d+)\/?$/.exec(String(url || ""));
+  return match ? Number.parseInt(match[1], 10) : null;
 };
 
-const getDexNumber = (entry) => {
-  if (!entry) return null;
-  if (Number.isFinite(entry.dexNumber)) return entry.dexNumber;
-  if (Number.isFinite(entry.number)) return entry.number;
-  if (Number.isFinite(entry.baseDexNumber)) return entry.baseDexNumber;
-  return null;
+const isRegionalFormName = (name) => {
+  const tokens = String(name || "").toLowerCase().split("-");
+  return tokens.some((token) => REGIONAL_TOKENS.has(token)) && !tokens.some((token) => NON_REGIONAL_TOKENS.has(token));
 };
 
-const createEntryKey = (entry) => {
-  const dexNumber = getDexNumber(entry) ?? "unknown";
-  const baseToken = entry?.name || entry?.displayName || entry?.id || entry?.spriteId || "entry";
-  const prefix = entry?.isForm ? "form" : "dex";
-  return String(`${prefix}-${dexNumber}-${baseToken}`).replace(/[^a-z0-9-]/gi, "-");
+const makeEntry = ({ id, slug, dexNumber, isForm }) => {
+  const displayName = formatPokemonName(slug) || `#${formatDexNumber(dexNumber)}`;
+  return {
+    entryKey: `${isForm ? "form" : "dex"}-${id}`,
+    id,
+    name: slug,
+    displayName,
+    dexNumber,
+    isForm,
+    searchText: normalizeSearchText(`${displayName} ${slug.replace(/-/g, " ")}`),
+  };
+};
+
+// National Dex #1-#1025 in order, each species followed by its regional forms (in PokeAPI order).
+const buildDisplayEntries = (pokemonList) => {
+  const bases = [];
+  const formsBySpecies = new Map();
+  for (const raw of pokemonList) {
+    const id = Number.isFinite(raw?.id) ? raw.id : getIdFromUrl(raw?.url);
+    if (!Number.isFinite(id) || !raw?.name) continue;
+    if (id < FIRST_FORM_ID) {
+      if (id >= 1 && id <= MAX_DEX_NUMBER) bases.push({ id, name: raw.name });
+      continue;
+    }
+    const speciesId = raw.speciesId;
+    if (!Number.isFinite(speciesId) || ALT_FORM_HIDE_FLAGS.has(speciesId) || !isRegionalFormName(raw.name)) continue;
+    const forms = formsBySpecies.get(speciesId) || [];
+    forms.push({ id, name: raw.name });
+    formsBySpecies.set(speciesId, forms);
+  }
+
+  bases.sort((a, b) => a.id - b.id);
+  const entries = [];
+  for (const base of bases) {
+    // Species slug, not the default form's ("deoxys" rather than "deoxys-normal").
+    const slug = NATIONAL_ID_TO_SLUG[base.id] || base.name;
+    entries.push(makeEntry({ id: base.id, slug, dexNumber: base.id, isForm: false }));
+    const forms = (formsBySpecies.get(base.id) || []).sort((a, b) => a.id - b.id);
+    for (const form of forms) {
+      entries.push(makeEntry({ id: form.id, slug: form.name, dexNumber: base.id, isForm: true }));
+    }
+  }
+  return entries;
 };
 
 export default function HomePage() {
   const [page, setPage] = useState(1);
-  const [baseEntries, setBaseEntries] = useState([]);
-  const [altFormEntries, setAltFormEntries] = useState([]);
+  const [displayEntries, setDisplayEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [highlightedEntryKey, setHighlightedEntryKey] = useState(null);
 
   useEffect(() => {
     let ignore = false;
-    const run = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(NATIONAL_DEX_URL);
-        if (!response?.ok) {
-          throw new Error(`Failed to load National Dex (${response?.status || "unknown"})`);
-        }
-        const json = await response.json();
-        if (ignore) return;
-        const rawEntries = Array.isArray(json?.pokemon_entries) ? json.pokemon_entries : [];
-        const normalized = rawEntries
-          .map((entry) => {
-            const number = Number(entry?.entry_number);
-            const name = entry?.pokemon_species?.name;
-            const speciesUrl = entry?.pokemon_species?.url || null;
-            if (!Number.isFinite(number) || number <= 0 || !name) {
-              return null;
-            }
-            if (number > 1025) {
-              return null;
-            }
-            const spriteId = getIdFromUrl(speciesUrl) ?? number;
-            return {
-              number,
-              name,
-              displayName: toTitleCase(name),
-              speciesUrl,
-              spriteId,
-            };
-          })
-          .filter(Boolean)
-          .sort((a, b) => a.number - b.number);
-        setBaseEntries(normalized);
-      } catch (fetchError) {
-        if (!ignore) {
-          setError(fetchError?.message || "Unable to load National Dex data.");
-          setBaseEntries([]);
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
-    };
-
-    run();
+    loadPokemonList()
+      .then((list) => {
+        if (!ignore) setDisplayEntries(buildDisplayEntries(Array.isArray(list) ? list : []));
+      })
+      .catch((loadError) => {
+        if (!ignore) setError(loadError?.message || "Unable to load Pokémon data.");
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
     return () => {
       ignore = true;
     };
   }, []);
 
-  const entryMap = useMemo(() => {
-    const map = new Map();
-    baseEntries.forEach((entry) => {
-      map.set(entry.number, entry);
-    });
-    return map;
-  }, [baseEntries]);
-
-  const maxDexNumber = useMemo(() => {
-    // Cap at 1025 to ensure last regular page shows 1021-1025
-    if (baseEntries.length > 0) {
-      const max = baseEntries[baseEntries.length - 1].number;
-      return Math.min(max, 1025);
-    }
-    return FALLBACK_TOTAL_POKEMON;
-  }, [baseEntries]);
+  const totalPages = Math.max(1, Math.ceil(displayEntries.length / SLOTS_PER_PAGE));
 
   useEffect(() => {
-    let ignore = false;
-    const loadForms = async () => {
-      setFormLoading(true);
-      setFormError(null);
-      const collected = [];
-      const failures = [];
-
-      const fetchFormsForKey = async (formKey) => {
-        if (formKey === "unown") {
-          const forms = [];
-          try {
-            const unownSpeciesUrl = `${POKEAPI_BASE}/pokemon-species/201`;
-            const speciesResponse = await fetch(unownSpeciesUrl);
-            if (!speciesResponse?.ok) throw new Error("Failed to fetch Unown species");
-            const speciesData = await speciesResponse.json();
-            const baseDexNumber = 201;
-            const varieties = Array.isArray(speciesData.varieties) ? speciesData.varieties : [];
-            for (const variety of varieties) {
-              if (!variety.pokemon?.url) continue;
-              try {
-                const pokemonResponse = await fetch(variety.pokemon.url);
-                if (!pokemonResponse?.ok) continue;
-                const pokemonData = await pokemonResponse.json();
-                const formName = pokemonData.name || "";
-                let displayName = formName.replace(/^unown-?/i, "").toUpperCase();
-                if (displayName === "EXCLAMATION") displayName = "!";
-                if (displayName === "QUESTION") displayName = "?";
-                forms.push({
-                  id: pokemonData.id,
-                  name: formName,
-                  displayName,
-                  spriteId: pokemonData.id,
-                  url: variety.pokemon.url,
-                  baseDexNumber,
-                  baseSpeciesName: "Unown",
-                });
-              } catch (err) {
-                console.warn(`Failed to fetch Unown form ${variety.pokemon?.url}:`, err);
-              }
-            }
-            forms.sort((a, b) => {
-              const aChar = a.displayName;
-              const bChar = b.displayName;
-              if (aChar === "!" && bChar === "?") return -1;
-              if (aChar === "?" && bChar === "!") return 1;
-              if (aChar === "!") return 1;
-              if (aChar === "?") return 1;
-              if (bChar === "!") return -1;
-              if (bChar === "?") return -1;
-              return aChar.localeCompare(bChar);
-            });
-          } catch (err) {
-            failures.push(formKey);
-          }
-          return forms;
-        }
-
-        const regionMap = {
-          alolan: "alola",
-          galarian: "galar",
-          hisuian: "hisui",
-          paldean: "paldea",
-        };
-        const regionKey = regionMap[formKey];
-        if (!regionKey) return [];
-
-        const regionForms = [];
-        const pokemonWithForms = REGIONAL_FORMS_MAP[formKey] || [];
-
-        for (const dexNumber of pokemonWithForms) {
-          if (ignore) break;
-          try {
-            const speciesUrl = `${POKEAPI_BASE}/pokemon-species/${dexNumber}`;
-            const speciesResponse = await fetch(speciesUrl);
-            if (!speciesResponse?.ok) continue;
-            const speciesData = await speciesResponse.json();
-            const baseDexNumber = speciesData?.id || null;
-            if (!baseDexNumber) continue;
-            const varieties = Array.isArray(speciesData.varieties) ? speciesData.varieties : [];
-            for (const variety of varieties) {
-              if (!variety.pokemon?.url) continue;
-              try {
-                const pokemonResponse = await fetch(variety.pokemon.url);
-                if (!pokemonResponse?.ok) continue;
-                const pokemonData = await pokemonResponse.json();
-                const formName = pokemonData.name || "";
-                const lowerName = formName.toLowerCase();
-                const tokens = lowerName.split("-");
-                const hasRegionToken = tokens.includes(regionKey) || tokens.includes(formKey);
-                if (hasRegionToken) {
-                  regionForms.push({
-                    id: pokemonData.id,
-                    name: formName,
-                    displayName: toTitleCase(formName),
-                    spriteId: pokemonData.id,
-                    url: variety.pokemon.url,
-                    baseDexNumber,
-                    baseSpeciesName: toTitleCase(speciesData?.name || ""),
-                  });
-                }
-              } catch (err) {
-                console.warn(`Failed to fetch Pokemon form ${variety.pokemon?.url}:`, err);
-              }
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch species ${dexNumber}:`, err);
-          }
-        }
-        regionForms.sort((a, b) => (a.baseDexNumber || 0) - (b.baseDexNumber || 0));
-        return regionForms;
-      };
-
-      for (const formKey of FORM_FETCH_KEYS) {
-        const forms = await fetchFormsForKey(formKey);
-        if (forms && forms.length) {
-          collected.push(...forms);
-        }
-      }
-
-      if (ignore) return;
-      const filtered = collected.filter((form) => {
-        const baseDexNumber = getDexNumber(form);
-        return baseDexNumber == null || !ALT_FORM_HIDE_FLAGS.has(baseDexNumber);
-      });
-      setAltFormEntries(filtered);
-      if (failures.length > 0) {
-        setFormError(`Failed to load ${failures.join(", ")} form data.`);
-      }
-      setFormLoading(false);
-    };
-
-    loadForms();
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  const altFormsByBaseDex = useMemo(() => {
-    const map = new Map();
-    altFormEntries.forEach((form) => {
-      const baseDexNumber = getDexNumber(form);
-      if (baseDexNumber == null || ALT_FORM_HIDE_FLAGS.has(baseDexNumber)) {
-        return;
-      }
-      const list = map.get(baseDexNumber) || [];
-      list.push({
-        ...form,
-        dexNumber: baseDexNumber,
-        isForm: true,
-      });
-      map.set(baseDexNumber, list);
-    });
-    map.forEach((list) => list.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "")));
-    return map;
-  }, [altFormEntries]);
-
-  const displayEntries = useMemo(() => {
-    const combined = [];
-    const seenKeys = new Set();
-    const pushEntry = (entry) => {
-      const entryWithKey = entry.entryKey ? entry : { ...entry, entryKey: createEntryKey(entry) };
-      const key = entryWithKey.entryKey;
-      if (!key || seenKeys.has(key)) return;
-      seenKeys.add(key);
-      combined.push(entryWithKey);
-    };
-
-    baseEntries.forEach((entry) => {
-      const baseEntry = { ...entry, dexNumber: entry.number, isForm: false };
-      pushEntry(baseEntry);
-      const forms = altFormsByBaseDex.get(entry.number) || [];
-      forms.forEach((form) => pushEntry(form));
-    });
-
-    // Ensure forms with missing base entries still render.
-    altFormEntries.forEach((form) => {
-      const dexNumber = getDexNumber(form);
-      if (dexNumber == null) return;
-      pushEntry({ ...form, dexNumber, isForm: true });
-    });
-
-    return combined;
-  }, [altFormEntries, altFormsByBaseDex, baseEntries]);
-
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(displayEntries.length / SLOTS_PER_PAGE)),
-    [displayEntries]
-  );
-
-  useEffect(() => {
-    setPage((current) => {
-      if (current < 1) return 1;
-      if (current > totalPages) return totalPages;
-      return current;
-    });
+    setPage((current) => Math.min(Math.max(current, 1), totalPages));
   }, [totalPages]);
 
   useEffect(() => {
-    if (!highlightedEntryKey) return;
+    if (!highlightedEntryKey) return undefined;
     const timeoutId = setTimeout(() => {
       const element = document.getElementById(`pokemon-slot-${highlightedEntryKey}`);
       if (element) {
@@ -353,14 +132,9 @@ export default function HomePage() {
   const pagination = useMemo(() => {
     const clampedPage = Math.min(Math.max(page, 1), totalPages);
     const startIndex = (clampedPage - 1) * SLOTS_PER_PAGE;
-    const endIndex = Math.min(startIndex + SLOTS_PER_PAGE, displayEntries.length);
-    const slots = displayEntries.slice(startIndex, endIndex).map((entry) => {
-      const dexNumber = getDexNumber(entry) || 0;
-      const key = entry.entryKey || createEntryKey(entry);
-      return { dexNumber, entry, key };
-    });
+    const slots = displayEntries.slice(startIndex, startIndex + SLOTS_PER_PAGE);
     const firstDex = slots.length > 0 ? slots[0].dexNumber : null;
-    const lastDex = slots.length > 0 ? slots[slots.length - 1].dexNumber : firstDex;
+    const lastDex = slots.length > 0 ? slots[slots.length - 1].dexNumber : null;
     const rangeLabel =
       firstDex != null && lastDex != null
         ? `#${formatDexNumber(firstDex)} - #${formatDexNumber(lastDex)}`
@@ -368,25 +142,19 @@ export default function HomePage() {
 
     return {
       page: clampedPage,
-      start: startIndex + 1,
-      end: endIndex,
       slots,
       hasPrevious: clampedPage > 1,
       hasNext: clampedPage < totalPages,
       rangeLabel,
       totalPages,
-      isFormPage: false,
     };
   }, [displayEntries, page, totalPages]);
 
   const focusEntryByIndex = useCallback(
     (index) => {
       if (index < 0 || index >= displayEntries.length) return;
-      const entry = displayEntries[index];
-      const key = entry.entryKey || createEntryKey(entry);
-      const targetPage = Math.floor(index / SLOTS_PER_PAGE) + 1;
-      setPage(targetPage);
-      setHighlightedEntryKey(key);
+      setPage(Math.floor(index / SLOTS_PER_PAGE) + 1);
+      setHighlightedEntryKey(displayEntries[index].entryKey);
     },
     [displayEntries]
   );
@@ -394,13 +162,15 @@ export default function HomePage() {
   const handleSelectDexNumber = useCallback(
     (dexNumber) => {
       if (!Number.isFinite(dexNumber) || dexNumber <= 0) return;
-      const baseIndex = displayEntries.findIndex(
-        (entry) => !entry.isForm && getDexNumber(entry) === dexNumber
-      );
-      const fallbackIndex =
-        baseIndex !== -1 ? baseIndex : displayEntries.findIndex((entry) => getDexNumber(entry) === dexNumber);
-      if (fallbackIndex === -1) return;
-      focusEntryByIndex(fallbackIndex);
+      focusEntryByIndex(displayEntries.findIndex((entry) => !entry.isForm && entry.dexNumber === dexNumber));
+    },
+    [displayEntries, focusEntryByIndex]
+  );
+
+  const focusEntry = useCallback(
+    (entry) => {
+      if (!entry) return;
+      focusEntryByIndex(displayEntries.findIndex((candidate) => candidate.entryKey === entry.entryKey));
     },
     [displayEntries, focusEntryByIndex]
   );
@@ -417,7 +187,7 @@ export default function HomePage() {
     setHighlightedEntryKey(null);
   };
 
-  const normalizedSearch = useMemo(() => searchTerm.trim().toLowerCase(), [searchTerm]);
+  const normalizedSearch = useMemo(() => normalizeSearchText(searchTerm.trim()), [searchTerm]);
 
   const suggestions = useMemo(() => {
     if (!normalizedSearch) return [];
@@ -425,11 +195,9 @@ export default function HomePage() {
     const matches = [];
     for (const entry of displayEntries) {
       if (matches.length >= limit) break;
-      const nameMatch = String(entry.displayName || "").toLowerCase().includes(normalizedSearch);
-      const dexNumber = getDexNumber(entry);
+      const nameMatch = entry.searchText.includes(normalizedSearch);
       const dexMatch =
-        (dexNumber != null && formatDexNumber(dexNumber).includes(normalizedSearch)) ||
-        String(dexNumber ?? "").includes(normalizedSearch);
+        formatDexNumber(entry.dexNumber).includes(normalizedSearch) || String(entry.dexNumber).includes(normalizedSearch);
       if (nameMatch || dexMatch) {
         matches.push(entry);
       }
@@ -445,37 +213,15 @@ export default function HomePage() {
     setSearchTerm("");
   };
 
-  const focusEntry = useCallback(
-    (entry) => {
-      if (!entry) return;
-      const key = entry.entryKey || createEntryKey(entry);
-      const index = displayEntries.findIndex(
-        (candidate) => (candidate.entryKey || createEntryKey(candidate)) === key
-      );
-      if (index === -1) return;
-      focusEntryByIndex(index);
-    },
-    [displayEntries, focusEntryByIndex]
-  );
-
-  const handleGridNameClick = (entry) => {
-    focusEntry(entry);
-    clearSearch();
-  };
-
-  const handleSuggestionSelect = (entry) => {
-    focusEntry(entry);
-  };
-
   const handleSearchSubmit = (event) => {
     event.preventDefault();
     if (!normalizedSearch) return;
     if (suggestions.length > 0) {
-      handleSuggestionSelect(suggestions[0]);
+      focusEntry(suggestions[0]);
       return;
     }
     const valueAsNumber = Number.parseInt(normalizedSearch, 10);
-    if (Number.isFinite(valueAsNumber) && valueAsNumber > 0 && valueAsNumber <= maxDexNumber) {
+    if (Number.isFinite(valueAsNumber) && valueAsNumber > 0 && valueAsNumber <= MAX_DEX_NUMBER) {
       handleSelectDexNumber(valueAsNumber);
       clearSearch();
     }
@@ -484,6 +230,8 @@ export default function HomePage() {
   return (
     <div className="home-page">
       <div className="home-container">
+        <CategoryToggle />
+
         <form className="home-search" onSubmit={handleSearchSubmit} role="search">
           <div className="home-search-input-wrapper">
             <input
@@ -502,17 +250,15 @@ export default function HomePage() {
             {normalizedSearch && suggestions.length > 0 ? (
               <ul className="home-search-suggestions" role="listbox">
                 {suggestions.map((entry) => (
-                  <li key={entry.entryKey || createEntryKey(entry)}>
+                  <li key={entry.entryKey}>
                     <button
                       type="button"
                       className="home-search-suggestion"
-                      onClick={() => handleSuggestionSelect(entry)}
+                      onClick={() => focusEntry(entry)}
                       role="option"
                     >
                       <span className="home-search-suggestion-name">{entry.displayName}</span>
-                      {Number.isFinite(getDexNumber(entry)) ? (
-                        <span className="home-search-suggestion-number">#{formatDexNumber(getDexNumber(entry))}</span>
-                      ) : null}
+                      <span className="home-search-suggestion-number">#{formatDexNumber(entry.dexNumber)}</span>
                     </button>
                   </li>
                 ))}
@@ -553,50 +299,30 @@ export default function HomePage() {
             {error}
           </div>
         ) : null}
-        {formError ? (
-          <div className="home-status home-status-error" role="alert">
-            {formError}
-          </div>
-        ) : null}
-        {loading && !baseEntries.length ? (
-          <div className="home-status home-status-loading">Loading Pokémon…</div>
-        ) : null}
-        {formLoading ? <div className="home-status home-status-loading">Loading alternate forms…</div> : null}
+        {loading ? <div className="home-status home-status-loading">Loading Pokémon…</div> : null}
 
         <div className="home-grid-wrapper">
           <div className="home-grid">
-            {pagination.slots.map((slot) => {
-              const hasEntry = Boolean(slot.entry);
-              const isHighlighted = highlightedEntryKey === slot.key;
-              const className = `home-slot${hasEntry ? " has-entry" : " is-empty"}${isHighlighted ? " is-highlighted" : ""}`;
-              const entry = slot.entry;
-              const displayName = entry?.displayName || "";
-              const spriteId = entry?.spriteId || entry?.id || null;
-              const dexLabel = Number.isFinite(slot.dexNumber) ? `#${formatDexNumber(slot.dexNumber)}` : null;
-              
+            {pagination.slots.map((entry) => {
+              const isHighlighted = highlightedEntryKey === entry.entryKey;
               return (
-                <div key={slot.key} className="home-card">
-                  <div id={`pokemon-slot-${slot.key}`} className={className}>
-                    {hasEntry ? (
-                      <span className="home-slot-name">{displayName}</span>
-                    ) : null}
-                    {hasEntry && spriteId ? (
-                      <div className="home-slot-sprite">
-                        <SpriteImage
-                          id={spriteId}
-                          alt={displayName}
-                          variant="home"
-                          width={120}
-                          height={120}
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : hasEntry ? (
-                      <span className="home-slot-placeholder">Loading…</span>
-                    ) : (
-                      <span className="home-slot-placeholder">Empty Slot</span>
-                    )}
-                    {dexLabel ? <span className="home-slot-number">{dexLabel}</span> : null}
+                <div key={entry.entryKey} className="home-card">
+                  <div
+                    id={`pokemon-slot-${entry.entryKey}`}
+                    className={`home-slot has-entry${isHighlighted ? " is-highlighted" : ""}`}
+                  >
+                    <span className="home-slot-name">{entry.displayName}</span>
+                    <div className="home-slot-sprite">
+                      <SpriteImage
+                        id={entry.id}
+                        alt={entry.displayName}
+                        variant="home"
+                        width={120}
+                        height={120}
+                        loading="lazy"
+                      />
+                    </div>
+                    <span className="home-slot-number">#{formatDexNumber(entry.dexNumber)}</span>
                   </div>
                 </div>
               );
@@ -607,6 +333,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-

@@ -1,169 +1,241 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { updatePokemonLocation } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
+import { formatPokemonName } from "./utils/pokemonNames.js";
+import { loadAbilityData, loadPokemonList } from "./data/staticData.js";
 
-// Abilities to exclude (no description and no pokemon data)
-const EXCLUDED_ABILITIES = new Set([
-  "as-one-glastrier",
-  "as-one-spectrier",
-  // Pokemon Conquest abilities
-  "aqua-boost",
-  "black-hole",
-  "bodyguard",
-  "bonanza",
-  "calming",
-  "celebrate",
-  "climber",
-  "confidence",
-  "conqueror",
-  "daze",
-  "decoy",
-  "deep-sleep",
-  "disgust",
-  "dodge",
-  "explode",
-  "flame-boost",
-  "fortune",
-  "frighten",
-  "frostbite",
-  "grass-cloak",
-  "gulp",
-  "herbivore",
-  "hero",
-  "high-rise",
-  "hot-blooded",
-  "instinct",
-  "interference",
-  "jagged-edge",
-  "last-bastion",
-  "life-force",
-  "lunchbox",
-  "lullaby",
-  "medic",
-  "melee",
-  "mood-maker",
-  "mountaineer",
-  "omnipotent",
-  "parry",
-  "perception",
-  "power-nap",
-  "pride",
-  "run-up",
-  "sandpit",
-  "sequence",
-  "shackle",
-  "shadow-dash",
-  "share",
-  "shield",
-  "skater",
-  "spirit",
-  "sponge",
-  "sprint",
-  "stealth",
-  "tenacity",
-  "thrust",
-  "vanguard",
-  "warm-blanket",
-  "wave-rider",
+const POKEAPI_BASE = "https://pokeapi.co/api/v2";
+const SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
+const LEARNERS_PAGE_SIZE = 60;
+
+/* ---------------------------------------------------------------- Names */
+
+// Official English names that title-casing the PokeAPI slug gets wrong (checked against PokeAPI's names).
+// Both As One variants are called "As One" in game; the partner Pokémon tells them apart here.
+const ABILITY_NAME_OVERRIDES = new Map([
+  ["soul-heart", "Soul-Heart"],
+  ["rks-system", "RKS System"],
+  ["dragons-maw", "Dragon’s Maw"],
+  ["well-baked-body", "Well-Baked Body"],
+  ["minds-eye", "Mind’s Eye"],
+  ["as-one-glastrier", "As One (Glastrier)"],
+  ["as-one-spectrier", "As One (Spectrier)"],
 ]);
+const LOWERCASE_WORDS = new Set(["of", "the", "or", "and", "to", "as"]);
 
-export default function AbilitiesPage() {
-  const [query, setQuery] = useState("");
-  const [abilities, setAbilities] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [selectedAbility, setSelectedAbility] = useState(null);
+const titleCaseSlug = (slug) =>
+  String(slug || "")
+    .split("-")
+    .filter(Boolean)
+    .map((word, index) =>
+      index > 0 && LOWERCASE_WORDS.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ");
 
+/** "good-as-gold" → "Good as Gold", "dragons-maw" → "Dragon’s Maw" */
+const formatAbilityName = (name) => ABILITY_NAME_OVERRIDES.get(name) ?? titleCaseSlug(name);
+
+// formatPokemonName drops Mega/Gigantamax tokens because Pokédex cards tag them; spell them out here.
+const FORM_PREFIX_TOKENS = new Map([
+  ["mega", "Mega"],
+  ["gmax", "Gigantamax"],
+  ["primal", "Primal"],
+]);
+const formatLearnerName = (slug) => {
+  const tokens = String(slug || "").toLowerCase().split("-");
+  const prefixes = tokens.filter((token) => FORM_PREFIX_TOKENS.has(token)).map((token) => FORM_PREFIX_TOKENS.get(token));
+  const base = formatPokemonName(tokens.filter((token) => !FORM_PREFIX_TOKENS.has(token)).join("-"));
+  return prefixes.length > 0 ? `${prefixes.join(" ")} ${base}` : base;
+};
+
+const toSearchKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const hideBrokenImage = (event) => {
+  event.currentTarget.style.display = "none";
+};
+const hideBrokenSprite = (event) => {
+  event.currentTarget.style.visibility = "hidden";
+};
+
+const readSearchParam = (key) => new URLSearchParams(window.location.search).get(key);
+
+/* ---------------------------------------------------------------- Data hooks */
+
+/** Resolves one of the cached static-data loaders (`null` = don't load yet). */
+function useStaticResource(loader) {
+  const [state, setState] = useState({ data: null, error: null });
   useEffect(() => {
-    // On mount, ensure URL only carries the Abilities param
-    try {
-      const u = new URL(window.location.href);
-      ["p", "i", "m"].forEach((k) => u.searchParams.delete(k));
-      window.history.replaceState({}, "", u);
-    } catch {}
-
+    if (!loader) return undefined;
     let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const r = await fetch("https://pokeapi.co/api/v2/ability?limit=20000");
-        const j = await r.json();
-        const allAbilities = Array.isArray(j.results) ? j.results : [];
-        // Filter out excluded abilities
-        const filteredAbilities = allAbilities.filter((a) => !EXCLUDED_ABILITIES.has(a.name));
-        if (!cancelled) setAbilities(filteredAbilities);
-      } catch (e) {
-        if (!cancelled) setError(e);
-      } finally {
-        if (!cancelled) setLoading(false);
+    loader().then(
+      (data) => {
+        if (!cancelled) setState({ data, error: null });
+      },
+      (error) => {
+        if (!cancelled) setState((previous) => (previous.data ? previous : { data: null, error }));
       }
-    }
-    load();
+    );
     return () => {
       cancelled = true;
     };
+  }, [loader]);
+  return state;
+}
+
+// `/ability/{name}` responses (full effect text). Concurrent callers share one in-flight request;
+// failures are evicted so a later visit retries.
+const abilityDetailCache = new Map(); // name -> { promise, data }
+
+function fetchAbilityDetail(name) {
+  let entry = abilityDetailCache.get(name);
+  if (!entry) {
+    entry = { promise: null, data: null };
+    const cacheEntry = entry;
+    cacheEntry.promise = fetch(`${POKEAPI_BASE}/ability/${encodeURIComponent(name)}/`)
+      .then((response) => {
+        if (!response.ok) throw new Error(`PokeAPI responded with ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        cacheEntry.data = data;
+        return data;
+      })
+      .catch((error) => {
+        abilityDetailCache.delete(name);
+        throw error;
+      });
+    abilityDetailCache.set(name, cacheEntry);
+  }
+  return entry.promise;
+}
+
+const IDLE_DETAIL = { data: null, loading: false, error: null };
+
+function useAbilityDetail(name) {
+  const [result, setResult] = useState({ name: null, data: null, error: null });
+  useEffect(() => {
+    if (!name) return undefined;
+    let cancelled = false;
+    fetchAbilityDetail(name).then(
+      (data) => {
+        if (!cancelled) setResult({ name, data, error: null });
+      },
+      (error) => {
+        if (!cancelled) setResult({ name, data: null, error });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [name]);
+  if (!name) return IDLE_DETAIL;
+  if (result.name === name) return { data: result.data, loading: false, error: result.error };
+  const cached = abilityDetailCache.get(name)?.data;
+  if (cached) return { data: cached, loading: false, error: null };
+  return { data: null, loading: true, error: null };
+}
+
+const cleanGameText = (text) =>
+  String(text || "")
+    .replace(/\xad\s*/g, "") // soft hyphens from line-wrapped game text
+    // PokeAPI markup such as "[HP]{mechanic:hp}" or "[]{move:protect}"
+    .replace(/\[([^\]]*)\]\{[^}:]*:([^}]*)\}/g, (_, label, slug) => label || titleCaseSlug(slug))
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Full English effect text from an `/ability/{name}` response (paragraphs kept). */
+const getEnglishEffect = (data) => {
+  const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
+  const entry = entries.find((e) => e?.language?.name === "en");
+  return entry?.effect || entry?.short_effect || "";
+};
+
+const looseTextKey = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+
+/** Splits the full effect into list lines (paragraphs, "* " bullets, sentences), minus lines repeating the summary. */
+const toEffectLines = (text, summary) => {
+  const summaryKey = looseTextKey(summary);
+  return String(text || "")
+    .split(/\n+/)
+    .map((paragraph) => cleanGameText(paragraph).replace(/^\*\s*/, ""))
+    .flatMap((paragraph) => paragraph.split(/(?<=[.!?])\s+(?=[A-Z0-9(“"])/))
+    .map((line) => line.trim())
+    .filter((line) => line && looseTextKey(line) !== summaryKey);
+};
+
+/* ---------------------------------------------------------------- Page */
+
+export default function AbilitiesPage() {
+  const abilityData = useStaticResource(loadAbilityData);
+  const [query, setQuery] = useState("");
+  const [selectedName, setSelectedName] = useState(() => readSearchParam("a"));
+
+  useEffect(() => {
+    // The Abilities page only carries its own `?a=` param.
+    const url = new URL(window.location.href);
+    const foreignKeys = ["p", "i", "m"].filter((key) => url.searchParams.has(key));
+    if (foreignKeys.length > 0) {
+      foreignKeys.forEach((key) => url.searchParams.delete(key));
+      window.history.replaceState(window.history.state, "", url);
+    }
+    // Back/forward and in-app navigation update the selection from the URL.
+    const syncFromUrl = () => setSelectedName(readSearchParam("a"));
+    window.addEventListener("popstate", syncFromUrl);
+    window.addEventListener("locationchange", syncFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl);
+      window.removeEventListener("locationchange", syncFromUrl);
+    };
   }, []);
 
+  // abilities.json holds main-series abilities only, so Conquest-only entries never appear.
+  const abilities = useMemo(
+    () =>
+      (abilityData.data?.abilities || [])
+        .map((ability) => ({
+          name: ability.n,
+          label: formatAbilityName(ability.n),
+          generation: ability.g ?? null,
+          effect: ability.e || "",
+          pokemon: Array.isArray(ability.p) ? ability.p : [],
+          searchKey: `${toSearchKey(ability.n)} ${toSearchKey(formatAbilityName(ability.n))}`,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [abilityData.data]
+  );
+
+  const abilitiesByName = useMemo(() => new Map(abilities.map((ability) => [ability.name, ability])), [abilities]);
+  const selectedAbility = (selectedName && abilitiesByName.get(selectedName)) || null;
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const result = q ? abilities.filter((a) => a.name.includes(q)) : abilities;
-    return [...result].sort((a, b) => a.name.localeCompare(b.name));
+    const search = toSearchKey(query);
+    return search ? abilities.filter((ability) => ability.searchKey.includes(search)) : abilities;
   }, [abilities, query]);
 
-  // Function to read URL and select ability
-  const resolveAbilityFromUrl = useCallback(() => {
-    const u = new URL(window.location.href);
-    const name = u.searchParams.get("a");
-    if (!name) {
-      setSelectedAbility(null);
-      return;
+  const detail = useAbilityDetail(selectedAbility ? selectedAbility.name : null);
+  const pokemonList = useStaticResource(selectedAbility ? loadPokemonList : null);
+  const pokemonById = useMemo(
+    () => new Map((pokemonList.data || []).filter((pokemon) => pokemon.id != null).map((pokemon) => [pokemon.id, pokemon])),
+    [pokemonList.data]
+  );
+
+  const selectAbility = useCallback((name) => {
+    const url = new URL(window.location.href);
+    ["p", "i", "m"].forEach((key) => url.searchParams.delete(key));
+    if (url.searchParams.get("a") !== name) {
+      url.searchParams.set("a", name);
+      window.history.pushState({}, "", url);
     }
-    const found = abilities.find((ab) => ab.name === name);
-    if (found) {
-      setSelectedAbility(found);
-    }
-  }, [abilities]);
+    setSelectedName(name);
+  }, []);
 
-  // Check URL on mount and when abilities load
-  useEffect(() => {
-    if (abilities.length > 0) {
-      resolveAbilityFromUrl();
-    }
-  }, [abilities, resolveAbilityFromUrl]);
-
-  // Listen for back/forward navigation and location changes
-  useEffect(() => {
-    const onPop = () => {
-      resolveAbilityFromUrl();
-    };
-    const onLocationChange = () => {
-      resolveAbilityFromUrl();
-    };
-    window.addEventListener("popstate", onPop);
-    window.addEventListener("locationchange", onLocationChange);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      window.removeEventListener("locationchange", onLocationChange);
-    };
-  }, [resolveAbilityFromUrl]);
-
-  function selectAbility(ab) {
-    const u = new URL(window.location.href);
-    ["p", "i", "m"].forEach((k) => u.searchParams.delete(k));
-    u.searchParams.set("a", ab.name);
-    window.history.pushState({}, "", u);
-    setSelectedAbility(ab);
-  }
-
-  function clearSelection() {
-    const u = new URL(window.location.href);
-    u.searchParams.delete("a");
-    window.history.pushState({}, "", u);
-    setSelectedAbility(null);
-  }
+  const loading = !abilityData.data && !abilityData.error;
 
   return (
     <div className="app-shell">
@@ -185,21 +257,18 @@ export default function AbilitiesPage() {
             <input
               className="search"
               placeholder="Search Abilities"
+              aria-label="Search abilities"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button
-              type="button"
-              className="reset-button"
-              onClick={() => setQuery("")}
-            >
+            <button type="button" className="reset-button" onClick={() => setQuery("")}>
               Reset
             </button>
           </div>
         </div>
       </header>
       <main className="container">
-        {error ? (
+        {abilityData.error ? (
           <div className="list-empty">Failed to load abilities.</div>
         ) : loading ? (
           <div className="list-empty">Loading abilities…</div>
@@ -210,24 +279,32 @@ export default function AbilitiesPage() {
             <div className="list-panel">
               <div className="list-scroll">
                 <div className="list items-list">
-                  {filtered.map((a) => (
-                    <button
-                      key={a.name}
-                      type="button"
-                      className={`item-row${selectedAbility?.name === a.name ? " is-selected" : ""}`}
-                      onClick={() => selectAbility(a)}
-                      aria-pressed={selectedAbility?.name === a.name}
-                    >
-                      <span className="item-name">{a.name.replaceAll("-", " ")}</span>
-                    </button>
-                  ))}
+                  {filtered.map((ability) => {
+                    const isSelected = selectedAbility?.name === ability.name;
+                    return (
+                      <button
+                        key={ability.name}
+                        type="button"
+                        className={`item-row${isSelected ? " is-selected" : ""}`}
+                        onClick={() => selectAbility(ability.name)}
+                        aria-pressed={isSelected}
+                      >
+                        <span className="item-name proper-name">{ability.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
             <aside className="detail-panel">
               <div className="detail-inner moves-detail-inner">
-                <AbilityDetailPanel ability={selectedAbility} onClose={clearSelection} />
-                <AbilityLearnersPanel ability={selectedAbility} />
+                <AbilityDetailPanel ability={selectedAbility} detail={detail} />
+                <AbilityLearnersPanel
+                  key={selectedAbility?.name || "none"}
+                  ability={selectedAbility}
+                  pokemonById={pokemonById}
+                  pokemonListPending={!pokemonList.data && !pokemonList.error}
+                />
               </div>
             </aside>
           </section>
@@ -237,61 +314,10 @@ export default function AbilitiesPage() {
   );
 }
 
-
-function AbilityDetailPanel({ ability, onClose }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const englishEffect = useMemo(() => {
-    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.effect || en.short_effect || "") : "";
-  }, [data]);
-
-  const englishShortEffect = useMemo(() => {
-    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.short_effect || "") : "";
-  }, [data]);
-
-  const effectLines = useMemo(() => {
-    const raw = String(englishEffect || "");
-    const cleaned = raw.replace(/\s+/g, " ").trim();
-    if (!cleaned) return [];
-    const shortEffectCleaned = String(englishShortEffect || "").replace(/\s+/g, " ").trim();
-    // If the full effect is the same as the short effect, don't show lines (to avoid duplication)
-    if (cleaned === shortEffectCleaned && shortEffectCleaned) return [];
-    return cleaned
-      .split(/(?<=[.!?])\s+|;\s+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }, [englishEffect, englishShortEffect]);
-
-  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!ability) return;
-      setLoading(true);
-      setError(null);
-      setData(null);
-      try {
-        const url = `https://pokeapi.co/api/v2/ability/${ability.name}`;
-        const j = await fetch(url).then((r) => r.json());
-        if (!cancelled) setData(j);
-      } catch (e) {
-        if (!cancelled) setError(e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [ability]);
+function AbilityDetailPanel({ ability, detail }) {
+  const summary = ability?.effect || "";
+  const longEffect = useMemo(() => getEnglishEffect(detail.data), [detail.data]);
+  const effectLines = useMemo(() => toEffectLines(longEffect, summary), [longEffect, summary]);
 
   if (!ability) {
     return (
@@ -307,31 +333,40 @@ function AbilityDetailPanel({ ability, onClose }) {
   return (
     <div className="move-detail-frame">
       <div className="detail-title detail-title-top">
-        <h2>{ability.name.replaceAll("-", " ")}</h2>
+        <h2 className="proper-name">{ability.label}</h2>
       </div>
       <div className="move-hero-container">
         <div className="detail-hero single-col">
           <div className="hero-right">
-            {loading ? (
-              <div className="list-empty">Loading</div>
-            ) : error ? (
-              <div className="list-empty">Failed to load ability.</div>
-            ) : (
-              <div className="main-col">
-                {englishShortEffect || englishEffect ? (
-                  <div className="effect-window">
-                    {englishShortEffect ? <div className="effect-summary">{englishShortEffect}</div> : null}
-                    {effectLines.length > 0 ? (
-                      <ul className="effect-list">
-                        {effectLines.map((line, idx) => (
-                          <li key={idx}>{line}</li>
-                        ))}
-                      </ul>
-                    ) : null}
+            <div className="main-col">
+              {summary || effectLines.length > 0 ? (
+                <div className="effect-window">
+                  {summary ? <div className="effect-summary">{summary}</div> : null}
+                  {effectLines.length > 0 ? (
+                    <ul className="effect-list">
+                      {effectLines.map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+              {ability.generation ? (
+                <section className="about">
+                  <div className="about-list" style={{ padding: 0 }}>
+                    <div className="about-row">
+                      <div className="label">Introduced</div>
+                      <div className="value">Gen {ability.generation}</div>
+                    </div>
                   </div>
-                ) : null}
-              </div>
-            )}
+                </section>
+              ) : null}
+              {detail.loading ? (
+                <p className="moves-inline-status">Loading full description…</p>
+              ) : detail.error ? (
+                <p className="moves-inline-status">Couldn&rsquo;t load the full description from PokeAPI.</p>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -339,143 +374,78 @@ function AbilityDetailPanel({ ability, onClose }) {
   );
 }
 
-function AbilityLearnersPanel({ ability }) {
-  const [data, setData] = useState(null);
-  const [learners, setLearners] = useState([]);
-  const [learnersLoading, setLearnersLoading] = useState(false);
-  const [learnersError, setLearnersError] = useState(null);
-  const [typesMap, setTypesMap] = useState(() => new Map());
+const goToPokemon = (slug) => {
+  if (slug) updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
+};
 
-  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function AbilityLearnersPanel({ ability, pokemonById, pokemonListPending }) {
+  const [visibleCount, setVisibleCount] = useState(LEARNERS_PAGE_SIZE);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!ability) {
-        setData(null);
-        setLearners([]);
-        return;
-      }
-      setLearnersLoading(true);
-      setLearnersError(null);
-      try {
-        const url = `https://pokeapi.co/api/v2/ability/${ability.name}`;
-        const j = await fetch(url).then((r) => r.json());
-        if (!cancelled) {
-          setData(j);
-          const entries = Array.isArray(j?.pokemon) ? j.pokemon : [];
-          const list = entries
-            .map((entry) => {
-              const name = entry?.pokemon?.name;
-              const url = entry?.pokemon?.url;
-              if (!name || !url) return null;
-              const parts = String(url).split("/").filter(Boolean);
-              const id = parts[parts.length - 1];
-              return id ? { name, id, url } : null;
-            })
-            .filter(Boolean)
-            .slice(0, 60);
-          setLearners(list);
-        }
-      } catch (e) {
-        if (!cancelled) setLearnersError(e);
-      } finally {
-        if (!cancelled) setLearnersLoading(false);
-      }
+  const holders = useMemo(() => {
+    const byId = new Map();
+    for (const [id, isHidden] of ability?.pokemon || []) {
+      // A few Pokémon list the same ability in a regular and the hidden slot; that's not hidden-only.
+      const hidden = isHidden === 1 && byId.get(id)?.hidden !== false;
+      const known = pokemonById.get(id);
+      byId.set(id, {
+        id,
+        slug: known?.name || String(id),
+        speciesId: known?.speciesId ?? id,
+        types: known?.types || [],
+        hidden,
+      });
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [ability]);
-
-  const goToPokemon = useCallback((pokemon) => {
-    if (!pokemon) return;
-    const slug = pokemon.name || String(pokemon.id || "").trim();
-    if (!slug) return;
-    updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
-    try {
-      window.location.hash = "";
-    } catch {}
-  }, []);
-
-  // Load types for learners to render type pills
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTypes() {
-      const pending = learners.filter((p) => p && !typesMap.has(p.id));
-      if (pending.length === 0) return;
-      try {
-        const results = await Promise.all(
-          pending.map(async (p) => {
-            try {
-              const j = await fetch(p.url).then((r) => r.json());
-              const types = Array.isArray(j?.types)
-                ? j.types.map((t) => t?.type?.name).filter(Boolean)
-                : [];
-              return { id: p.id, types };
-            } catch {
-              return { id: p.id, types: [] };
-            }
-          })
-        );
-        if (!cancelled) {
-          setTypesMap((prev) => {
-            const next = new Map(prev);
-            for (const res of results) next.set(res.id, res.types);
-            return next;
-          });
-        }
-      } catch {}
-    }
-    loadTypes();
-    return () => { cancelled = true; };
-  }, [learners, typesMap]);
+    // National Dex order, with each species' forms right after it.
+    return [...byId.values()].sort((a, b) => a.speciesId - b.speciesId || a.id - b.id);
+  }, [ability, pokemonById]);
 
   if (!ability) {
-    return <aside className="learners-panel" style={{ display: 'none' }} />;
+    return <aside className="learners-panel" style={{ display: "none" }} />;
   }
+
+  const loading = pokemonListPending && holders.length > 0;
+  const visible = holders.slice(0, visibleCount);
+  const remaining = holders.length - visible.length;
 
   return (
     <aside className="learners-panel">
-      <h4 className="learners-title">Has Ability</h4>
-      {learnersLoading ? (
+      <h4 className="learners-title">
+        Has Ability
+        {!loading && holders.length > 0 ? (
+          <span className="learners-count">({holders.length.toLocaleString()})</span>
+        ) : null}
+      </h4>
+      {loading ? (
         <div className="learners-empty">Loading</div>
-      ) : learnersError ? (
-        <div className="learners-empty">Failed to load</div>
-      ) : learners.length === 0 ? (
-        <div className="learners-empty">No data</div>
+      ) : holders.length === 0 ? (
+        <div className="learners-empty">No Pokémon listed</div>
       ) : (
         <ul className="learners-list" role="list">
-          {learners.map((p) => {
-            const types = typesMap.get(p.id) || [];
+          {visible.map((pokemon) => {
+            const name = formatLearnerName(pokemon.slug);
             return (
-              <li key={p.id}>
+              <li key={pokemon.id}>
                 <button
                   type="button"
                   className="learners-poke-button"
-                  onClick={() => goToPokemon(p)}
-                  title={`Open ${humanize(p.name)}`}
+                  onClick={() => goToPokemon(pokemon.slug)}
+                  title={`Open ${name}${pokemon.hidden ? " (Hidden Ability)" : ""}`}
                 >
                   <img
                     className="learners-poke-sprite"
-                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
+                    src={`${SPRITE_BASE}/${pokemon.id}.png`}
                     alt=""
                     loading="lazy"
+                    onError={hideBrokenSprite}
                   />
-                  <span className="label">{humanize(p.name)}</span>
+                  <span className="label proper-name">
+                    {name}
+                    {pokemon.hidden ? <span className="learners-hidden-tag">Hidden</span> : null}
+                  </span>
                   <span className="types-vertical">
-                    {types.map((t) => (
+                    {pokemon.types.map((t) => (
                       <span key={t} className={`type-chip type-${t}`}>
-                        <img 
-                          src={getTypeIconUrl(t)} 
-                          alt={t} 
-                          className="type-icon"
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
+                        <img src={getTypeIconUrl(t)} alt={t} className="type-icon" loading="lazy" onError={hideBrokenImage} />
                         <span className="type-name">{t}</span>
                       </span>
                     ))}
@@ -484,9 +454,19 @@ function AbilityLearnersPanel({ ability }) {
               </li>
             );
           })}
+          {remaining > 0 ? (
+            <li className="learners-more">
+              <button
+                type="button"
+                className="neutral-chip learners-more-button"
+                onClick={() => setVisibleCount((count) => count + LEARNERS_PAGE_SIZE)}
+              >
+                Show {Math.min(LEARNERS_PAGE_SIZE, remaining)} more ({remaining.toLocaleString()} left)
+              </button>
+            </li>
+          ) : null}
         </ul>
       )}
     </aside>
   );
 }
-

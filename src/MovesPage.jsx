@@ -1,251 +1,500 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 import { updatePokemonLocation } from "./utils/url.js";
 import { getTypeIconUrl } from "./utils/typeIcons.js";
+import { formatPokemonName } from "./utils/pokemonNames.js";
+import { formatMoveName, getMoveGroupKey, titleCaseSlug } from "./utils/moveNames.js";
+import {
+  getMoveForVersionGroup,
+  loadMoveData,
+  loadMoveEffects,
+  loadPokemonList,
+} from "./data/staticData.js";
 
-export default function MovesPage() {
-  const [query, setQuery] = useState("");
-  const [moves, setMoves] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [selectedMove, setSelectedMove] = useState(null);
-  const [selectedType, setSelectedType] = useState(null);
-  const [selectedDamageClass, setSelectedDamageClass] = useState(null); // 'physical' | 'special' | 'status'
-  const [priorityOnly, setPriorityOnly] = useState(false); // true => priority > 0
-  const [typeMovesMap, setTypeMovesMap] = useState(() => new Map());
-  const [typeLoading, setTypeLoading] = useState(() => new Map());
-  const [typeError, setTypeError] = useState(() => new Map());
-  const [moveTypeMap, setMoveTypeMap] = useState(() => new Map());
-  const [moveMetaMap, setMoveMetaMap] = useState(() => new Map()); // name -> {power, accuracy, pp, priority, damage_class}
+const POKEAPI_BASE = "https://pokeapi.co/api/v2";
+const SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
+const LEARNERS_PAGE_SIZE = 60;
+const MAX_FLAVOR_ENTRIES = 6;
 
+const MOVE_TYPES = [
+  "normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison", "ground",
+  "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy",
+];
+const DAMAGE_CLASSES = ["physical", "special", "status"];
+
+/* ---------------------------------------------------------------- Names */
+
+const formatTypeName = (type) => (type === "unknown" ? "???" : titleCaseSlug(type));
+
+// formatPokemonName drops Mega/Gigantamax tokens because Pokédex cards tag them; spell them out here.
+const FORM_PREFIX_TOKENS = new Map([
+  ["mega", "Mega"],
+  ["gmax", "Gigantamax"],
+  ["primal", "Primal"],
+]);
+const formatLearnerName = (slug) => {
+  const tokens = String(slug || "").toLowerCase().split("-");
+  const prefixes = tokens.filter((token) => FORM_PREFIX_TOKENS.has(token)).map((token) => FORM_PREFIX_TOKENS.get(token));
+  const base = formatPokemonName(tokens.filter((token) => !FORM_PREFIX_TOKENS.has(token)).join("-"));
+  return prefixes.length > 0 ? `${prefixes.join(" ")} ${base}` : base;
+};
+
+const toSearchKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const VERSION_GROUP_LABELS = new Map([
+  ["red-green-japan", "Red / Green (JP)"],
+  ["blue-japan", "Blue (JP)"],
+  ["red-blue", "Red / Blue"],
+  ["gold-silver", "Gold / Silver"],
+  ["ruby-sapphire", "Ruby / Sapphire"],
+  ["xd", "XD"],
+  ["firered-leafgreen", "FireRed / LeafGreen"],
+  ["diamond-pearl", "Diamond / Pearl"],
+  ["heartgold-soulsilver", "HeartGold / SoulSilver"],
+  ["black-white", "Black / White"],
+  ["black-2-white-2", "Black 2 / White 2"],
+  ["x-y", "X / Y"],
+  ["omega-ruby-alpha-sapphire", "Omega Ruby / Alpha Sapphire"],
+  ["sun-moon", "Sun / Moon"],
+  ["ultra-sun-ultra-moon", "Ultra Sun / Ultra Moon"],
+  ["lets-go-pikachu-lets-go-eevee", "Let’s Go, Pikachu! / Let’s Go, Eevee!"],
+  ["sword-shield", "Sword / Shield"],
+  ["brilliant-diamond-and-shining-pearl", "Brilliant Diamond / Shining Pearl"],
+  ["legends-arceus", "Legends: Arceus"],
+  ["scarlet-violet", "Scarlet / Violet"],
+  ["legends-za", "Legends: Z-A"],
+]);
+const formatVersionGroup = (name) => VERSION_GROUP_LABELS.get(name) ?? titleCaseSlug(name);
+
+const formatGenerationRange = (from, to) => (from === to ? `Gen ${from}` : `Gen ${from}–${to}`);
+const formatAccuracy = (value) => (value == null ? "—" : `${value}%`);
+const formatPriority = (value) => (value > 0 ? `+${value}` : String(value ?? 0));
+
+const hideBrokenImage = (event) => {
+  event.currentTarget.style.display = "none";
+};
+const hideBrokenSprite = (event) => {
+  event.currentTarget.style.visibility = "hidden";
+};
+
+const readSearchParam = (key) => new URLSearchParams(window.location.search).get(key);
+
+/* ---------------------------------------------------------------- Data hooks */
+
+/** Resolves one of the cached static-data loaders (`null` = don't load yet). */
+function useStaticResource(loader) {
+  const [state, setState] = useState({ data: null, error: null });
   useEffect(() => {
-    // On mount, ensure URL only carries the Moves param
-    try {
-      const u = new URL(window.location.href);
-      ["p", "i", "a"].forEach((k) => u.searchParams.delete(k));
-      window.history.replaceState({}, "", u);
-    } catch {}
-
+    if (!loader) return undefined;
     let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const r = await fetch("https://pokeapi.co/api/v2/move?limit=20000");
-        const j = await r.json();
-        if (!cancelled) setMoves(Array.isArray(j.results) ? j.results : []);
-      } catch (e) {
-        if (!cancelled) setError(e);
-      } finally {
-        if (!cancelled) setLoading(false);
+    loader().then(
+      (data) => {
+        if (!cancelled) setState({ data, error: null });
+      },
+      (error) => {
+        if (!cancelled) setState((previous) => (previous.data ? previous : { data: null, error }));
       }
-    }
-    load();
+    );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loader]);
+  return state;
+}
 
-  const MOVE_TYPES = [
-    "normal","fire","water","electric","grass","ice","fighting","poison","ground","flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy"
-  ];
+// `/move/{name}` responses (flavor text, full effect, learners), shared by the detail and learners panels.
+// Concurrent callers share one in-flight request; failures are evicted so a later visit retries.
+const moveDetailCache = new Map(); // name -> { promise, data }
 
-  function normalizeMoveGroupName(name) {
-    const n = String(name || "").toLowerCase();
-    // Group Z-move variants like "breakneck-blitz--physical" and "--special"
-    if (n.includes("--")) {
-      return n.split("--")[0];
-    }
-    return n;
-  }
-
-  const activeTypeSet = useMemo(() => {
-    if (!selectedType) return null;
-    return typeMovesMap.get(selectedType) || null;
-  }, [selectedType, typeMovesMap]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (selectedType && !activeTypeSet) return [];
-    const base = selectedType ? moves.filter((m) => activeTypeSet.has(m.name)) : moves;
-    const result = q ? base.filter((m) => m.name.includes(q)) : base;
-    const needsMeta = !!(selectedDamageClass || priorityOnly);
-    let afterMeta = result;
-    if (needsMeta) {
-      afterMeta = result.filter((m) => {
-        const meta = moveMetaMap.get(m.name);
-        if (!meta) return false;
-        if (selectedDamageClass && meta.damage_class !== selectedDamageClass) return false;
-        if (priorityOnly && (meta.priority ?? 0) <= 0) return false;
-        return true;
+function fetchMoveDetail(name) {
+  let entry = moveDetailCache.get(name);
+  if (!entry) {
+    entry = { promise: null, data: null };
+    const cacheEntry = entry;
+    cacheEntry.promise = fetch(`${POKEAPI_BASE}/move/${encodeURIComponent(name)}/`)
+      .then((response) => {
+        if (!response.ok) throw new Error(`PokeAPI responded with ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        cacheEntry.data = data;
+        return data;
+      })
+      .catch((error) => {
+        moveDetailCache.delete(name);
+        throw error;
       });
-    }
-    return [...afterMeta].sort((a, b) => a.name.localeCompare(b.name));
-  }, [moves, query, selectedType, activeTypeSet, selectedDamageClass, priorityOnly, moveMetaMap]);
-
-  const grouped = useMemo(() => {
-    const map = new Map();
-    for (const m of filtered) {
-      const key = normalizeMoveGroupName(m.name);
-      const existing = map.get(key);
-      if (existing) {
-        existing.variants.push(m);
-      } else {
-        map.set(key, { key, variants: [m] });
-      }
-    }
-    const groups = Array.from(map.values());
-    groups.forEach((g) => g.variants.sort((a, b) => a.name.localeCompare(b.name)));
-    return groups.sort((a, b) => a.key.localeCompare(b.key));
-  }, [filtered]);
-
-  const selectedGroupKey = useMemo(() => selectedMove ? normalizeMoveGroupName(selectedMove.name) : null, [selectedMove]);
-
-  const variantsForSelected = useMemo(() => {
-    if (!selectedMove) return [];
-    const key = normalizeMoveGroupName(selectedMove.name);
-    return [...moves.filter((m) => normalizeMoveGroupName(m.name) === key)].sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedMove, moves]);
-
-  async function ensureTypeLoaded(typeName) {
-    if (typeMovesMap.has(typeName) || typeLoading.get(typeName)) return;
-    setTypeLoading((m) => new Map(m).set(typeName, true));
-    setTypeError((m) => new Map(m).set(typeName, null));
-    try {
-      const url = `https://pokeapi.co/api/v2/type/${typeName}`;
-      const j = await fetch(url).then((r) => r.json());
-      const list = Array.isArray(j?.moves) ? j.moves : [];
-      const set = new Set(list.map((x) => x.name));
-      setTypeMovesMap((m) => new Map(m).set(typeName, set));
-      setMoveTypeMap((m) => {
-        const nm = new Map(m);
-        for (const n of set) if (!nm.has(n)) nm.set(n, typeName);
-        return nm;
-      });
-    } catch (e) {
-      setTypeError((m) => new Map(m).set(typeName, e));
-    } finally {
-      setTypeLoading((m) => new Map(m).set(typeName, false));
-    }
+    moveDetailCache.set(name, cacheEntry);
   }
+  return entry.promise;
+}
 
-  function onClickType(typeName) {
-    if (selectedType === typeName) {
-      setSelectedType(null);
-      return;
-    }
-    setSelectedType(typeName);
-    ensureTypeLoaded(typeName);
-  }
+const IDLE_DETAIL = { data: null, loading: false, error: null };
 
-  function onClickAll() {
-    setSelectedType(null);
-  }
-
-  // Background-load metadata when meta filters are active
+function useMoveDetail(name) {
+  const [result, setResult] = useState({ name: null, data: null, error: null });
   useEffect(() => {
-    const needsMeta = !!(selectedDamageClass || priorityOnly);
-    if (!needsMeta) return;
-    const q = query.trim().toLowerCase();
-    const base = selectedType && activeTypeSet ? moves.filter((m) => activeTypeSet.has(m.name)) : moves;
-    const result = q ? base.filter((m) => m.name.includes(q)) : base;
-    const toFetch = [];
-    for (const m of result) {
-      if (!moveMetaMap.has(m.name)) toFetch.push(m.name);
-      if (toFetch.length >= 200) break;
-    }
-    if (toFetch.length === 0) return;
+    if (!name) return undefined;
     let cancelled = false;
-    (async () => {
-      try {
-        const chunks = [];
-        for (let i = 0; i < toFetch.length; i += 25) chunks.push(toFetch.slice(i, i + 25));
-        for (const names of chunks) {
-          const results = await Promise.all(names.map(async (name) => {
-            try {
-              const j = await fetch(`https://pokeapi.co/api/v2/move/${name}`).then((r) => r.json());
-              return { name, power: j?.power ?? null, accuracy: j?.accuracy ?? null, pp: j?.pp ?? null, priority: j?.priority ?? 0, damage_class: j?.damage_class?.name || null };
-            } catch {
-              return { name, power: null, accuracy: null, pp: null, priority: 0, damage_class: null };
-            }
-          }));
-          if (cancelled) return;
-          setMoveMetaMap((prev) => {
-            const next = new Map(prev);
-            for (const m of results) next.set(m.name, m);
-            return next;
-          });
-        }
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-  }, [selectedDamageClass, priorityOnly, query, selectedType, activeTypeSet, moves, moveMetaMap]);
+    fetchMoveDetail(name).then(
+      (data) => {
+        if (!cancelled) setResult({ name, data, error: null });
+      },
+      (error) => {
+        if (!cancelled) setResult({ name, data: null, error });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [name]);
+  if (!name) return IDLE_DETAIL;
+  if (result.name === name) return { data: result.data, loading: false, error: result.error };
+  const cached = moveDetailCache.get(name)?.data;
+  if (cached) return { data: cached, loading: false, error: null };
+  return { data: null, loading: true, error: null };
+}
 
-  // Preload all types in the background to color-code move list
+/* ---------------------------------------------------------------- Move text helpers */
+
+const cleanGameText = (text) =>
+  String(text || "")
+    .replace(/\xad\s*/g, "") // soft hyphens from line-wrapped game text
+    // PokeAPI markup such as "[HP]{mechanic:hp}" or "[]{move:protect}"
+    .replace(/\[([^\]]*)\]\{[^}:]*:([^}]*)\}/g, (_, label, slug) => label || titleCaseSlug(slug))
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Full English effect text from a `/move/{name}` response (paragraphs kept, effect chance filled in). */
+const getEnglishEffect = (data) => {
+  const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
+  const entry = entries.find((e) => e?.language?.name === "en");
+  const text = entry?.effect || entry?.short_effect || "";
+  return data?.effect_chance != null
+    ? text.replace(/\$effect_chance/g, String(data.effect_chance))
+    : text.replace(/\$effect_chance%?\s*/g, "");
+};
+
+// Compares sentences while ignoring numbers, so "Has a chance to burn" matches "Has a 10% chance to burn".
+const looseTextKey = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .replace(/\$effect_chance|[\d%]/g, "")
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+
+/** Splits the full effect into list lines (paragraphs, "* " bullets, sentences), minus lines repeating the summary. */
+const toEffectLines = (text, summary) => {
+  const summaryKey = looseTextKey(summary);
+  return String(text || "")
+    .split(/\n+/)
+    .map((paragraph) => cleanGameText(paragraph).replace(/^\*\s*/, ""))
+    .flatMap((paragraph) => paragraph.split(/(?<=[.!?])\s+(?=[A-Z0-9(“"])/))
+    .map((line) => line.trim())
+    .filter((line) => line && looseTextKey(line) !== summaryKey);
+};
+
+const mentionsStatStages = (text) => {
+  const lower = String(text || "").toLowerCase();
+  return /\bstages?\b/.test(lower) && /(raise|boost|increase|lower|decrease|drop|sharply|harshly)/.test(lower);
+};
+
+const versionGroupIdFromUrl = (url) => Number(String(url || "").split("/").filter(Boolean).pop()) || 0;
+
+/** English flavor text, newest game first, with consecutive identical texts merged into one row. */
+function groupFlavorText(entries, versionGroups) {
+  // Groups newer than the snapshot aren't in `versionGroups`; their PokeAPI ids still sort them last.
+  const orderOf = (group) => versionGroups?.[group.name]?.order ?? 1000 + versionGroupIdFromUrl(group.url);
+  const english = (Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry?.language?.name === "en" && entry.version_group?.name)
+    .map((entry) => ({
+      group: entry.version_group.name,
+      order: orderOf(entry.version_group),
+      text: cleanGameText(entry.flavor_text || entry.text),
+    }))
+    .filter((entry) => entry.text)
+    .sort((a, b) => b.order - a.order);
+  const grouped = [];
+  for (const entry of english) {
+    const last = grouped[grouped.length - 1];
+    if (last && last.text === entry.text) last.oldest = entry.group;
+    else grouped.push({ newest: entry.group, oldest: entry.group, text: entry.text });
+  }
+  return grouped.slice(0, MAX_FLAVOR_ENTRIES);
+}
+
+/* ---------------------------------------------------------------- Change history */
+
+// Spin-offs and Japan-only releases: listed only when their values differ from their generation's main games.
+const SIDE_VERSION_GROUPS = new Set([
+  "red-green-japan",
+  "blue-japan",
+  "colosseum",
+  "xd",
+  "lets-go-pikachu-lets-go-eevee",
+  "legends-arceus",
+]);
+const HISTORY_FIELDS = ["type", "damage_class", "power", "accuracy", "pp"];
+const sameHistoryStats = (a, b) => HISTORY_FIELDS.every((field) => a?.[field] === b?.[field]);
+
+/**
+ * Rows of `{ fromGen, toGen, games, stats }` describing how a move's type, category, power, accuracy and
+ * PP changed between games (consecutive generations with equal values are merged), or `null` if it never changed.
+ * Generations whose main games disagree (e.g. Hypnosis in Diamond/Pearl vs. Platinum) get one row per game set.
+ */
+function buildMoveHistory(moveData, moveName) {
+  const move = moveData?.moves?.[moveName];
+  if (!move) return null;
+  const introduced = move.g ?? 1;
+  const mainGroupsByGeneration = new Map();
+  const sideGroups = [];
+  const orderedGroups = Object.entries(moveData.versionGroups || {})
+    .filter(([, info]) => info.generation >= introduced)
+    .sort((a, b) => a[1].order - b[1].order);
+  for (const [group, info] of orderedGroups) {
+    if (SIDE_VERSION_GROUPS.has(group)) {
+      sideGroups.push([group, info.generation]);
+    } else {
+      if (!mainGroupsByGeneration.has(info.generation)) mainGroupsByGeneration.set(info.generation, []);
+      mainGroupsByGeneration.get(info.generation).push(group);
+    }
+  }
+
+  const rows = [];
+  const generationStats = new Map();
+  for (const [generation, groups] of mainGroupsByGeneration) {
+    const runs = [];
+    for (const group of groups) {
+      const stats = getMoveForVersionGroup(moveData, moveName, group);
+      const last = runs[runs.length - 1];
+      if (last && sameHistoryStats(last.stats, stats)) last.games.push(group);
+      else runs.push({ games: [group], stats });
+    }
+    if (runs.length === 1) {
+      generationStats.set(generation, runs[0].stats);
+      const previous = rows[rows.length - 1];
+      if (
+        previous &&
+        !previous.games &&
+        previous.toGen === generation - 1 &&
+        sameHistoryStats(previous.stats, runs[0].stats)
+      ) {
+        previous.toGen = generation;
+      } else {
+        rows.push({ fromGen: generation, toGen: generation, games: null, stats: runs[0].stats });
+      }
+    } else {
+      for (const run of runs) rows.push({ fromGen: generation, toGen: generation, games: run.games, stats: run.stats });
+    }
+  }
+
+  for (const [group, generation] of sideGroups) {
+    const mainStats = generationStats.get(generation);
+    const stats = getMoveForVersionGroup(moveData, moveName, group);
+    if (!mainStats || sameHistoryStats(mainStats, stats)) continue;
+    // Insert after the last row covering that generation.
+    let index = rows.length - 1;
+    while (index >= 0 && !(rows[index].fromGen <= generation && generation <= rows[index].toGen)) index -= 1;
+    rows.splice(index + 1, 0, { fromGen: generation, toGen: generation, games: [group], stats });
+  }
+
+  if (rows.length < 2) return null;
+  const fields = HISTORY_FIELDS.filter((field) => rows.some((row) => row.stats[field] !== rows[0].stats[field]));
+  if (fields.length === 0) return null;
+  const categoryFromType = fields.includes("damage_class") && move.c !== "status" && introduced <= 3;
+  return { rows, fields, categoryFromType };
+}
+
+/* ---------------------------------------------------------------- Small pieces */
+
+function TypeChip({ type }) {
+  return (
+    <span className={`type-chip type-${type}`}>
+      {type !== "unknown" ? (
+        <img src={getTypeIconUrl(type)} alt="" className="type-icon" loading="lazy" onError={hideBrokenImage} />
+      ) : null}
+      <span className="type-name">{formatTypeName(type)}</span>
+    </span>
+  );
+}
+
+function CategoryChip({ category }) {
+  return (
+    <span className={category ? `move-category-chip move-category-${category}` : "move-category-chip"}>
+      {category ? (
+        <img className="move-meta-icon" src={`/move-categories/${category}.png`} alt="" aria-hidden="true" loading="lazy" />
+      ) : null}
+      {category ? titleCaseSlug(category) : "Unknown"}
+    </span>
+  );
+}
+
+function HistoryValue({ field, value }) {
+  if (field === "type") return value ? <TypeChip type={value} /> : <span className="move-stat-chip">Type: —</span>;
+  if (field === "damage_class") return <CategoryChip category={value} />;
+  if (field === "power") return <span className="move-stat-chip">Power: {value ?? "—"}</span>;
+  if (field === "accuracy") return <span className="move-stat-chip">Accuracy: {formatAccuracy(value)}</span>;
+  return <span className="move-stat-chip">PP: {value ?? "—"}</span>;
+}
+
+function StageInfoPanel() {
+  return (
+    <div className="effect-window stage-info-panel">
+      <div className="stage-info-header">
+        <h3 className="stage-info-title">Understanding Stat Stages</h3>
+        <p className="stage-info-intro">
+          When moves mention &ldquo;stages,&rdquo; they&rsquo;re referring to in-battle stat modifiers. Each stat&rsquo;s
+          stage ranges from <strong>−6</strong> (lowest) to <strong>+6</strong> (highest), and stages reset when the
+          Pokémon switches out.
+        </p>
+      </div>
+
+      <div className="stage-info-section">
+        <h4 className="stage-info-subtitle">Battle Stats</h4>
+        <p className="stage-info-description">Attack, Defense, Special Attack, Special Defense, and Speed:</p>
+        <div className="stage-info-chips">
+          <div className="stage-info-chip-group">
+            <span className="stage-info-label">Boosts:</span>
+            <div className="stage-info-chip-row">
+              <span className="move-stat-chip positive">+1 stage = 1.5×</span>
+              <span className="move-stat-chip positive">+2 stages = 2×</span>
+              <span className="move-stat-chip positive">+6 stages = 4×</span>
+            </div>
+          </div>
+          <div className="stage-info-chip-group">
+            <span className="stage-info-label">Drops:</span>
+            <div className="stage-info-chip-row">
+              <span className="move-stat-chip negative">−1 stage = 0.67×</span>
+              <span className="move-stat-chip negative">−2 stages = 0.5×</span>
+              <span className="move-stat-chip negative">−6 stages = 0.25×</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="stage-info-section">
+        <h4 className="stage-info-subtitle">Accuracy &amp; Evasion</h4>
+        <p className="stage-info-description">
+          These also go from −6 to +6 but use a gentler scale. The user&rsquo;s accuracy stage minus the target&rsquo;s
+          evasion stage (capped at ±6) multiplies the move&rsquo;s accuracy:
+        </p>
+        <div className="stage-info-chips">
+          <div className="stage-info-chip-group">
+            <span className="stage-info-label">Boosts:</span>
+            <div className="stage-info-chip-row">
+              <span className="move-stat-chip positive">+1 stage = 1.33×</span>
+              <span className="move-stat-chip positive">+2 stages = 1.67×</span>
+              <span className="move-stat-chip positive">+6 stages = 3×</span>
+            </div>
+          </div>
+          <div className="stage-info-chip-group">
+            <span className="stage-info-label">Drops:</span>
+            <div className="stage-info-chip-row">
+              <span className="move-stat-chip negative">−1 stage = 0.75×</span>
+              <span className="move-stat-chip negative">−2 stages = 0.6×</span>
+              <span className="move-stat-chip negative">−6 stages = 0.33×</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- Page */
+
+export default function MovesPage() {
+  const moveData = useStaticResource(loadMoveData);
+  const moveEffects = useStaticResource(loadMoveEffects);
+  const [query, setQuery] = useState("");
+  const [selectedType, setSelectedType] = useState(null);
+  const [selectedDamageClass, setSelectedDamageClass] = useState(null); // 'physical' | 'special' | 'status'
+  const [priorityOnly, setPriorityOnly] = useState(false); // true => priority > 0
+  const [selectedName, setSelectedName] = useState(() => readSearchParam("m"));
+
   useEffect(() => {
-    MOVE_TYPES.forEach((t) => ensureTypeLoaded(t));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The Moves page only carries its own `?m=` param.
+    const url = new URL(window.location.href);
+    const foreignKeys = ["p", "i", "a"].filter((key) => url.searchParams.has(key));
+    if (foreignKeys.length > 0) {
+      foreignKeys.forEach((key) => url.searchParams.delete(key));
+      window.history.replaceState(window.history.state, "", url);
+    }
+    // Back/forward and in-app navigation update the selection from the URL.
+    const syncFromUrl = () => setSelectedName(readSearchParam("m"));
+    window.addEventListener("popstate", syncFromUrl);
+    window.addEventListener("locationchange", syncFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl);
+      window.removeEventListener("locationchange", syncFromUrl);
+    };
   }, []);
 
-  function getPrimaryVariant(variants) {
-    if (!Array.isArray(variants) || variants.length === 0) return null;
-    // Prefer a variant without explicit form suffix; else first alphabetically
-    const noSuffix = variants.find((v) => !/--(physical|special)$/.test(v.name));
-    return noSuffix || variants[0];
-  }
+  const allMoves = useMemo(() => {
+    const data = moveData.data;
+    if (!data?.moves) return [];
+    return Object.keys(data.moves)
+      .map((name) => ({
+        ...getMoveForVersionGroup(data, name, null),
+        searchKey: `${toSearchKey(name)} ${toSearchKey(formatMoveName(name))}`,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [moveData.data]);
 
-  // Function to read URL and select move
-  const resolveMoveFromUrl = useCallback(() => {
-    const u = new URL(window.location.href);
-    const name = u.searchParams.get("m");
-    if (!name) {
-      setSelectedMove(null);
-      return;
+  const movesByName = useMemo(() => new Map(allMoves.map((move) => [move.name, move])), [allMoves]);
+  const selectedMove = (selectedName && movesByName.get(selectedName)) || null;
+  const selectedGroupKey = selectedMove ? getMoveGroupKey(selectedMove.name) : null;
+
+  const groups = useMemo(() => {
+    const search = toSearchKey(query);
+    const byKey = new Map();
+    for (const move of allMoves) {
+      if (selectedType && move.type !== selectedType) continue;
+      if (selectedDamageClass && move.damage_class !== selectedDamageClass) continue;
+      if (priorityOnly && !(move.priority > 0)) continue;
+      if (search && !move.searchKey.includes(search)) continue;
+      const key = getMoveGroupKey(move.name);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(move);
     }
-    const found = moves.find((mv) => mv.name === name);
-    if (found) {
-      setSelectedMove(found);
+    return Array.from(byKey, ([key, variants]) => ({
+      key,
+      // Prefer the plain move; Z-moves only have "--physical"/"--special" variants.
+      primary: variants.find((variant) => !variant.name.includes("--")) ?? variants[0],
+    })).sort((a, b) => a.key.localeCompare(b.key));
+  }, [allMoves, query, selectedType, selectedDamageClass, priorityOnly]);
+
+  const variantsForSelected = useMemo(
+    () => (selectedGroupKey ? allMoves.filter((move) => getMoveGroupKey(move.name) === selectedGroupKey) : []),
+    [allMoves, selectedGroupKey]
+  );
+
+  const detail = useMoveDetail(selectedMove ? selectedMove.name : null);
+  const pokemonList = useStaticResource(selectedMove ? loadPokemonList : null);
+  const pokemonById = useMemo(
+    () => new Map((pokemonList.data || []).filter((pokemon) => pokemon.id != null).map((pokemon) => [pokemon.id, pokemon])),
+    [pokemonList.data]
+  );
+
+  const selectMove = useCallback((name) => {
+    const url = new URL(window.location.href);
+    ["p", "i", "a"].forEach((key) => url.searchParams.delete(key));
+    if (url.searchParams.get("m") !== name) {
+      url.searchParams.set("m", name);
+      window.history.pushState({}, "", url);
     }
-  }, [moves]);
+    setSelectedName(name);
+  }, []);
 
-  // Check URL on mount and when moves load
-  useEffect(() => {
-    if (moves.length > 0) {
-      resolveMoveFromUrl();
-    }
-  }, [moves, resolveMoveFromUrl]);
+  const resetFilters = () => {
+    setQuery("");
+    setSelectedType(null);
+    setSelectedDamageClass(null);
+    setPriorityOnly(false);
+  };
 
-  // Listen for back/forward navigation and location changes
-  useEffect(() => {
-    const onPop = () => {
-      resolveMoveFromUrl();
-    };
-    const onLocationChange = () => {
-      resolveMoveFromUrl();
-    };
-    window.addEventListener("popstate", onPop);
-    window.addEventListener("locationchange", onLocationChange);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      window.removeEventListener("locationchange", onLocationChange);
-    };
-  }, [resolveMoveFromUrl]);
-
-  function selectMove(mv) {
-    const u = new URL(window.location.href);
-    ["p", "i", "a"].forEach((k) => u.searchParams.delete(k));
-    u.searchParams.set("m", mv.name);
-    window.history.pushState({}, "", u);
-    setSelectedMove(mv);
-  }
-
-  function clearSelection() {
-    const u = new URL(window.location.href);
-    u.searchParams.delete("m");
-    window.history.pushState({}, "", u);
-    setSelectedMove(null);
-  }
+  const loading = !moveData.data && !moveData.error;
 
   return (
     <div className="app-shell">
@@ -267,17 +516,11 @@ export default function MovesPage() {
             <input
               className="search"
               placeholder="Search Moves"
+              aria-label="Search moves"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button
-              type="button"
-              className="reset-button"
-              onClick={() => {
-                setQuery("");
-                setSelectedType(null);
-              }}
-            >
+            <button type="button" className="reset-button" onClick={resetFilters}>
               Reset
             </button>
           </div>
@@ -287,41 +530,25 @@ export default function MovesPage() {
               <div className="filter-box-wrap">
                 <div className="filter-box-title">Type</div>
                 <div className="filter-box type-filters">
-                  {(() => {
-                    const isOn = selectedType == null;
-                    return (
-                      <button
-                        key="all"
-                        type="button"
-                        className={`neutral-chip${isOn ? " is-on" : ""}`}
-                        aria-pressed={isOn}
-                        onClick={onClickAll}
-                      >
-                        All
-                      </button>
-                    );
-                  })()}
+                  <button
+                    type="button"
+                    className={`neutral-chip${selectedType == null ? " is-on" : ""}`}
+                    aria-pressed={selectedType == null}
+                    onClick={() => setSelectedType(null)}
+                  >
+                    All
+                  </button>
                   {MOVE_TYPES.map((t) => {
                     const isOn = selectedType === t;
-                    const isLoading = typeLoading.get(t);
                     return (
                       <button
                         key={t}
                         type="button"
-                        className={`type-chip ${`type-${t}`}${isOn ? " is-on" : ""}`}
+                        className={`type-chip type-${t}${isOn ? " is-on" : ""}`}
                         aria-pressed={isOn}
-                        onClick={() => onClickType(t)}
-                        title={isLoading ? "Loading…" : undefined}
+                        onClick={() => setSelectedType(isOn ? null : t)}
                       >
-                        <img 
-                          src={getTypeIconUrl(t)} 
-                          alt={t} 
-                          className="type-icon"
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
+                        <img src={getTypeIconUrl(t)} alt="" className="type-icon" loading="lazy" onError={hideBrokenImage} />
                         <span className="type-name">{t}</span>
                       </button>
                     );
@@ -333,13 +560,13 @@ export default function MovesPage() {
               <div className="filter-box-wrap">
                 <div className="filter-box-title">Category</div>
                 <div className="filter-box special-filters">
-                  {['physical','special','status'].map((c) => {
+                  {DAMAGE_CLASSES.map((c) => {
                     const isOn = selectedDamageClass === c;
                     return (
                       <button
                         key={c}
                         type="button"
-                        className={`special-filter-chip${isOn ? ' is-on' : ''}`}
+                        className={`special-filter-chip${isOn ? " is-on" : ""}`}
                         aria-pressed={isOn}
                         onClick={() => setSelectedDamageClass(isOn ? null : c)}
                       >
@@ -349,8 +576,9 @@ export default function MovesPage() {
                   })}
                   <button
                     type="button"
-                    className={`special-filter-chip${priorityOnly ? ' is-on' : ''}`}
+                    className={`special-filter-chip${priorityOnly ? " is-on" : ""}`}
                     aria-pressed={priorityOnly}
+                    title="Moves with increased priority (+1 or higher)"
                     onClick={() => setPriorityOnly((v) => !v)}
                   >
                     priority
@@ -362,51 +590,46 @@ export default function MovesPage() {
         </div>
       </header>
       <main className="container">
-        {error ? (
+        {moveData.error ? (
           <div className="list-empty">Failed to load moves.</div>
         ) : loading ? (
           <div className="list-empty">Loading moves…</div>
-        ) : filtered.length === 0 ? (
+        ) : groups.length === 0 ? (
           <div className="list-empty">No moves found.</div>
         ) : (
           <section className="content split">
             <div className="list-panel">
               <div className="list-scroll">
                 <div className="list items-list">
-                  {grouped.map((g) => {
-                    const primary = getPrimaryVariant(g.variants);
-                    const isSelected = selectedGroupKey === g.key;
-                    const typeForGroup = primary ? moveTypeMap.get(primary.name) : null;
+                  {groups.map(({ key, primary }) => {
+                    const isSelected = selectedGroupKey === key;
+                    const type = primary.type;
                     return (
                       <button
-                        key={g.key}
+                        key={key}
                         type="button"
-                        className={`item-row${isSelected ? " is-selected" : ""}${typeForGroup ? ` move-type-${typeForGroup}` : ""}`}
-                        onClick={() => primary && selectMove(primary)}
+                        className={`item-row${isSelected ? " is-selected" : ""}${type ? ` move-type-${type}` : ""}`}
+                        onClick={() => selectMove(primary.name)}
                         aria-pressed={isSelected}
                       >
-                        {typeForGroup ? (
+                        {type ? (
                           <img
-                            src={getTypeIconUrl(typeForGroup)}
+                            src={getTypeIconUrl(type)}
                             alt=""
                             className="type-icon type-icon-bg"
                             loading="lazy"
                             aria-hidden="true"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
+                            onError={hideBrokenImage}
                           />
                         ) : null}
-                        <span className="item-name">{g.key.replaceAll("-", " ")}</span>
-                        {typeForGroup ? (
+                        <span className="item-name proper-name">{formatMoveName(key)}</span>
+                        {type ? (
                           <img
-                            src={getTypeIconUrl(typeForGroup)}
-                            alt={typeForGroup}
+                            src={getTypeIconUrl(type)}
+                            alt={type}
                             className="type-icon item-type-icon"
                             loading="lazy"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
+                            onError={hideBrokenImage}
                           />
                         ) : null}
                       </button>
@@ -419,14 +642,19 @@ export default function MovesPage() {
               <div className="detail-inner moves-detail-inner">
                 <MoveDetailPanel
                   move={selectedMove}
-                  onClose={clearSelection}
+                  moveData={moveData.data}
+                  shortEffect={selectedMove ? moveEffects.data?.[selectedMove.name] || "" : ""}
+                  detail={detail}
                   variants={variantsForSelected}
-                  onSelectVariant={(name) => {
-                    const found = moves.find((mv) => mv.name === name);
-                    if (found) selectMove(found);
-                  }}
+                  onSelectVariant={selectMove}
                 />
-                <MoveLearnersPanel move={selectedMove} />
+                <MoveLearnersPanel
+                  key={selectedMove?.name || "none"}
+                  move={selectedMove}
+                  detail={detail}
+                  pokemonById={pokemonById}
+                  pokemonListPending={!pokemonList.data && !pokemonList.error}
+                />
               </div>
             </aside>
           </section>
@@ -436,70 +664,15 @@ export default function MovesPage() {
   );
 }
 
-
-function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const englishEffect = useMemo(() => {
-    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.effect || en.short_effect || "") : "";
-  }, [data]);
-
-  const englishShortEffect = useMemo(() => {
-    const entries = Array.isArray(data?.effect_entries) ? data.effect_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.short_effect || "") : "";
-  }, [data]);
-
-  const englishFlavor = useMemo(() => {
-    const entries = Array.isArray(data?.flavor_text_entries) ? data.flavor_text_entries : [];
-    const en = entries.find((e) => e?.language?.name === "en");
-    return en ? (en.text || en.flavor_text || "") : "";
-  }, [data]);
-
-  const effectLines = useMemo(() => {
-    const raw = String(englishEffect || "");
-    const cleaned = raw.replace(/\s+/g, " ").trim();
-    if (!cleaned) return [];
-    return cleaned
-      .split(/(?<=[.!?])\s+|;\s+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }, [englishEffect]);
-
-  const mentionsStages = useMemo(() => {
-    const text = String(englishEffect || "").toLowerCase();
-    if (!text.includes("stage")) return false;
-    return /(raise|raises|boost|boosts|increase|increases|lower|lowers|decrease|decreases|drop|drops)/.test(text);
-  }, [englishEffect]);
-
-  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!move) return;
-      setLoading(true);
-      setError(null);
-      setData(null);
-      try {
-        const url = `https://pokeapi.co/api/v2/move/${move.name}`;
-        const j = await fetch(url).then((r) => r.json());
-        if (!cancelled) setData(j);
-      } catch (e) {
-        if (!cancelled) setError(e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [move]);
+function MoveDetailPanel({ move, moveData, shortEffect, detail, variants, onSelectVariant }) {
+  const longEffect = useMemo(() => getEnglishEffect(detail.data), [detail.data]);
+  const effectLines = useMemo(() => toEffectLines(longEffect, shortEffect), [longEffect, shortEffect]);
+  const showStageInfo = useMemo(() => mentionsStatStages(`${shortEffect} ${longEffect}`), [shortEffect, longEffect]);
+  const history = useMemo(() => (move ? buildMoveHistory(moveData, move.name) : null), [moveData, move]);
+  const flavorEntries = useMemo(
+    () => groupFlavorText(detail.data?.flavor_text_entries, moveData?.versionGroups),
+    [detail.data, moveData]
+  );
 
   if (!move) {
     return (
@@ -512,330 +685,210 @@ function MoveDetailPanel({ move, onClose, variants = [], onSelectVariant }) {
     );
   }
 
+  const otherVariants = variants.filter((variant) => variant.name !== move.name);
+
   return (
     <div className="move-detail-frame">
       <div className="detail-title detail-title-top">
-        <h2>{move.name.replaceAll("-", " ")}</h2>
+        <h2 className="proper-name">{formatMoveName(move.name)}</h2>
       </div>
       <div className="move-hero-container">
         <div className="detail-hero single-col">
-        <div className="hero-right">
-          {loading ? (
-            <div className="list-empty">Loading</div>
-          ) : error ? (
-            <div className="list-empty">Failed to load move.</div>
-          ) : (
+          <div className="hero-right">
             <div className="main-col">
-                <section className="about">
-                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Overview</h3>
-                  <div className="about-list" style={{padding: 0}}>
-                    <div className="about-row">
-                      <div className="label">Type</div>
-                      <div className="value">
-                        {data?.type?.name ? (
-                          <span className={`type-chip type-${data.type.name}`}>
-                            <img 
-                              src={getTypeIconUrl(data.type.name)} 
-                              alt={data.type.name} 
-                              className="type-icon"
-                              loading="lazy"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                            <span className="type-name">{humanize(data.type.name)}</span>
-                          </span>
-                        ) : (
-                          <span>Unknown</span>
-                        )}
-                      </div>
-                    </div>
+              <section className="about">
+                <h3 className="list-subheading" style={{ textAlign: "left" }}>Overview</h3>
+                <div className="about-list" style={{ padding: 0 }}>
+                  <div className="about-row">
+                    <div className="label">Type</div>
+                    <div className="value">{move.type ? <TypeChip type={move.type} /> : <span>Unknown</span>}</div>
+                  </div>
 
-                    <div className="about-row">
-                      <div className="label">Category</div>
-                      <div className="value">
-                        {(() => {
-                          const cat = data?.damage_class?.name || null;
-                          const cls = cat ? `move-category-chip move-category-${cat}` : 'move-category-chip';
-                          const src = cat ? `/moves/${cat}.png` : null;
-                          return (
-                            <span className={cls}>
-                              {src ? (
-                                <img className="move-meta-icon" src={src} alt="" aria-hidden="true" loading="lazy" />
-                              ) : null}
-                              {cat ? humanize(cat) : 'Unknown'}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    <div className="about-row">
-                      <div className="label">Stats</div>
-                      <div className="value move-stats-group">
-                        <span className="move-stat-chip">Power: {data?.power ?? '—'}</span>
-                        <span className="move-stat-chip">Accuracy: {data?.accuracy ?? '—'}</span>
-                        <span className="move-stat-chip">PP: {data?.pp ?? '—'}</span>
-                        <span className="move-stat-chip">Priority: {data?.priority ?? 0}</span>
-                      </div>
+                  <div className="about-row">
+                    <div className="label">Category</div>
+                    <div className="value">
+                      <CategoryChip category={move.damage_class} />
                     </div>
                   </div>
-                  {Array.isArray(variants) && variants.length > 1 ? (
-                    <div style={{ marginTop: 10 }}>
-                      <h3 className="list-subheading" style={{ textAlign: "left" }}>Alternate Forms</h3>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {variants
-                          .filter((v) => v.name !== move.name)
-                          .map((v) => (
-                            <button
-                              key={v.name}
-                              type="button"
-                              className="neutral-chip"
-                              onClick={() => onSelectVariant && onSelectVariant(v.name)}
-                            >
-                              {humanize(v.name)}
-                            </button>
-                          ))}
-                      </div>
+
+                  <div className="about-row">
+                    <div className="label">Stats</div>
+                    <div className="value move-stats-group">
+                      <span className="move-stat-chip">Power: {move.power ?? "—"}</span>
+                      <span className="move-stat-chip">Accuracy: {formatAccuracy(move.accuracy)}</span>
+                      <span className="move-stat-chip">PP: {move.pp ?? "—"}</span>
+                      <span className="move-stat-chip">Priority: {formatPriority(move.priority)}</span>
+                    </div>
+                  </div>
+
+                  {move.generation ? (
+                    <div className="about-row">
+                      <div className="label">Introduced</div>
+                      <div className="value">Gen {move.generation}</div>
                     </div>
                   ) : null}
+                </div>
+                {otherVariants.length > 0 ? (
+                  <div style={{ marginTop: 10 }}>
+                    <h3 className="list-subheading" style={{ textAlign: "left" }}>Alternate Forms</h3>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {otherVariants.map((variant) => (
+                        <button
+                          key={variant.name}
+                          type="button"
+                          className="neutral-chip"
+                          onClick={() => onSelectVariant(variant.name)}
+                        >
+                          {formatMoveName(variant.name)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+
+              {shortEffect || effectLines.length > 0 ? (
+                <div className="effect-window">
+                  {shortEffect ? <div className="effect-summary">{shortEffect}</div> : null}
+                  {effectLines.length > 0 ? (
+                    <ul className="effect-list">
+                      {effectLines.map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {showStageInfo ? <StageInfoPanel /> : null}
+
+              {history ? (
+                <section className="about">
+                  <h3 className="list-subheading" style={{ textAlign: "left" }}>Changes by Generation</h3>
+                  <div className="about-list" style={{ padding: 0 }}>
+                    {history.rows.map((row, idx) => (
+                      <div className="about-row" key={idx}>
+                        <div className="label">
+                          {formatGenerationRange(row.fromGen, row.toGen)}
+                          {row.games ? (
+                            <span className="move-history-games">{row.games.map(formatVersionGroup).join(", ")}</span>
+                          ) : null}
+                        </div>
+                        <div className="value">
+                          {history.fields.map((field) => (
+                            <HistoryValue key={field} field={field} value={row.stats[field]} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {history.categoryFromType ? (
+                    <p className="move-history-note">
+                      Before Gen 4, a damaging move&rsquo;s category came from its type rather than the move itself.
+                    </p>
+                  ) : null}
                 </section>
+              ) : null}
 
-                {englishEffect ? (
-                  <div className="effect-window">
-                    {effectLines.length > 0 ? (
-                      <ul className="effect-list">
-                        {effectLines.map((line, idx) => (
-                          <li key={idx}>{line}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {mentionsStages ? (
-                  <div className="effect-window stage-info-panel">
-                    <div className="stage-info-header">
-                      <h3 className="stage-info-title">Understanding Stat Stages</h3>
-                      <p className="stage-info-intro">
-                        When moves mention "stages," they're referring to stat modifiers that change your Pokémon's effectiveness. 
-                        Stages range from <strong>−6</strong> (lowest) to <strong>+6</strong> (highest), with each stage representing a multiplier.
-                      </p>
-                    </div>
-                    
-                    <div className="stage-info-section">
-                      <h4 className="stage-info-subtitle">Battle Stats</h4>
-                      <p className="stage-info-description">
-                        Attack, Defense, Special Attack, Special Defense, and Speed:
-                      </p>
-                      <div className="stage-info-chips">
-                        <div className="stage-info-chip-group">
-                          <span className="stage-info-label">Boosts:</span>
-                          <div className="stage-info-chip-row">
-                            <span className="move-stat-chip positive">+1 stage = 1.5×</span>
-                            <span className="move-stat-chip positive">+2 stages = 2×</span>
-                            <span className="move-stat-chip positive">+6 stages = 4×</span>
-                          </div>
+              {detail.loading ? (
+                <p className="moves-inline-status">Loading game descriptions…</p>
+              ) : detail.error ? (
+                <p className="moves-inline-status">Couldn&rsquo;t load game descriptions from PokeAPI.</p>
+              ) : flavorEntries.length > 0 ? (
+                <section className="about">
+                  <div className="flavor-window">
+                    {flavorEntries.map((entry) => (
+                      <div key={entry.newest} className="flavor-row">
+                        <div className="flavor-meta">
+                          {entry.oldest === entry.newest
+                            ? formatVersionGroup(entry.newest)
+                            : `${formatVersionGroup(entry.oldest)} – ${formatVersionGroup(entry.newest)}`}
                         </div>
-                        <div className="stage-info-chip-group">
-                          <span className="stage-info-label">Drops:</span>
-                          <div className="stage-info-chip-row">
-                            <span className="move-stat-chip negative">−1 stage = 0.67×</span>
-                            <span className="move-stat-chip negative">−2 stages = 0.5×</span>
-                            <span className="move-stat-chip negative">−6 stages = 0.25×</span>
-                          </div>
-                        </div>
+                        <div className="flavor-text">{entry.text}</div>
                       </div>
-                    </div>
-
-                    <div className="stage-info-section">
-                      <h4 className="stage-info-subtitle">Accuracy & Evasion</h4>
-                      <p className="stage-info-description">
-                        These stats use different multipliers and cap at ±3 stages:
-                      </p>
-                      <div className="stage-info-chips">
-                        <div className="stage-info-chip-group">
-                          <span className="stage-info-label">Boosts:</span>
-                          <div className="stage-info-chip-row">
-                            <span className="move-stat-chip positive">+1 stage = 1.33×</span>
-                            <span className="move-stat-chip positive">+2 stages = 1.67×</span>
-                            <span className="move-stat-chip positive">+3 stages = 2×</span>
-                          </div>
-                        </div>
-                        <div className="stage-info-chip-group">
-                          <span className="stage-info-label">Drops:</span>
-                          <div className="stage-info-chip-row">
-                            <span className="move-stat-chip negative">−1 stage = 0.75×</span>
-                            <span className="move-stat-chip negative">−2 stages = 0.6×</span>
-                            <span className="move-stat-chip negative">−3 stages = 0.5×</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ) : null}
-
-                {Array.isArray(data?.flavor_text_entries) && data.flavor_text_entries.length > 0 ? (
-                  <section className="about">
-                    <div className="flavor-window">
-                      {data.flavor_text_entries
-                        .filter((e) => e?.language?.name === "en" && (e.text || e.flavor_text))
-                        .slice(0, 6)
-                        .map((e, idx) => (
-                          <div key={idx} className="flavor-row">
-                            <div className="flavor-meta">{humanize(e.version_group?.name || e.version?.name || "")}</div>
-                            <div className="flavor-text">{e.text || e.flavor_text}</div>
-                          </div>
-                        ))}
-                    </div>
-                  </section>
-                ) : null}
+                </section>
+              ) : null}
             </div>
-          )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );
 }
 
-function MoveLearnersPanel({ move }) {
-  const [data, setData] = useState(null);
-  const [learners, setLearners] = useState([]);
-  const [learnersLoading, setLearnersLoading] = useState(false);
-  const [learnersError, setLearnersError] = useState(null);
-  const [typesMap, setTypesMap] = useState(() => new Map());
+const goToPokemon = (slug) => {
+  if (slug) updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
+};
 
-  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function MoveLearnersPanel({ move, detail, pokemonById, pokemonListPending }) {
+  const [visibleCount, setVisibleCount] = useState(LEARNERS_PAGE_SIZE);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!move) {
-        setData(null);
-        setLearners([]);
-        return;
-      }
-      setLearnersLoading(true);
-      setLearnersError(null);
-      try {
-        const url = `https://pokeapi.co/api/v2/move/${move.name}`;
-        const j = await fetch(url).then((r) => r.json());
-        if (!cancelled) {
-          setData(j);
-          const list = Array.isArray(j?.learned_by_pokemon) ? j.learned_by_pokemon : [];
-          const objs = list
-            .map((p) => {
-              const name = p?.name;
-              const url = p?.url;
-              if (!name || !url) return null;
-              const parts = String(url).split("/").filter(Boolean);
-              const id = parts[parts.length - 1];
-              return id ? { name, id, url } : null;
-            })
-            .filter(Boolean)
-            .slice(0, 60);
-          setLearners(objs);
-        }
-      } catch (e) {
-        if (!cancelled) setLearnersError(e);
-      } finally {
-        if (!cancelled) setLearnersLoading(false);
-      }
+  const learners = useMemo(() => {
+    const list = Array.isArray(detail.data?.learned_by_pokemon) ? detail.data.learned_by_pokemon : [];
+    const byId = new Map();
+    for (const entry of list) {
+      const id = Number(String(entry?.url || "").split("/").filter(Boolean).pop());
+      if (!id || byId.has(id)) continue;
+      const known = pokemonById.get(id);
+      byId.set(id, {
+        id,
+        slug: known?.name || entry.name,
+        speciesId: known?.speciesId ?? id,
+        types: known?.types || [],
+      });
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [move]);
-
-  const goToPokemon = useCallback((pokemon) => {
-    if (!pokemon) return;
-    const slug = pokemon.name || String(pokemon.id || "").trim();
-    if (!slug) return;
-    updatePokemonLocation(slug, { pruneKeys: ["i", "m", "a", "p"] });
-    try {
-      window.location.hash = "";
-    } catch {}
-  }, []);
-
-  // Load types for learners to render type pills
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTypes() {
-      const pending = learners.filter((p) => p && !typesMap.has(p.id));
-      if (pending.length === 0) return;
-      try {
-        const results = await Promise.all(
-          pending.map(async (p) => {
-            try {
-              const j = await fetch(p.url).then((r) => r.json());
-              const types = Array.isArray(j?.types)
-                ? j.types.map((t) => t?.type?.name).filter(Boolean)
-                : [];
-              return { id: p.id, types };
-            } catch {
-              return { id: p.id, types: [] };
-            }
-          })
-        );
-        if (!cancelled) {
-          setTypesMap((prev) => {
-            const next = new Map(prev);
-            for (const res of results) next.set(res.id, res.types);
-            return next;
-          });
-        }
-      } catch {}
-    }
-    loadTypes();
-    return () => { cancelled = true; };
-  }, [learners, typesMap]);
+    // National Dex order, with each species' forms right after it.
+    return [...byId.values()].sort((a, b) => a.speciesId - b.speciesId || a.id - b.id);
+  }, [detail.data, pokemonById]);
 
   if (!move) {
-    return <aside className="learners-panel" style={{ display: 'none' }} />;
+    return <aside className="learners-panel" style={{ display: "none" }} />;
   }
+
+  const loading = detail.loading || (pokemonListPending && learners.length > 0);
+  const visible = learners.slice(0, visibleCount);
+  const remaining = learners.length - visible.length;
 
   return (
     <aside className="learners-panel">
-      <h4 className="learners-title">Learnt By</h4>
-      {learnersLoading ? (
+      <h4 className="learners-title">
+        Learnt By
+        {!loading && learners.length > 0 ? (
+          <span className="learners-count">({learners.length.toLocaleString()})</span>
+        ) : null}
+      </h4>
+      {loading ? (
         <div className="learners-empty">Loading</div>
-      ) : learnersError ? (
+      ) : detail.error ? (
         <div className="learners-empty">Failed to load</div>
       ) : learners.length === 0 ? (
-        <div className="learners-empty">No data</div>
+        <div className="learners-empty">No Pokémon learn this move</div>
       ) : (
         <ul className="learners-list" role="list">
-          {learners.map((p) => {
-            const types = typesMap.get(p.id) || [];
+          {visible.map((pokemon) => {
+            const name = formatLearnerName(pokemon.slug);
             return (
-              <li key={p.id}>
+              <li key={pokemon.id}>
                 <button
                   type="button"
                   className="learners-poke-button"
-                  onClick={() => goToPokemon(p)}
-                  title={`Open ${humanize(p.name)}`}
+                  onClick={() => goToPokemon(pokemon.slug)}
+                  title={`Open ${name}`}
                 >
                   <img
                     className="learners-poke-sprite"
-                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
+                    src={`${SPRITE_BASE}/${pokemon.id}.png`}
                     alt=""
                     loading="lazy"
+                    onError={hideBrokenSprite}
                   />
-                  <span className="label">{humanize(p.name)}</span>
+                  <span className="label proper-name">{name}</span>
                   <span className="types-vertical">
-                    {types.map((t) => (
+                    {pokemon.types.map((t) => (
                       <span key={t} className={`type-chip type-${t}`}>
-                        <img 
-                          src={getTypeIconUrl(t)} 
-                          alt={t} 
-                          className="type-icon"
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
+                        <img src={getTypeIconUrl(t)} alt={t} className="type-icon" loading="lazy" onError={hideBrokenImage} />
                         <span className="type-name">{t}</span>
                       </span>
                     ))}
@@ -844,9 +897,19 @@ function MoveLearnersPanel({ move }) {
               </li>
             );
           })}
+          {remaining > 0 ? (
+            <li className="learners-more">
+              <button
+                type="button"
+                className="neutral-chip learners-more-button"
+                onClick={() => setVisibleCount((count) => count + LEARNERS_PAGE_SIZE)}
+              >
+                Show {Math.min(LEARNERS_PAGE_SIZE, remaining)} more ({remaining.toLocaleString()} left)
+              </button>
+            </li>
+          ) : null}
         </ul>
       )}
     </aside>
   );
 }
-

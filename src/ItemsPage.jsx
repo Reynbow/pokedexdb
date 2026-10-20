@@ -1,276 +1,356 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
+import { getBasePath } from "./utils/url.js";
+
+const BASE_PATH = getBasePath();
+const ITEMS_URL = `${BASE_PATH}item-data/items.json`;
+const POKEAPI_ITEM_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/";
+const PAGE_SIZE = 150;
+const ROW_ICON_SIZE = 32;
+const DETAIL_ICON_SIZE = 64;
+const SUPPORTS_INTERSECTION_OBSERVER = typeof window !== "undefined" && "IntersectionObserver" in window;
+
+/** "King's Rock" / "kings-rock" / "Poké Ball" -> "kingsrock" / "pokeball" (the items.json key format). */
+const toItemKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[^a-z0-9]/g, "");
+
+/** PokeAPI sprite slug from a display name: "King's Rock" -> "kings-rock". */
+const toPokeApiSlug = (name) =>
+  String(name || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/['’.]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+// ---------------------------------------------------------------------------
+// Data loading: fetched and parsed once per page load, shared across mounts.
+// ---------------------------------------------------------------------------
+
+let itemsPromise = null;
+let itemsCache = null;
+
+function loadItems() {
+  if (!itemsPromise) {
+    itemsPromise = fetch(ITEMS_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Items database request failed (${response.status})`);
+        return response.json();
+      })
+      .then((db) => {
+        if (!db || typeof db !== "object" || Array.isArray(db)) throw new Error("Items database is invalid");
+        const list = Object.entries(db)
+          .map(([key, entry]) => {
+            const name = String(entry?.name || key);
+            return {
+              key,
+              name,
+              lower: name.toLowerCase(),
+              image: Array.isArray(entry?.images) ? entry.images[0] || null : null,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+        itemsCache = { db, list };
+        return itemsCache;
+      })
+      .catch((error) => {
+        itemsPromise = null; // allow a retry on the next attempt
+        throw error;
+      });
+  }
+  return itemsPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Games: every game name used in items.json, in release order, with generation.
+// ---------------------------------------------------------------------------
+
+const GAMES = [
+  ["Red", 1], ["Green", 1], ["Blue", 1], ["Yellow", 1],
+  ["Gold", 2], ["Silver", 2], ["Crystal", 2],
+  ["Ruby", 3], ["Sapphire", 3], ["Colosseum", 3], ["FireRed", 3], ["LeafGreen", 3], ["Emerald", 3], ["XD", 3],
+  ["Diamond", 4], ["Pearl", 4], ["Battle Revolution", 4], ["Platinum", 4], ["HeartGold", 4], ["SoulSilver", 4], ["PokéWalker", 4],
+  ["Black", 5], ["White", 5], ["Black 2", 5], ["White 2", 5],
+  ["X", 6], ["Y", 6], ["Omega Ruby", 6], ["Alpha Sapphire", 6],
+  ["Sun", 7], ["Moon", 7], ["Ultra Sun", 7], ["Ultra Moon", 7], ["Let's Go, Pikachu!", 7], ["Let's Go, Eevee!", 7],
+  ["Sword", 8], ["Shield", 8], ["Isle of Armor", 8], ["The Crown Tundra", 8], ["Brilliant Diamond", 8], ["Shining Pearl", 8], ["Legends: Arceus", 8],
+  ["Scarlet", 9], ["Violet", 9], ["The Teal Mask", 9], ["The Indigo Disk", 9], ["Legends: Z-A", 9], ["Mega Dimension", 9],
+];
+
+// Keyed by toItemKey(name) so spelling variants in the data ("Legends Arceus",
+// "Let's Go, Eevee", "Pokewalker") resolve to the same game.
+const GAME_INFO = new Map(GAMES.map(([name, gen], order) => [toItemKey(name), { name, gen, order }]));
+
+const resolveGame = (raw) => GAME_INFO.get(toItemKey(raw)) || null;
+const gameName = (raw) => resolveGame(raw)?.name || String(raw || "").trim();
+const gameOrder = (name) => resolveGame(name)?.order ?? -1;
+
+/** "Let's Go, Pikachu!, Let's Go, Eevee!" -> ["Let's Go, Pikachu!", "Let's Go, Eevee!"] */
+function parseScope(scope) {
+  const parts = String(scope || "").split(",").map((p) => p.trim()).filter(Boolean);
+  const games = [];
+  for (let i = 0; i < parts.length; i++) {
+    const pair = i + 1 < parts.length ? resolveGame(`${parts[i]}, ${parts[i + 1]}`) : null;
+    if (pair) {
+      games.push(pair.name);
+      i++;
+    } else {
+      games.push(gameName(parts[i]));
+    }
+  }
+  return games;
+}
+
+/** Normalises one of the per-game lists of an entry into rows plus sorted game options. */
+function buildSection(list, getGames, getValue) {
+  const rows = [];
+  for (const raw of Array.isArray(list) ? list : []) {
+    const value = String(getValue(raw) || "").trim();
+    const games = getGames(raw).filter(Boolean);
+    if (value && games.length > 0) rows.push({ games, label: games.join(", "), value });
+  }
+  const options = [...new Set(rows.flatMap((row) => row.games))].sort((a, b) => gameOrder(a) - gameOrder(b));
+  return { rows, options };
+}
+
+const groupGames = (group) => (Array.isArray(group?.games) ? group.games.map(gameName) : []);
+
+function buildSections(entry) {
+  return {
+    flavour: buildSection(entry?.effect_flavour_by_group, groupGames, (g) => g?.text),
+    locations: buildSection(entry?.acquisition, (a) => parseScope(a?.scope), (a) => a?.text),
+    shopping: buildSection(entry?.shopping_details, (s) => parseScope(s?.scope), (s) => s?.shops),
+    pocket: buildSection(entry?.pocket_by_group, groupGames, (g) => g?.pocket),
+  };
+}
+
+const formatPrice = (value) =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value.toLocaleString("en-US") : "—";
+
+// ---------------------------------------------------------------------------
+// URL helpers
+// ---------------------------------------------------------------------------
+
+const readItemParam = () => {
+  try {
+    return toItemKey(new URL(window.location.href).searchParams.get("i")) || null;
+  } catch {
+    return null;
+  }
+};
+
+function writeItemParam(key) {
+  const url = new URL(window.location.href);
+  ["p", "m", "a"].forEach((k) => url.searchParams.delete(k));
+  if (key) url.searchParams.set("i", key);
+  else url.searchParams.delete("i");
+  window.history.pushState({}, "", url);
+}
+
+// ---------------------------------------------------------------------------
+// Components
+// ---------------------------------------------------------------------------
+
+/** Local sprite first, then the PokeAPI sprite; keeps its box (no broken-image icon) if both fail. */
+function ItemIcon({ item, className, size }) {
+  const sources = useMemo(() => {
+    const list = [];
+    if (item.image) list.push(`${BASE_PATH}item-data/${item.image}`);
+    const slug = toPokeApiSlug(item.name);
+    if (slug) list.push(`${POKEAPI_ITEM_SPRITES}${slug}.png`);
+    return list;
+  }, [item]);
+  const [failed, setFailed] = useState(0);
+
+  if (failed >= sources.length) {
+    return <span className={className} style={{ display: "inline-block", width: size, height: size }} aria-hidden="true" />;
+  }
+  return (
+    <img
+      className={className}
+      src={sources[failed]}
+      alt=""
+      width={size}
+      height={size}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed((n) => n + 1)}
+    />
+  );
+}
 
 export default function ItemsPage() {
-  const [query, setQuery] = useState("");
-  const [items, setItems] = useState([]);
+  const [data, setData] = useState(itemsCache);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [localItemsDb, setLocalItemsDb] = useState(null);
-  
-  const [selectedFilter, setSelectedFilter] = useState(null);
-  const [filterItemsMap, setFilterItemsMap] = useState(() => new Map());
-  const [filterLoading, setFilterLoading] = useState(() => new Map());
-  const [filterError, setFilterError] = useState(() => new Map());
-  const [filterIconMap, setFilterIconMap] = useState(() => new Map());
-  const [selectedItem, setSelectedItem] = useState(null);
-  const loadGuard = useRef(new Set());
-
-  const EV_KNOWN_ITEMS = [
-    // Vitamins
-    "hp-up", "protein", "iron", "calcium", "zinc", "carbos",
-    // Feathers
-    "health-feather", "muscle-feather", "resist-feather", "genius-feather", "clever-feather", "swift-feather",
-    // Power items and brace
-    "macho-brace", "power-weight", "power-bracer", "power-belt", "power-lens", "power-band", "power-anklet",
-  ];
-
-  const FILTERS = [
-    { key: "medicines", label: "Medicines", kind: "pocket", name: "medicine" },
-    { key: "pokeballs", label: "Poke Balls", kind: "pocket", name: "pokeballs" },
-    { key: "berries", label: "Berries", kind: "pocket", name: "berries" },
-    { key: "tms", label: "TMs", kind: "pocket", name: "machines" },
-    { key: "evtraining", label: "EV Training", kind: "custom-ev" },
-    { key: "megastones", label: "Mega Stones", kind: "category", name: "mega-stones" },
-    { key: "treasures", label: "Treasures", kind: "category", name: "treasures" },
-    { key: "keyitems", label: "Key Items", kind: "pocket", name: "key-items" },
-    { key: "other", label: "Other Items", kind: "other" },
-  ];
+  const [attempt, setAttempt] = useState(0);
+  const [query, setQuery] = useState("");
+  const [selectedKey, setSelectedKey] = useState(readItemParam);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const scrollRef = useRef(null);
+  const sentinelRef = useRef(null);
+  // Scroll the selected row into view when the selection comes from the URL (deep link, back/forward).
+  const scrollToSelectionRef = useRef(true);
 
   useEffect(() => {
-    // On mount, ensure URL only carries the Items param
+    // The Items page only carries its own query param.
     try {
-      const u = new URL(window.location.href);
-      ["p", "m", "a"].forEach((k) => u.searchParams.delete(k));
-      window.history.replaceState({}, "", u);
-    } catch {}
-
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        // Prefer local database only
-        try {
-          const localResp = await fetch("/items/items.json", { cache: "no-store" });
-          if (!cancelled && localResp?.ok) {
-            const localData = await localResp.json();
-            if (localData && typeof localData === "object") {
-              setLocalItemsDb(localData);
-              const keys = Object.keys(localData);
-              const list = keys.map((k) => ({ name: k }));
-              setItems(list);
-              return;
-            }
-          }
-          // If local DB missing or invalid, surface empty state
-          if (!cancelled) {
-            setItems([]);
-            setError(new Error("Local items database not found"));
-          }
-        } catch (e) {
-          if (!cancelled) {
-            setItems([]);
-            setError(e);
-          }
-        }
-      } catch (e) {
-        if (!cancelled) setError(e);
-      } finally {
-        if (!cancelled) setLoading(false);
+      const url = new URL(window.location.href);
+      if (["p", "m", "a"].some((k) => url.searchParams.has(k))) {
+        ["p", "m", "a"].forEach((k) => url.searchParams.delete(k));
+        window.history.replaceState(window.history.state, "", url);
       }
+    } catch {
+      // Non-fatal: leave the URL as it is.
     }
-    load();
+  }, []);
+
+  useEffect(() => {
+    if (data) return undefined;
+    let cancelled = false;
+    loadItems().then(
+      (result) => {
+        if (!cancelled) setData(result);
+      },
+      (err) => {
+        if (!cancelled) setError(err);
+      }
+    );
     return () => {
       cancelled = true;
     };
+  }, [data, attempt]);
+
+  // Back/forward and in-app navigation keep the selection in sync with ?i=
+  useEffect(() => {
+    const syncFromUrl = () => {
+      scrollToSelectionRef.current = true;
+      setSelectedKey(readItemParam());
+    };
+    window.addEventListener("popstate", syncFromUrl);
+    window.addEventListener("locationchange", syncFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl);
+      window.removeEventListener("locationchange", syncFromUrl);
+    };
   }, []);
 
-  // No preloading of filters; we no longer render filter chips
-  useEffect(() => {
-    if (!Array.isArray(items) || items.length === 0) return;
-    // intentionally no-op
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length]);
-
-  const activeFilterSet = null;
-
   const filtered = useMemo(() => {
+    const list = data?.list ?? [];
     const q = query.trim().toLowerCase();
-    const base = Array.isArray(items) ? items : [];
-    const constrained = localItemsDb ? base.filter((i) => !!localItemsDb[i.name]) : base;
-    const result = q ? constrained.filter((i) => i.name.includes(q)) : constrained;
-    return [...result].sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, query, localItemsDb]);
+    if (!q) return list;
+    const compact = toItemKey(q);
+    return list.filter((it) => it.lower.includes(q) || (compact && it.key.includes(compact)));
+  }, [data, query]);
+
+  const selectedItem = useMemo(
+    () => (data && selectedKey && data.db[selectedKey] ? data.list.find((it) => it.key === selectedKey) || null : null),
+    [data, selectedKey]
+  );
+  const selectedIndex = useMemo(
+    () => (selectedKey ? filtered.findIndex((it) => it.key === selectedKey) : -1),
+    [filtered, selectedKey]
+  );
+
+  const renderCount = SUPPORTS_INTERSECTION_OBSERVER
+    ? Math.min(filtered.length, Math.max(visibleCount, selectedIndex + 1))
+    : filtered.length;
+  const hasMore = renderCount < filtered.length;
+
+  // Render the list incrementally: load the next page when the sentinel nears the viewport.
+  // Re-created after every page (and on new results) so a sentinel that is still visible keeps loading.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!hasMore || !sentinel) return undefined;
+    const container = scrollRef.current;
+    const scrolls = container && /(auto|scroll)/.test(window.getComputedStyle(container).overflowY);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setVisibleCount(renderCount + PAGE_SIZE);
+      },
+      { root: scrolls ? container : null, rootMargin: "600px 0px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, renderCount, filtered]);
 
   useEffect(() => {
-    const onPop = () => {
-      const u = new URL(window.location.href);
-      const name = u.searchParams.get("i");
-      if (!name) {
-        setSelectedItem(null);
-        return;
-      }
-      const found = items.find((it) => it.name === name);
-      if (found) setSelectedItem(found);
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [items]);
+    if (!scrollToSelectionRef.current || !data) return;
+    scrollToSelectionRef.current = false;
+    const container = scrollRef.current;
+    if (!container || !selectedKey) return;
+    const row = container.querySelector(`[data-item-key="${selectedKey}"]`);
+    if (row) container.scrollTop = row.offsetTop - (container.clientHeight - row.offsetHeight) / 2;
+  }, [data, selectedKey]);
 
-  function selectItem(it) {
-    const u = new URL(window.location.href);
-    ["p", "m", "a"].forEach((k) => u.searchParams.delete(k));
-    u.searchParams.set("i", it.name);
-    window.history.pushState({}, "", u);
-    setSelectedItem(it);
-  }
+  const selectItem = (key) => {
+    scrollToSelectionRef.current = false;
+    if (key === selectedKey) return;
+    writeItemParam(key);
+    setSelectedKey(key);
+  };
 
-  function clearSelection() {
-    const u = new URL(window.location.href);
-    u.searchParams.delete("i");
-    window.history.pushState({}, "", u);
-    setSelectedItem(null);
-  }
+  const updateQuery = (value) => {
+    setQuery(value);
+    setVisibleCount(PAGE_SIZE);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  };
 
-  async function loadPocketItems(pocketName) {
-    const pocketUrl = `https://pokeapi.co/api/v2/item-pocket/${pocketName}`;
-    const pocket = await fetch(pocketUrl).then((r) => r.json());
-    const categories = Array.isArray(pocket?.categories) ? pocket.categories : [];
-    const allItems = new Set();
-    for (const cat of categories) {
-      try {
-        const catData = await fetch(cat.url).then((r) => r.json());
-        const catItems = Array.isArray(catData?.items) ? catData.items : [];
-        for (const it of catItems) allItems.add(it.name);
-      } catch {}
-    }
-    return allItems;
-  }
+  const retry = () => {
+    setError(null);
+    setAttempt((n) => n + 1);
+  };
 
-  async function loadCategoryItems(categoryName) {
-    const url = `https://pokeapi.co/api/v2/item-category/${categoryName}`;
-    const data = await fetch(url).then((r) => r.json());
-    const list = Array.isArray(data?.items) ? data.items : [];
-    return new Set(list.map((i) => i.name));
-  }
-
-  function getItemSpriteUrl(name) {
-    // Use local image if available
-    try {
-      const entry = localItemsDb && localItemsDb[name];
-      const imgRel = Array.isArray(entry?.images) ? entry.images[0] : null;
-      if (imgRel) return `/items/${imgRel}`;
-    } catch {}
-    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${name}.png`;
-  }
-
-  function humanizeName(raw) {
-    const s = String(raw || "").replace(/[-_]+/g, " ").trim();
-    return s.replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-
-  function getDisplayName(name) {
-    const local = localItemsDb && localItemsDb[name];
-    if (local && local.name) return String(local.name);
-    return humanizeName(name);
-  }
-
-  function getIconOverride(key) {
-    switch (key) {
-      case "medicines": return getItemSpriteUrl("potion");
-      case "pokeballs": return getItemSpriteUrl("poke-ball");
-      case "berries": return getItemSpriteUrl("oran-berry");
-      case "tms": return getItemSpriteUrl("tm-normal");
-      case "evtraining": return getItemSpriteUrl("carbos");
-      case "megastones": return getItemSpriteUrl("venusaurite");
-      case "treasures": return getItemSpriteUrl("nugget");
-      case "keyitems": return getItemSpriteUrl("bicycle");
-      case "other": return getItemSpriteUrl("rare-candy");
-      default: return null;
-    }
-  }
-
-  async function ensureFilterLoaded(key) {
-    if (filterItemsMap.has(key) || loadGuard.current.has(key)) return;
-    loadGuard.current.add(key);
-    setFilterLoading((m) => new Map(m).set(key, true));
-    setFilterError((m) => new Map(m).set(key, null));
-    try {
-      const def = FILTERS.find((f) => f.key === key);
-      let set = new Set();
-      async function buildEvSet() {
-        try {
-          const [vit, wing] = await Promise.all([
-            loadCategoryItems("vitamins"),
-            loadCategoryItems("wing"),
-          ]);
-          const s = new Set([...(vit || []), ...(wing || [])]);
-          [
-            "power-weight",
-            "power-bracer",
-            "power-belt",
-            "power-lens",
-            "power-band",
-            "power-anklet",
-            "macho-brace",
-          ].forEach((n) => s.add(n));
-          // Ensure presence even if API categories are unavailable
-          EV_KNOWN_ITEMS.forEach((n) => s.add(n));
-          return s;
-        } catch {
-          return new Set(EV_KNOWN_ITEMS);
-        }
-      }
-      if (def?.kind === "pocket") {
-        set = await loadPocketItems(def.name);
-        // Exclude EV items from Medicines pocket so they only appear under EV Training
-        if (def.name === "medicine") {
-          const evSet = filterItemsMap.get("evtraining") || await buildEvSet();
-          evSet.forEach((n) => set.delete(n));
-        }
-      } else if (def?.kind === "category") {
-        set = await loadCategoryItems(def.name);
-      } else if (def?.kind === "custom-ev") {
-        set = await buildEvSet();
-      } else if (def?.kind === "other") {
-        // Load all other categories first
-        const keysToLoad = FILTERS.filter((f) => f.kind !== "other").map((f) => f.key);
-        await Promise.all(keysToLoad.map((k) => ensureFilterLoaded(k)));
-        // Compute complement
-        const union = new Set();
-        for (const k of keysToLoad) {
-          const s = filterItemsMap.get(k);
-          if (s) for (const n of s) union.add(n);
-        }
-        for (const it of items) {
-          if (!union.has(it.name)) set.add(it.name);
-        }
-      }
-      setFilterItemsMap((m) => new Map(m).set(key, set));
-      // Determine icon: override or first item in set
-      let icon = getIconOverride(key);
-      if (!icon) {
-        const first = set.values().next().value;
-        if (first) icon = getItemSpriteUrl(first);
-      }
-      if (icon) setFilterIconMap((m) => new Map(m).set(key, icon));
-    } catch (e) {
-      setFilterError((m) => new Map(m).set(key, e));
-    } finally {
-      setFilterLoading((m) => new Map(m).set(key, false));
-    }
-  }
-
-  function onClickFilter(key) {
-    if (selectedFilter === key) {
-      setSelectedFilter(null);
-      return;
-    }
-    setSelectedFilter(key);
-    // Ensure only this filter's set is considered fresh; no sticky union across filters
-    ensureFilterLoaded(key);
+  let body;
+  if (error) {
+    body = (
+      <div className="list-empty">
+        Failed to load items.{" "}
+        <button type="button" className="reset-button" onClick={retry}>
+          Retry
+        </button>
+      </div>
+    );
+  } else if (!data) {
+    body = <div className="list-empty">Loading items…</div>;
+  } else {
+    body = (
+      <section className="content split">
+        <div className="list-panel">
+          <div className="list-scroll" ref={scrollRef}>
+            {filtered.length === 0 ? (
+              <div className="list-empty">No items found.</div>
+            ) : (
+              <div className="list items-list">
+                {filtered.slice(0, renderCount).map((it) => (
+                  <button
+                    key={it.key}
+                    type="button"
+                    data-item-key={it.key}
+                    className={`item-row${it.key === selectedKey ? " is-selected" : ""}`}
+                    onClick={() => selectItem(it.key)}
+                    aria-pressed={it.key === selectedKey}
+                  >
+                    <ItemIcon item={it} className="item-icon" size={ROW_ICON_SIZE} />
+                    <span className="item-name">{it.name}</span>
+                  </button>
+                ))}
+                {hasMore ? <div ref={sentinelRef} className="items-list-sentinel" aria-hidden="true" /> : null}
+              </div>
+            )}
+          </div>
+        </div>
+        <aside className="detail-panel">
+          <div className="detail-inner">
+            <ItemDetailPanel item={selectedItem} entry={selectedItem ? data.db[selectedItem.key] : null} />
+          </div>
+        </aside>
+      </section>
+    );
   }
 
   return (
@@ -293,378 +373,108 @@ export default function ItemsPage() {
             <input
               className="search"
               placeholder="Search Items"
+              aria-label="Search items"
+              autoComplete="off"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => updateQuery(e.target.value)}
             />
-            <button
-              type="button"
-              className="reset-button"
-              onClick={() => setQuery("")}
-            >
+            <button type="button" className="reset-button" onClick={() => updateQuery("")}>
               Reset
             </button>
           </div>
-          
         </div>
       </header>
-      <main className="container">
-        {error ? (
-          <div className="list-empty">Failed to load items.</div>
-        ) : loading ? (
-          <div className="list-empty">Loading items</div>
-        ) : filtered.length === 0 ? (
-          <div className="list-empty">No items found.</div>
-        ) : (
-          <section className="content split">
-            <div className="list-panel">
-              <div className="list-scroll">
-                <div className="list items-list">
-                  {filtered.map((i) => (
-                    <button
-                      key={i.name}
-                      type="button"
-                      className={`item-row${selectedItem?.name === i.name ? " is-selected" : ""}`}
-                      onClick={() => selectItem(i)}
-                      aria-pressed={selectedItem?.name === i.name}
-                    >
-                      <img className="item-icon" alt="" src={getItemSpriteUrl(i.name)} />
-                      <span className="item-name">{getDisplayName(i.name)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <aside className="detail-panel">
-              <div className="detail-inner">
-                <ItemDetailPanel item={selectedItem} onClose={clearSelection} localDb={localItemsDb} />
-              </div>
-            </aside>
-          </section>
-        )}
-      </main>
+      <main className="container">{body}</main>
     </div>
   );
 }
 
-function ItemDetailPanel({ item, onClose, localDb }) {
-  const [loading, setLoading] = useState(false);
-  const [itemSpriteSrc, setItemSpriteSrc] = useState(null);
-  // Global games (union) - retained but not primary
-  const [availableGames, setAvailableGames] = useState([]);
-  const [selectedGame, setSelectedGame] = useState("");
-  // Per-panel game selections
-  const [flavorGames, setFlavorGames] = useState([]);
-  const [selectedFlavorGame, setSelectedFlavorGame] = useState("");
-  const [locationGames, setLocationGames] = useState([]);
-  const [selectedLocationGame, setSelectedLocationGame] = useState("");
-  const [shoppingGames, setShoppingGames] = useState([]);
-  const [selectedShoppingGame, setSelectedShoppingGame] = useState("");
-  const [pocketGames, setPocketGames] = useState([]);
-  const [selectedPocketGame, setSelectedPocketGame] = useState("");
-  
-
-  // Local helper to infer generation from game text
-  const inferGenerationFromGameText = (text) => {
-    const t = String(text || "").toLowerCase();
-    if (t.includes("red") || t.includes("blue") || t.includes("yellow")) return 1;
-    if (t.includes("gold") || t.includes("silver") || t.includes("crystal")) return 2;
-    if (t.includes("ruby") || t.includes("sapphire") || t.includes("emerald") || t.includes("firered") || t.includes("leafgreen")) return 3;
-    if (t.includes("diamond") || t.includes("pearl") || t.includes("platinum") || t.includes("heartgold") || t.includes("soulsilver")) return 4;
-    if (t.includes("black 2") || t.includes("white 2") || (/\bblack\b/.test(t) && !t.includes("blackberry")) || /\bwhite\b/.test(t)) return 5;
-    if (t.includes("x ") || t.startsWith("x") || t.includes(" y ") || t.endsWith(" y") || t.startsWith("y ") || t.includes("omega ruby") || t.includes("alpha sapphire")) return 6;
-    if (t.includes("sun") || t.includes("moon") || t.includes("ultra sun") || t.includes("ultra moon") || t.includes("let's go, pikachu") || t.includes("let's go, eevee")) return 7;
-    if (t.includes("sword") || t.includes("shield") || t.includes("brilliant diamond") || t.includes("shining pearl") || t.includes("legends: arceus") || t.includes("legends arceus") || t.includes("isle of armor") || t.includes("crown tundra")) return 8;
-    if (t.includes("scarlet") || t.includes("violet") || t.includes("the teal mask") || t.includes("the indigo disk") || t.includes("legends: z-a")) return 9;
-    return null;
-  };
-
-  const humanize = (s) => String(s || "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const entry = useMemo(() => (localDb && item ? localDb[item.name] : null), [localDb, item]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!item) return;
-      setLoading(true);
-      // Prefer local image
-      try {
-        const entry = localDb && localDb[item.name];
-        const imgRel = Array.isArray(entry?.images) ? entry.images[0] : null;
-        if (imgRel) {
-          setItemSpriteSrc(`/items/${imgRel}`);
-        } else {
-          setItemSpriteSrc(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`);
-        }
-      } catch {
-        setItemSpriteSrc(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`);
-      }
-      if (!cancelled) setLoading(false);
+function GameSection({ title, section, selectedGame, onSelectGame, showAll = false }) {
+  const matches = section.rows.filter((row) => row.games.includes(selectedGame));
+  const shown = showAll ? matches : matches.slice(0, 1);
+  const optionGroups = useMemo(() => {
+    const groups = new Map();
+    for (const name of section.options) {
+      const gen = resolveGame(name)?.gen ?? 0;
+      if (!groups.has(gen)) groups.set(gen, []);
+      groups.get(gen).push(name);
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [item, localDb]);
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]);
+  }, [section.options]);
 
-  // Build available games from local DB and default-select latest (global)
-  useEffect(() => {
-    if (!entry) { setAvailableGames([]); setSelectedGame(""); return; }
-    const gameSet = new Set();
-    const groups = Array.isArray(entry.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
-    groups.forEach((g) => {
-      (Array.isArray(g?.games) ? g.games : []).forEach((name) => {
-        const n = String(name || "").trim();
-        if (n) gameSet.add(n);
-      });
-    });
-    const acquisitions = Array.isArray(entry.acquisition) ? entry.acquisition : [];
-    acquisitions.forEach((a) => {
-      const scope = String(a?.scope || "");
-      scope.split(/,|\band\b|\/|\+|·/i).forEach((part) => {
-        const n = String(part || "").trim();
-        if (n) gameSet.add(n);
-      });
-    });
-    const games = Array.from(gameSet);
-    const withGen = games.map((g) => ({ name: g, gen: inferGenerationFromGameText(g) || 0 }));
-    withGen.sort((a, b) => (a.gen !== b.gen ? a.gen - b.gen : a.name.localeCompare(b.name)));
-    setAvailableGames(withGen.map((x) => x.name));
-    const latest = withGen.length > 0 ? withGen[withGen.length - 1].name : "";
-    setSelectedGame(latest);
-  }, [entry]);
+  return (
+    <section className="about items-section">
+      <div className="items-section-head">
+        <h3 className="list-subheading">{title}</h3>
+        {section.options.length > 0 ? (
+          <select
+            aria-label={`Game for ${title.toLowerCase()}`}
+            value={selectedGame}
+            onChange={(e) => onSelectGame(e.target.value)}
+          >
+            {optionGroups.map(([gen, names]) => (
+              <optgroup key={gen} label={gen > 0 ? `Generation ${gen}` : "Other"}>
+                {names.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        ) : null}
+      </div>
+      {shown.length === 0 ? (
+        <p className="items-section-text">—</p>
+      ) : (
+        shown.map((row, idx) => (
+          <p key={`${row.label}-${idx}`} className="items-section-text">
+            {shown.length > 1 ? <span className="items-scope-label">{row.label}: </span> : null}
+            {row.value}
+          </p>
+        ))
+      )}
+    </section>
+  );
+}
 
-  // Build per-panel game lists and defaults
-  useEffect(() => {
-    if (!entry) {
-      setFlavorGames([]); setSelectedFlavorGame("");
-      setLocationGames([]); setSelectedLocationGame("");
-      setShoppingGames([]); setSelectedShoppingGame("");
-      setPocketGames([]); setSelectedPocketGame("");
-      return;
-    }
-    // Flavor games
-    const fg = new Set();
-    const fgroups = Array.isArray(entry.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
-    fgroups.forEach(g => (Array.isArray(g?.games) ? g.games : []).forEach(n => { const t = String(n||"").trim(); if (t) fg.add(t); }));
-    const fga = Array.from(fg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
-      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
-    setFlavorGames(fga);
-    setSelectedFlavorGame(fga[fga.length-1] || "");
-    // Location games
-    const lg = new Set();
-    const acq = Array.isArray(entry.acquisition) ? entry.acquisition : [];
-    acq.forEach(a => {
-      String(a?.scope||"").split(/,|\band\b|\/|\+|·/i).forEach(p => { const t = String(p||"").trim(); if (t) lg.add(t); });
-    });
-    const lga = Array.from(lg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
-      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
-    setLocationGames(lga);
-    setSelectedLocationGame(lga[lga.length-1] || "");
-    // Shopping games
-    const sg = new Set();
-    const sgroups = Array.isArray(entry.shopping_by_group) ? entry.shopping_by_group : [];
-    sgroups.forEach(g => (Array.isArray(g?.games) ? g.games : []).forEach(n => { const t = String(n||"").trim(); if (t) sg.add(t); }));
-    const sga = Array.from(sg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
-      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
-    setShoppingGames(sga);
-    setSelectedShoppingGame(sga[sga.length-1] || "");
-    // Pocket games
-    const pg = new Set();
-    const pgroups = Array.isArray(entry.pocket_by_group) ? entry.pocket_by_group : [];
-    pgroups.forEach(g => (Array.isArray(g?.games) ? g.games : []).forEach(n => { const t = String(n||"").trim(); if (t) pg.add(t); }));
-    const pga = Array.from(pg).map(name => ({ name, gen: inferGenerationFromGameText(name) || 0 }))
-      .sort((a,b)=> a.gen!==b.gen ? a.gen-b.gen : a.name.localeCompare(b.name)).map(x=>x.name);
-    setPocketGames(pga);
-    setSelectedPocketGame(pga[pga.length-1] || "");
-  }, [entry]);
+function ItemDetailPanel({ item, entry }) {
+  // One preferred game shared by all sections; each falls back to its latest game.
+  const [preferredGame, setPreferredGame] = useState("");
+  const sections = useMemo(() => buildSections(entry), [entry]);
 
-  // No pocket/category fetch; we do not query PokeAPI
+  if (!item || !entry) {
+    return <div className="list-empty items-detail-empty">Select an item to see its details.</div>;
+  }
 
-  const selectFlavorText = useMemo(() => {
-    if (!entry) return "";
-    const groups = Array.isArray(entry?.effect_flavour_by_group) ? entry.effect_flavour_by_group : [];
-    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedFlavorGame));
-    if (direct && direct.text) return direct.text;
-    let best = null;
-    let bestGen = -1;
-    for (const g of groups) {
-      const gen = Math.max(...(Array.isArray(g?.games) ? g.games.map((n) => inferGenerationFromGameText(String(n))) : []).filter((x) => typeof x === "number"));
-      if (Number.isFinite(gen) && gen >= bestGen && g.text) {
-        bestGen = gen;
-        best = g.text;
-      }
-    }
-    return best || "";
-  }, [entry, selectedFlavorGame]);
-
-  const selectAcquisitionText = useMemo(() => {
-    if (!entry) return "";
-    const acquisitions = Array.isArray(entry?.acquisition) ? entry.acquisition : [];
-    const direct = acquisitions.find((a) => String(a?.scope || "").split(/,|\band\b|\/|\+|·/i).some((p) => String(p).trim() === selectedLocationGame));
-    if (direct && direct.text) return direct.text;
-    let best = null;
-    let bestGen = -1;
-    for (const a of acquisitions) {
-      const scope = String(a?.scope || "");
-      const gens = scope.split(/,|\band\b|\/|\+|·/i).map((p) => inferGenerationFromGameText(String(p))).filter((x) => typeof x === "number");
-      const gen = gens.length > 0 ? Math.max(...gens) : -1;
-      if (gen >= bestGen && a.text) {
-        bestGen = gen;
-        best = a.text;
-      }
-    }
-    return best || "";
-  }, [entry, selectedLocationGame]);
-
-  const selectShoppingDetails = useMemo(() => {
-    if (!entry) return [];
-    const groups = Array.isArray(entry?.shopping_by_group) ? entry.shopping_by_group : [];
-    const direct = groups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedShoppingGame));
-    if (direct) {
-      const lines = [];
-      // Support both free-text and structured fields in group entries
-      const locs = Array.isArray(direct.locations) ? direct.locations :
-        (direct.location ? [direct.location] : []);
-      const buy = direct.buy_price != null ? direct.buy_price : (direct.price?.buy ?? null);
-      const sell = direct.sell_price != null ? direct.sell_price : (direct.price?.sell ?? null);
-      if (locs.length > 0) lines.push(`Location: ${locs.join(", ")}`);
-      if (buy != null) lines.push(`Buy: ${buy}`);
-      if (sell != null) lines.push(`Sell: ${sell}`);
-      if (direct.text && lines.length === 0) return [direct.text];
-      if (lines.length > 0) return lines;
-    }
-    const lines = [];
-    if (entry.cost != null) lines.push(`Cost: ${entry.cost}`);
-    if (entry.buy_price != null) lines.push(`Buy: ${entry.buy_price}`);
-    if (entry.sell_price != null) lines.push(`Sell: ${entry.sell_price}`);
-    // Derive shopping location from common fields
-    const entryLocs =
-      (Array.isArray(entry.shop_locations) ? entry.shop_locations : null) ||
-      (Array.isArray(entry.purchase_locations) ? entry.purchase_locations : null) ||
-      (Array.isArray(entry.buy_locations) ? entry.buy_locations : null) ||
-      (Array.isArray(entry.locations) ? entry.locations : null) ||
-      (Array.isArray(entry.shops) ? entry.shops : null);
-    if (Array.isArray(entryLocs) && entryLocs.length > 0) lines.push(`Location: ${entryLocs.join(", ")}`);
-    if (Array.isArray(entry.attributes) && entry.attributes.length > 0) lines.push(`Attributes: ${entry.attributes.join(", ")}`);
-    if (lines.length > 0) return lines;
-    let best = null; let bestGen = -1;
-    for (const g of groups) {
-      const gen = Math.max(...(Array.isArray(g?.games) ? g.games.map((n) => inferGenerationFromGameText(String(n))) : []).filter((x) => typeof x === "number"));
-      if (Number.isFinite(gen) && gen >= bestGen && g.text) { bestGen = gen; best = g.text; }
-    }
-    return best ? [best] : [];
-  }, [entry, selectedShoppingGame]);
-
-  const selectPocketCategory = useMemo(() => {
-    if (!entry) return { pocket: null, category: null };
-    const pocketGroups = Array.isArray(entry?.pocket_by_group) ? entry.pocket_by_group : [];
-    const direct = pocketGroups.find((g) => Array.isArray(g?.games) && g.games.some((n) => String(n).trim() === selectedPocketGame));
-    const pocket = direct?.pocket || entry.pocket || null;
-    const category = entry.category || null;
-    return { pocket, category };
-  }, [entry, selectedPocketGame]);
-
-  // No machine data fetch; we use only local JSON
-
-  if (!item) return <div />;
+  const gameFor = ({ options }) =>
+    options.includes(preferredGame) ? preferredGame : options[options.length - 1] || "";
+  const sectionProps = (section) => ({ section, selectedGame: gameFor(section), onSelectGame: setPreferredGame });
 
   return (
     <>
       <div className="detail-title detail-title-top">
-        <h2>{(localDb && localDb[item.name] && localDb[item.name].name) ? localDb[item.name].name : humanize(item.name)}</h2>
+        <h2>{item.name}</h2>
       </div>
-      <div className="detail-hero item-hero">
-        {loading ? (
-          <div className="list-empty">Loading</div>
-        ) : (
-          <>
-            {/* Basic info */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ marginBottom: 8 }}>
-                <img
-                  className="detail-art is-static"
-                  src={itemSpriteSrc || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png`}
-                  alt=""
-                  style={{ width: 60, height: 60, transform: "none" }}
-                  loading="lazy"
-                />
-              </div>
-              <div>Type: {(entry && (entry.type || entry.category)) || "—"}</div>
-              <div>Buy: {(entry && (entry.buy_price ?? entry.price?.buy)) ?? "—"}</div>
-              <div>Sell: {(entry && (entry.sell_price ?? entry.price?.sell)) ?? "—"}</div>
-            </div>
-
-            {/* Flavour Text */}
-            <section className="about" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Flavour Text</h3>
-                {flavorGames.length > 0 ? (
-                  <select aria-label="Select game for flavour" value={selectedFlavorGame} onChange={(e)=>setSelectedFlavorGame(e.target.value)}>
-                    {flavorGames.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                ) : null}
-              </div>
-              <div>{selectFlavorText || "—"}</div>
-            </section>
-
-            {/* Locations */}
-            <section className="about" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Locations</h3>
-                {locationGames.length > 0 ? (
-                  <select aria-label="Select game for locations" value={selectedLocationGame} onChange={(e)=>setSelectedLocationGame(e.target.value)}>
-                    {locationGames.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                ) : null}
-              </div>
-              <div>{selectAcquisitionText || "—"}</div>
-            </section>
-
-            {/* Shopping Details */}
-            <section className="about" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Shopping Details</h3>
-                {shoppingGames.length > 0 ? (
-                  <select aria-label="Select game for shopping" value={selectedShoppingGame} onChange={(e)=>setSelectedShoppingGame(e.target.value)}>
-                    {shoppingGames.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                ) : null}
-              </div>
-              {selectShoppingDetails.length > 0 ? (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {selectShoppingDetails.map((line, idx) => (
-                    <li key={idx}>{line}</li>
-                  ))}
-                </ul>
-              ) : (
-                <div>—</div>
-              )}
-            </section>
-
-            {/* Pocket */}
-            <section className="about" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <h3 className="list-subheading" style={{ textAlign: "left", margin: 0 }}>Pocket</h3>
-                {pocketGames.length > 0 ? (
-                  <select aria-label="Select game for pocket" value={selectedPocketGame} onChange={(e)=>setSelectedPocketGame(e.target.value)}>
-                    {pocketGames.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                ) : null}
-              </div>
-              {selectPocketCategory.pocket || selectPocketCategory.category ? (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {selectPocketCategory.pocket ? <li>Pocket: {selectPocketCategory.pocket}</li> : null}
-                  {selectPocketCategory.category ? <li>Category: {selectPocketCategory.category}</li> : null}
-                </ul>
-              ) : (
-                <div>—</div>
-              )}
-            </section>
-          </>
-        )}
+      <div className="detail-hero item-hero single-col items-detail-body">
+        <div className="items-summary">
+          <div className="detail-art-wrap item-art-wrap">
+            <ItemIcon key={item.key} item={item} className="detail-art is-static" size={DETAIL_ICON_SIZE} />
+          </div>
+          <dl className="items-facts">
+            <dt>Type</dt>
+            <dd>{entry.item_type || "—"}</dd>
+            <dt>Buy</dt>
+            <dd>{formatPrice(entry.purchase_price)}</dd>
+            <dt>Sell</dt>
+            <dd>{formatPrice(entry.sell_price)}</dd>
+          </dl>
+        </div>
+        <GameSection title="Flavour Text" {...sectionProps(sections.flavour)} />
+        <GameSection title="Locations" showAll {...sectionProps(sections.locations)} />
+        <GameSection title="Shops" showAll {...sectionProps(sections.shopping)} />
+        <GameSection title="Pocket" {...sectionProps(sections.pocket)} />
       </div>
     </>
   );
 }
-
-

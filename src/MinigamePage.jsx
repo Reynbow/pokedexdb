@@ -2,49 +2,68 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import "./App.css";
 import CategoryToggle from "./CategoryToggle.jsx";
 import SpriteImage from "./components/SpriteImage.jsx";
+import { NATIONAL_ID_TO_SLUG } from "./data/pokemonSpeciesMap.js";
+import { formatPokemonName, toTitleCase } from "./utils/pokemonNames.js";
 
-const MAX_POKEMON_ID = 1010;
+// Daily answers are drawn from National Dex species #1-#MAX_POKEMON_ID. This is deliberately a
+// fixed number rather than the size of the Pokémon index: changing it reshuffles the answer for
+// every day, so only bump it when new species should join the rotation.
+const MAX_POKEMON_ID = 1025;
 const STEP_COUNT = 5;
 const HISTORY_STORAGE_KEY = "minigame:daily-history:v1";
-const COMPLETION_COOKIE_KEY = "minigame_daily_complete";
+const MIN_HISTORY_DATE = "2025-11-01"; // History available starting from this date
+const POKEAPI_BASE = "https://pokeapi.co/api/v2";
+const DAY_MS = 24 * 60 * 60 * 1000;
+const OUTCOME_SOLVED = "solved";
+const OUTCOME_FAILED = "failed";
 const CONFETTI_COLORS = ["#38bdf8", "#fbbf24", "#f472b6", "#34d399", "#a855f7", "#f97316"];
 
-const toTitleCase = (value) =>
+// Case, accents, punctuation, spaces and ♀/♂ are ignored when comparing names, so "mr mime",
+// "flabebe" and "nidoran f" match "Mr. Mime", "Flabébé" and "Nidoran♀".
+const normalizeName = (value) =>
   String(value || "")
     .toLowerCase()
-    .split(/[-_\s]+/g)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[♀]/g, "f")
+    .replace(/[♂]/g, "m")
+    .replace(/[^a-z0-9]/g, "");
 
-// Extract base name from Pokemon names with form-specific suffixes
-// e.g., "lycanroc-midday" -> "lycanroc", "lycanroc-dusk" -> "lycanroc"
-const getBasePokemonName = (name) => {
-  if (!name) return "";
-  const lowerName = String(name).toLowerCase();
-  // Split by hyphen and take the first part as the base name
-  // This handles form-specific names like "lycanroc-midday", "lycanroc-dusk", etc.
-  const parts = lowerName.split("-");
-  return parts[0] || lowerName;
+const nameForPokemonId = (pokemonId) => {
+  const slug = NATIONAL_ID_TO_SLUG[pokemonId];
+  return slug ? formatPokemonName(slug) : null;
+};
+
+// Splits a display name into clue slots: characters that count toward the answer (letters,
+// digits, ♀/♂) point at their position in the normalized name; separators (" ", "-", ".", ":",
+// "’") have no index and are always shown.
+const buildNameSlots = (displayName) => {
+  const slots = [];
+  let index = 0;
+  for (const char of String(displayName || "")) {
+    const normalized = normalizeName(char);
+    if (normalized) {
+      slots.push({ char, index });
+      index += normalized.length;
+    } else {
+      slots.push({ char, index: null });
+    }
+  }
+  return slots;
 };
 
 const formatGeneration = (gen) => {
   if (!gen?.name) return "Unknown";
   const match = /generation-(\w+)/i.exec(gen.name);
   if (!match) return toTitleCase(gen.name);
-  const value = match[1].toUpperCase();
-  return `Generation ${value}`;
+  return `Generation ${match[1].toUpperCase()}`;
 };
 
-const selectEnglish = (list, key) => {
+const findEnglishText = (list, key) => {
   if (!Array.isArray(list)) return null;
-  const entry = list.find((item) => item?.language?.name === "en");
-  if (!entry) return null;
-  const value = key ? entry[key] : entry;
-  if (typeof value === "string") {
-    return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\f|\n|\r/g, " ").replace(/\s+/g, " ").trim();
-  }
-  return value ?? null;
+  const value = list.find((item) => item?.language?.name === "en")?.[key];
+  if (typeof value !== "string") return null;
+  return value.replace(/[\f\n\r]/g, " ").replace(/\s+/g, " ").trim() || null;
 };
 
 const formatHeight = (decimeters) => {
@@ -57,61 +76,17 @@ const formatWeight = (hectograms) => {
   return `${(hectograms / 10).toFixed(1)} kg`;
 };
 
-const getUtcDateKey = () => {
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(now.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+/* ------------------------------------------------------------------ Dates */
+// The daily puzzle rolls over at midnight UTC so everyone gets the same Pokémon for the same
+// date. Every date key on this page ("YYYY-MM-DD") is a UTC calendar date.
 
-// Improved seeded random number generator using xorshift for better distribution
-const seededRandom = (seed) => {
-  // Xorshift32 algorithm for better randomness
-  // Ensure seed is a valid 32-bit unsigned integer
-  let x = (seed >>> 0) || 1; // Use 1 as fallback to avoid 0
-  x ^= x << 13;
-  x ^= x >>> 17;
-  x ^= x << 5;
-  // Convert to unsigned 32-bit integer
-  x = (x >>> 0);
-  // Normalize to 0-1 range (exclusive of 1)
-  return (x >>> 0) / 0x100000000;
-};
+const toDateKey = (date) => date.toISOString().slice(0, 10);
 
-// Improved hash function for better distribution
-const hashStringToNumber = (value) => {
-  // Use a better hash algorithm (djb2 variant with better mixing)
-  let hash = 5381;
-  const input = String(value || "");
-  for (let idx = 0; idx < input.length; idx += 1) {
-    hash = ((hash << 5) + hash) + input.charCodeAt(idx);
-    hash = hash >>> 0; // Convert to unsigned 32-bit integer
-  }
-  // Additional mixing for better distribution
-  hash = hash ^ (hash >>> 16);
-  hash = hash * 0x85ebca6b;
-  hash = hash ^ (hash >>> 13);
-  hash = hash * 0xc2b2ae35;
-  hash = hash ^ (hash >>> 16);
-  return hash >>> 0;
-};
-
-const normalizeName = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[♀]/g, "f")
-    .replace(/[♂]/g, "m")
-    .replace(/[^a-z0-9]/g, "");
-
-const MIN_HISTORY_DATE = "2025-11-01"; // History available starting from this date
+const getUtcDateKey = () => toDateKey(new Date());
 
 const parseDateKey = (value) => {
   if (!value || typeof value !== "string") return null;
-  const match = /^\d{4}-\d{2}-\d{2}$/.exec(value.trim());
-  if (!match) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return null;
   const [year, month, day] = value.split("-").map((part) => Number.parseInt(part, 10));
   if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
   const parsed = new Date(Date.UTC(year, month - 1, day));
@@ -119,39 +94,9 @@ const parseDateKey = (value) => {
   return parsed;
 };
 
-// Calculate days since November 1st, 2025 for better randomization
-const getDaysSinceStart = (dateKey) => {
-  const startDate = parseDateKey(MIN_HISTORY_DATE);
-  const targetDate = parseDateKey(dateKey);
-  if (!startDate || !targetDate) return 0;
-  const diffTime = targetDate.getTime() - startDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(0, diffDays);
-};
-
-const computeDailyPokemonId = (dateKey) => {
-  // Combine date hash with days since start for better randomization
-  const dateHash = hashStringToNumber(dateKey);
-  const daysSinceStart = getDaysSinceStart(dateKey);
-  
-  // Use multiple rounds of randomization for better distribution
-  let seed = dateHash;
-  seed = seed ^ (daysSinceStart * 0x9e3779b9);
-  seed = seed ^ (dateHash >>> 16);
-  
-  // Generate multiple random values and combine them
-  let random1 = seededRandom(seed);
-  let random2 = seededRandom(seed + 1);
-  let random3 = seededRandom(seed + 2);
-  
-  // Combine random values using XOR and addition for better distribution
-  const combined = (random1 * 0.5 + random2 * 0.3 + random3 * 0.2);
-  
-  // Generate random ID between 1 and MAX_POKEMON_ID
-  const randomId = Math.floor(combined * MAX_POKEMON_ID) + 1;
-  
-  // Ensure it's within valid range
-  return Math.max(1, Math.min(MAX_POKEMON_ID, randomId));
+const shiftDateKey = (dateKey, days) => {
+  const date = parseDateKey(dateKey);
+  return date ? toDateKey(new Date(date.getTime() + days * DAY_MS)) : null;
 };
 
 const isDateOnOrAfter = (value, minimum) => {
@@ -161,23 +106,138 @@ const isDateOnOrAfter = (value, minimum) => {
   return target.getTime() >= min.getTime();
 };
 
+const getDaysSinceStart = (dateKey) => {
+  const startDate = parseDateKey(MIN_HISTORY_DATE);
+  const targetDate = parseDateKey(dateKey);
+  if (!startDate || !targetDate) return 0;
+  return Math.max(0, Math.floor((targetDate.getTime() - startDate.getTime()) / DAY_MS));
+};
+
+/* ------------------------------------------------------------------ Daily Pokémon */
+
+// One round of xorshift32, normalized to [0, 1).
+const seededRandom = (seed) => {
+  let x = seed >>> 0 || 1; // 0 is a fixed point of xorshift
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  return (x >>> 0) / 0x100000000;
+};
+
+// djb2 followed by a murmur-style finalizer.
+const hashStringToNumber = (value) => {
+  let hash = 5381;
+  const input = String(value || "");
+  for (let idx = 0; idx < input.length; idx += 1) {
+    hash = ((hash << 5) + hash) + input.charCodeAt(idx);
+    hash = hash >>> 0;
+  }
+  hash = hash ^ (hash >>> 16);
+  hash = hash * 0x85ebca6b;
+  hash = hash ^ (hash >>> 13);
+  hash = hash * 0xc2b2ae35;
+  hash = hash ^ (hash >>> 16);
+  return hash >>> 0;
+};
+
+// Deterministic Pokémon for a date. Any change to this math (or to MAX_POKEMON_ID) changes the
+// answer for past and future days. seed+1 and seed+2 produce almost the same xorshift output as
+// seed, so the weighted blend is effectively seededRandom(seed); it is kept because simplifying
+// it would still change the answer on roughly one day in eight.
+const computeDailyPokemonId = (dateKey) => {
+  const dateHash = hashStringToNumber(dateKey);
+  let seed = dateHash;
+  seed = seed ^ (getDaysSinceStart(dateKey) * 0x9e3779b9);
+  seed = seed ^ (dateHash >>> 16);
+  const combined = seededRandom(seed) * 0.5 + seededRandom(seed + 1) * 0.3 + seededRandom(seed + 2) * 0.2;
+  const randomId = Math.floor(combined * MAX_POKEMON_ID) + 1;
+  return Math.max(1, Math.min(MAX_POKEMON_ID, randomId));
+};
+
+// Puzzle data per Pokémon id, kept for the whole session so revisiting a day never refetches.
+const puzzlePokemonCache = new Map();
+
+const fetchPuzzlePokemon = async (pokemonId, signal) => {
+  const cached = puzzlePokemonCache.get(pokemonId);
+  if (cached) return cached;
+
+  const [pokemonResponse, speciesResponse] = await Promise.all([
+    fetch(`${POKEAPI_BASE}/pokemon/${pokemonId}`, { signal }),
+    fetch(`${POKEAPI_BASE}/pokemon-species/${pokemonId}`, { signal }),
+  ]);
+  if (!pokemonResponse.ok || !speciesResponse.ok) {
+    throw new Error(`Failed to load Pokémon (status ${pokemonResponse.status}/${speciesResponse.status})`);
+  }
+  const [pokemonData, speciesData] = await Promise.all([pokemonResponse.json(), speciesResponse.json()]);
+
+  const types = Array.isArray(pokemonData?.types)
+    ? pokemonData.types
+        .slice()
+        .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
+        .map((entry) => entry?.type?.name)
+        .filter(Boolean)
+    : [];
+
+  // Species names never carry form suffixes ("lycanroc", not "lycanroc-midday").
+  const speciesName = speciesData?.name || NATIONAL_ID_TO_SLUG[pokemonId] || "";
+  const displayName =
+    findEnglishText(speciesData?.names, "name") || formatPokemonName(speciesName) || `Pokémon #${pokemonId}`;
+  const normalizedName = normalizeName(displayName);
+  const answers = [...new Set([normalizedName, normalizeName(speciesName)].filter(Boolean))];
+
+  const payload = {
+    id: pokemonId,
+    speciesName,
+    displayName,
+    normalizedName,
+    answers,
+    types,
+    generation: speciesData?.generation ?? null,
+    classification: findEnglishText(speciesData?.genera, "genus"),
+    height: Number.isFinite(pokemonData?.height) ? pokemonData.height : null,
+    weight: Number.isFinite(pokemonData?.weight) ? pokemonData.weight : null,
+  };
+  puzzlePokemonCache.set(pokemonId, payload);
+  return payload;
+};
+
+/* ------------------------------------------------------------------ History */
+
+const isValidPokemonId = (value) => Number.isInteger(value) && value >= 1 && value <= MAX_POKEMON_ID;
+
+// A record is `{ date, pokemonId, pokemonName, completedAt, outcome, solvedAtStep }` where outcome is
+// "solved" (solvedAtStep = 1-4) or "failed" (gave up / wrong final guess, solvedAtStep = null).
+// Records saved before outcomes existed stored failures as solvedAtStep 5 (a correct guess always
+// lands on steps 1-4) and a name cut at the first hyphen ("Ho" for Ho-Oh), so both are rebuilt here.
+const normalizeHistoryRecord = (entry) => {
+  const pokemonId = isValidPokemonId(entry.pokemonId) ? entry.pokemonId : null;
+  const step = Number.isInteger(entry.solvedAtStep) ? entry.solvedAtStep : null;
+  const isLegacy = entry.outcome !== OUTCOME_SOLVED && entry.outcome !== OUTCOME_FAILED;
+  const outcome = isLegacy
+    ? step != null && step >= 1 && step < STEP_COUNT
+      ? OUTCOME_SOLVED
+      : OUTCOME_FAILED
+    : entry.outcome;
+  const storedName = typeof entry.pokemonName === "string" ? entry.pokemonName : null;
+  return {
+    date: entry.date,
+    pokemonId,
+    pokemonName: (isLegacy ? nameForPokemonId(pokemonId) : storedName) || storedName || nameForPokemonId(pokemonId),
+    completedAt: typeof entry.completedAt === "string" ? entry.completedAt : null,
+    outcome,
+    solvedAtStep: outcome === OUTCOME_SOLVED ? step : null,
+  };
+};
+
 const loadStoredHistory = () => {
-  if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(HISTORY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((entry) => entry && typeof entry.date === "string")
-      .filter((entry) => isDateOnOrAfter(entry.date, MIN_HISTORY_DATE))
-      .map((entry) => ({
-        date: entry.date,
-        pokemonId: entry.pokemonId ?? null,
-        pokemonName: entry.pokemonName ?? null,
-        completedAt: entry.completedAt ?? null,
-        solvedAtStep: entry.solvedAtStep ?? null,
-      }))
+      .filter((entry) => entry && typeof entry.date === "string" && isDateOnOrAfter(entry.date, MIN_HISTORY_DATE))
+      .map(normalizeHistoryRecord)
       .sort((a, b) => b.date.localeCompare(a.date));
   } catch (error) {
     console.warn("[Minigame] Failed to load history", error);
@@ -186,7 +246,6 @@ const loadStoredHistory = () => {
 };
 
 const saveHistoryRecords = (records) => {
-  if (typeof window === "undefined") return;
   try {
     const filtered = records.filter((entry) => entry && isDateOnOrAfter(entry.date, MIN_HISTORY_DATE));
     window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(filtered));
@@ -195,22 +254,15 @@ const saveHistoryRecords = (records) => {
   }
 };
 
-const setCompletionCookie = (dateKey) => {
-  if (typeof document === "undefined") return;
-  try {
-    const maxAge = 60 * 60 * 24 * 90; // 90 days
-    document.cookie = `${COMPLETION_COOKIE_KEY}=${encodeURIComponent(dateKey)}; max-age=${maxAge}; path=/; SameSite=Lax`;
-  } catch {}
-};
-
 const formatHistoryDate = (dateKey) => {
-  if (!dateKey) return "Unknown";
-  const baseDate = new Date(`${dateKey}T00:00:00Z`);
-  if (Number.isNaN(baseDate.getTime())) return dateKey;
-  return baseDate.toLocaleDateString(undefined, {
+  const date = parseDateKey(dateKey);
+  if (!date) return dateKey || "Unknown";
+  // Date keys are UTC dates; format them in UTC so e.g. "2026-10-20" never shows as Oct 19.
+  return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
 };
 
@@ -226,237 +278,114 @@ const formatHistoryTimestamp = (isoValue) => {
   });
 };
 
-const formatPerformanceSummary = (solvedAtStep) => {
-  if (solvedAtStep == null) {
-    return "Solved after all clues";
-  }
-  if (solvedAtStep <= 1) {
-    return "Solved with no clues";
-  }
-  const cluesUsed = Math.max(0, solvedAtStep - 1);
-  const label = cluesUsed === 1 ? "clue" : "clues";
-  return `Solved after ${cluesUsed} ${label}`;
+const formatCluesUsed = (cluesUsed) => `${cluesUsed} ${cluesUsed === 1 ? "clue" : "clues"}`;
+
+const formatOutcomeSummary = (record) => {
+  if (!record) return "";
+  if (record.outcome !== OUTCOME_SOLVED) return "Not solved";
+  const cluesUsed = Math.max(0, (record.solvedAtStep ?? 1) - 1);
+  return cluesUsed === 0 ? "Solved with no clues" : `Solved after ${formatCluesUsed(cluesUsed)}`;
 };
 
-// Get color for completed history entry based on clues used
-// Green = solved with 1 clue (best), Red = solved with 4 clues (worst)
-const getCompletionColor = (solvedAtStep) => {
-  if (solvedAtStep == null) {
-    // Solved after all clues (worst - red)
-    return "rgba(239, 68, 68, 0.2)"; // red-500 with opacity
-  }
-  
-  const cluesUsed = Math.max(0, solvedAtStep - 1);
-  
-  // Map clues used (0-4) to colors from green to red
-  // 0 clues = bright green (even better than 1 clue), 1 clue = green, 2 clues = yellow, 3 clues = orange, 4 clues = red
-  const colorMap = {
-    0: "rgba(34, 197, 94, 0.2)",     // green-500 - solved with no clues (best)
-    1: "rgba(74, 222, 128, 0.2)",    // green-400 - solved with 1 clue (green as requested)
-    2: "rgba(234, 179, 8, 0.2)",     // yellow-500 - solved with 2 clues
-    3: "rgba(249, 115, 22, 0.2)",   // orange-500 - solved with 3 clues
-    4: "rgba(239, 68, 68, 0.2)",    // red-500 - solved with 4 clues (red as requested)
-  };
-  
-  return colorMap[Math.min(4, cluesUsed)] || colorMap[4];
+// Green = solved with no clues (best) ... orange = solved after 3 clues, red = not solved.
+const SOLVED_COLORS = [
+  "rgba(34, 197, 94, 0.2)", // green-500 - no clues
+  "rgba(74, 222, 128, 0.2)", // green-400 - 1 clue
+  "rgba(234, 179, 8, 0.2)", // yellow-500 - 2 clues
+  "rgba(249, 115, 22, 0.2)", // orange-500 - 3 clues
+];
+const FAILED_COLOR = "rgba(239, 68, 68, 0.2)"; // red-500
+
+const getCompletionColor = (record) => {
+  if (record?.outcome !== OUTCOME_SOLVED) return FAILED_COLOR;
+  const cluesUsed = Math.max(0, (record.solvedAtStep ?? 1) - 1);
+  return SOLVED_COLORS[Math.min(SOLVED_COLORS.length - 1, cluesUsed)];
 };
 
-const generatePastDateKeys = (daysBack = null) => {
-  const dates = [];
-  const minDate = parseDateKey(MIN_HISTORY_DATE);
-  if (!minDate) return dates;
-
-  const now = new Date();
-  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const startDate = todayUtc.getTime() < minDate.getTime() ? minDate : todayUtc;
-
-  // Calculate days from minDate to today if daysBack is not provided
-  const actualDaysBack = daysBack ?? Math.ceil((todayUtc.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-  for (let i = 0; i < actualDaysBack; i += 1) {
-    const date = new Date(startDate);
-    date.setUTCDate(date.getUTCDate() - i);
-
-    if (date.getTime() < minDate.getTime()) {
-      break;
-    }
-
-    if (date.getTime() > todayUtc.getTime()) {
-      continue;
-    }
-
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    dates.push(`${year}-${month}-${day}`);
+// Every date from today back to MIN_HISTORY_DATE (newest first), with that day's record if played.
+const buildFullHistory = (records, todayKey) => {
+  const recordsByDate = new Map(records.map((entry) => [entry.date, entry]));
+  const days = [];
+  for (let dateKey = todayKey; dateKey && dateKey >= MIN_HISTORY_DATE; dateKey = shiftDateKey(dateKey, -1)) {
+    const record = recordsByDate.get(dateKey);
+    days.push(record ? { ...record, isCompleted: true } : { date: dateKey, isCompleted: false });
   }
-  return dates;
-};
-
-const buildFullHistory = (completedHistory, daysBack = null) => {
-  const completedMap = new Map();
-  completedHistory.forEach((entry) => {
-    if (entry && isDateOnOrAfter(entry.date, MIN_HISTORY_DATE)) {
-      completedMap.set(entry.date, { ...entry, isCompleted: true });
-    }
-  });
-
-  const allDateKeys = generatePastDateKeys(daysBack);
-  const fullHistory = allDateKeys.map((dateKey) => {
-    const completed = completedMap.get(dateKey);
-    if (completed) {
-      return completed;
-    }
-    const pokemonId = computeDailyPokemonId(dateKey);
-    return {
-      date: dateKey,
-      pokemonId,
-      pokemonName: null,
-      completedAt: null,
-      solvedAtStep: null,
-      isCompleted: false,
-    };
-  });
-
-  return fullHistory.sort((a, b) => b.date.localeCompare(a.date));
+  return days;
 };
 
 export default function MinigamePage() {
   const todayKey = getUtcDateKey();
   const [dailyKey, setDailyKey] = useState(todayKey);
 
-  useEffect(() => {
-    try {
-      const url = new URL(window.location.href);
-      const basePath = (import.meta.env.BASE_URL || "/").replace(/\/+$|^$/, "/");
-      const expectedPath = basePath === "/" ? "/whosthat" : `${basePath}whosthat`;
-      
-      // Redirect hash-based #/whosthat to path-based /whosthat
-      if (url.hash === "#/whosthat" || url.hash.startsWith("#/whosthat")) {
-        url.pathname = expectedPath;
-        url.hash = "";
-        ["p", "i", "m", "a"].forEach((param) => url.searchParams.delete(param));
-        window.history.replaceState({}, "", url);
-        return;
-      }
-      
-      // Ensure path is /whosthat
-      if (url.pathname !== expectedPath && !url.pathname.endsWith("/whosthat")) {
-        url.pathname = expectedPath;
-        url.hash = "";
-        ["p", "i", "m", "a"].forEach((param) => url.searchParams.delete(param));
-        window.history.replaceState({}, "", url);
-      }
-    } catch {}
-  }, []);
+  // Legacy #/whosthat URLs are redirected by the router (router.js) before the app renders.
 
-  const initialDataRef = useRef(null);
-  if (!initialDataRef.current) {
-    const history = loadStoredHistory();
-    const todaysRecord = history.find((entry) => entry.date === todayKey) || null;
-    initialDataRef.current = { history, todaysRecord };
-  }
-
-  const [history, setHistory] = useState(initialDataRef.current.history);
-  const [fullHistory, setFullHistory] = useState(() => buildFullHistory(initialDataRef.current.history));
-  const [pokemonNamesCache, setPokemonNamesCache] = useState(() => new Map());
+  const [history, setHistory] = useState(loadStoredHistory);
   const [pokemon, setPokemon] = useState(null);
-  const [step, setStep] = useState(() => {
-    const record = initialDataRef.current.history.find((entry) => entry.date === todayKey);
-    return record ? STEP_COUNT : 1;
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [completion, setCompletion] = useState(() => {
-    const record = initialDataRef.current.history.find((entry) => entry.date === todayKey);
-    return {
-      isCompleted: Boolean(record),
-      completedAt: record?.completedAt ?? null,
-    };
-  });
+  const [loadError, setLoadError] = useState(null); // { pokemonId, message }
+  const [retryCount, setRetryCount] = useState(0);
+  const [progressStep, setProgressStep] = useState(1);
+  const [revealedLetters, setRevealedLetters] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [guess, setGuess] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [feedbackType, setFeedbackType] = useState("info");
   const [confettiPieces, setConfettiPieces] = useState([]);
   const confettiTimeoutRef = useRef(null);
-  const pokemonCacheRef = useRef(new Map());
-  const [solvedAtStep, setSolvedAtStep] = useState(() => {
-    const record = initialDataRef.current.history.find((entry) => entry.date === todayKey);
-    return record?.solvedAtStep ?? null;
-  });
-  const [revealedLetters, setRevealedLetters] = useState(() => {
-    // Initialize as empty array, will be set when Pokemon loads
-    return [];
-  });
-
-  const dailyPokemonId = useMemo(() => computeDailyPokemonId(dailyKey), [dailyKey]);
 
   const currentRecord = useMemo(
     () => history.find((entry) => entry.date === dailyKey) || null,
     [history, dailyKey]
   );
+  const isCompleted = Boolean(currentRecord);
+  const isSolved = currentRecord?.outcome === OUTCOME_SOLVED;
+  // A finished day keeps the Pokémon it was played with, even if the daily formula changes later.
+  const targetPokemonId = currentRecord?.pokemonId ?? computeDailyPokemonId(dailyKey);
+  const step = isCompleted ? STEP_COUNT : progressStep;
 
-  const normalizedTargetName = useMemo(() => {
-    if (!pokemon?.name) return "";
-    const baseName = getBasePokemonName(pokemon.name);
-    return normalizeName(baseName);
-  }, [pokemon?.name]);
+  // Only data for the day being shown counts, so a late response for another day is never displayed.
+  const activePokemon = pokemon?.id === targetPokemonId ? pokemon : null;
+  const error = !activePokemon && loadError?.pokemonId === targetPokemonId ? loadError.message : null;
+  const loading = !activePokemon && !error;
+
+  const fullHistory = useMemo(() => buildFullHistory(history, todayKey), [history, todayKey]);
 
   useEffect(() => {
-    if (currentRecord && !completion.isCompleted) {
-      setCompletion({ isCompleted: true, completedAt: currentRecord.completedAt });
-      setSolvedAtStep(currentRecord.solvedAtStep ?? STEP_COUNT);
+    const cached = puzzlePokemonCache.get(targetPokemonId);
+    if (cached) {
+      setPokemon(cached);
+      return undefined;
     }
-  }, [currentRecord, completion.isCompleted]);
+    setLoadError(null);
+    // Aborted when the date changes, so flipping quickly through days can't let an older
+    // request land after a newer one.
+    const controller = new AbortController();
+    fetchPuzzlePokemon(targetPokemonId, controller.signal)
+      .then((payload) => {
+        if (!controller.signal.aborted) setPokemon(payload);
+      })
+      .catch((fetchError) => {
+        if (controller.signal.aborted) return;
+        setLoadError({
+          pokemonId: targetPokemonId,
+          message: fetchError?.message || "Unable to load Pokémon. Please try again later.",
+        });
+      });
+    return () => controller.abort();
+  }, [targetPokemonId, retryCount]);
 
-  // Update full history when completed history changes
-  useEffect(() => {
-    setFullHistory(buildFullHistory(history));
-  }, [history]);
-
-  // Track which Pokemon IDs we've requested to avoid duplicate requests
-  const requestedIdsRef = useRef(new Set());
-  const pokemonNamesCacheRef = useRef(new Map());
-  
-  // Sync cache ref with state
-  useEffect(() => {
-    pokemonNamesCacheRef.current = pokemonNamesCache;
-  }, [pokemonNamesCache]);
-
-  // Note: We no longer load Pokemon names for uncompleted games since they should be hidden
-  // This effect is kept for potential future use but currently does nothing
-
-  useEffect(() => () => {
-    if (confettiTimeoutRef.current) {
-      clearTimeout(confettiTimeoutRef.current);
-    }
+  const handleRetry = useCallback(() => {
+    setLoadError(null);
+    setRetryCount((count) => count + 1);
   }, []);
 
-  useEffect(() => {
-    setGuess("");
-    if (!completion.isCompleted) {
-      setFeedback(null);
-      setFeedbackType("info");
-    }
-    setConfettiPieces([]);
-    // Initialize revealed letters array when Pokemon changes
-    if (pokemon?.name) {
-      const baseName = getBasePokemonName(pokemon.name);
-      const nameLength = baseName.length;
-      setRevealedLetters(new Array(nameLength).fill(false));
-    } else {
-      setRevealedLetters([]);
-    }
-  }, [pokemon?.id, completion.isCompleted, pokemon?.name]);
-
-  useEffect(() => {
-    if (completion.isCompleted && currentRecord && !feedback) {
-      const summary = formatPerformanceSummary(currentRecord.solvedAtStep);
-      setFeedback(`Daily complete: ${summary}`);
-      setFeedbackType("success");
-    }
-  }, [completion.isCompleted, currentRecord, feedback]);
+  useEffect(
+    () => () => {
+      if (confettiTimeoutRef.current) {
+        clearTimeout(confettiTimeoutRef.current);
+      }
+    },
+    []
+  );
 
   const generateConfetti = useCallback(() => {
     const pieces = Array.from({ length: 28 }, () => ({
@@ -473,366 +402,171 @@ export default function MinigamePage() {
     confettiTimeoutRef.current = setTimeout(() => setConfettiPieces([]), 1800);
   }, []);
 
-  const loadDailyPokemon = useCallback(async (targetDateKey = dailyKey) => {
-    setLoading(true);
-    setError(null);
+  const loadGameForDate = useCallback(
+    (dateKey) => {
+      if (!parseDateKey(dateKey)) return;
+      setShowHistory(false);
+      if (dateKey === dailyKey) return;
+      setDailyKey(dateKey);
+      setProgressStep(1);
+      setRevealedLetters([]);
+      setGuess("");
+      setFeedback(null);
+      setFeedbackType("info");
+      setConfettiPieces([]);
+    },
+    [dailyKey]
+  );
 
-    const targetPokemonId = computeDailyPokemonId(targetDateKey);
-    const targetRecord = history.find((entry) => entry.date === targetDateKey);
-    const isCompleted = Boolean(targetRecord);
+  const previousDateKey = useMemo(() => {
+    const key = shiftDateKey(dailyKey, -1);
+    return key && key >= MIN_HISTORY_DATE ? key : null;
+  }, [dailyKey]);
 
-    const cached = pokemonCacheRef.current.get(targetPokemonId);
-    if (cached) {
-      setPokemon(cached);
-      setLoading(false);
-      setStep(isCompleted ? STEP_COUNT : 1);
-      setCompletion({
-        isCompleted,
-        completedAt: targetRecord?.completedAt ?? null,
-      });
-      setSolvedAtStep(targetRecord?.solvedAtStep ?? null);
-      return;
-    }
+  const nextDateKey = useMemo(() => {
+    const key = shiftDateKey(dailyKey, 1);
+    return key && key <= todayKey ? key : null;
+  }, [dailyKey, todayKey]);
 
-    try {
-      const [pokemonResponse, speciesResponse] = await Promise.all([
-        fetch(`https://pokeapi.co/api/v2/pokemon/${targetPokemonId}`),
-        fetch(`https://pokeapi.co/api/v2/pokemon-species/${targetPokemonId}`),
-      ]);
+  const displayName = activePokemon?.displayName || "";
 
-      if (!pokemonResponse.ok || !speciesResponse.ok) {
-        throw new Error(
-          `Failed to load Pokémon (status ${pokemonResponse.status}/${speciesResponse.status})`
-        );
-      }
+  const nameSlots = useMemo(() => buildNameSlots(activePokemon?.displayName), [activePokemon?.displayName]);
 
-      const [pokemonData, speciesData] = await Promise.all([
-        pokemonResponse.json(),
-        speciesResponse.json(),
-      ]);
-
-      const types = Array.isArray(pokemonData?.types)
-        ? pokemonData.types
-            .slice()
-            .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
-            .map((entry) => entry?.type?.name)
-            .filter(Boolean)
-        : [];
-
-      const genera = selectEnglish(speciesData?.genera, "genus");
-
-      const payload = {
-        id: pokemonData?.id ?? targetPokemonId,
-        name: pokemonData?.name ?? speciesData?.name ?? `Pokemon ${targetPokemonId}`,
-        types,
-        generation: speciesData?.generation ?? null,
-        classification: genera,
-        height: Number.isFinite(pokemonData?.height) ? pokemonData.height : null,
-        weight: Number.isFinite(pokemonData?.weight) ? pokemonData.weight : null,
-      };
-
-      pokemonCacheRef.current.set(payload.id, payload);
-      setPokemon(payload);
-      setLoading(false);
-      setStep(isCompleted ? STEP_COUNT : 1);
-      setCompletion({
-        isCompleted,
-        completedAt: targetRecord?.completedAt ?? null,
-      });
-      setSolvedAtStep(targetRecord?.solvedAtStep ?? null);
-      if (!isCompleted) {
-        setSolvedAtStep(null);
-      }
-    } catch (fetchError) {
-      setPokemon(null);
-      setLoading(false);
-      setError(fetchError?.message || "Unable to load Pokémon. Please try again later.");
-    }
-  }, [dailyKey, history]);
-
-  useEffect(() => {
-    loadDailyPokemon(dailyKey);
-  }, [dailyKey, loadDailyPokemon]);
-
-  const loadGameForDate = useCallback((dateKey) => {
-    if (!dateKey || typeof dateKey !== "string") return;
-    setDailyKey(dateKey);
-    setShowHistory(false);
-    setGuess("");
-    setFeedback(null);
-    setFeedbackType("info");
-  }, []);
-
-  // Get previous date (one day earlier)
-  const getPreviousDate = useCallback((currentDateKey) => {
-    const currentDate = parseDateKey(currentDateKey);
-    if (!currentDate) return null;
-    const prevDate = new Date(currentDate);
-    prevDate.setUTCDate(prevDate.getUTCDate() - 1);
-    const year = prevDate.getUTCFullYear();
-    const month = String(prevDate.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(prevDate.getUTCDate()).padStart(2, "0");
-    const prevDateKey = `${year}-${month}-${day}`;
-    // Check if previous date is on or after MIN_HISTORY_DATE
-    if (isDateOnOrAfter(prevDateKey, MIN_HISTORY_DATE)) {
-      return prevDateKey;
-    }
-    return null;
-  }, []);
-
-  // Get next date (one day later)
-  const getNextDate = useCallback((currentDateKey) => {
-    const currentDate = parseDateKey(currentDateKey);
-    if (!currentDate) return null;
-    const nextDate = new Date(currentDate);
-    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-    const year = nextDate.getUTCFullYear();
-    const month = String(nextDate.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(nextDate.getUTCDate()).padStart(2, "0");
-    const nextDateKey = `${year}-${month}-${day}`;
-    // Check if next date is on or before today
-    if (nextDateKey <= todayKey) {
-      return nextDateKey;
-    }
-    return null;
-  }, [todayKey]);
-
-  const handlePreviousDate = useCallback(() => {
-    const prevDate = getPreviousDate(dailyKey);
-    if (prevDate) {
-      loadGameForDate(prevDate);
-    }
-  }, [dailyKey, getPreviousDate, loadGameForDate]);
-
-  const handleNextDate = useCallback(() => {
-    const nextDate = getNextDate(dailyKey);
-    if (nextDate) {
-      loadGameForDate(nextDate);
-    }
-  }, [dailyKey, getNextDate, loadGameForDate]);
-
-  const canGoPrevious = getPreviousDate(dailyKey) !== null;
-  const canGoNext = getNextDate(dailyKey) !== null;
-
-  const friendlyName = useMemo(() => {
-    if (!pokemon?.name) return "";
-    const baseName = getBasePokemonName(pokemon.name);
-    return toTitleCase(baseName);
-  }, [pokemon?.name]);
-
-  // Compute the name clue display (letters and underscores)
-  const nameClueDisplay = useMemo(() => {
-    if (!pokemon?.name) return null;
-    
-    const baseName = getBasePokemonName(pokemon.name);
-    
-    // Show full name if game is completed
-    if (completion.isCompleted) {
-      return toTitleCase(baseName);
-    }
-    
-    const displayChars = [];
-    
-    // Build display array with revealed letters or underscores
-    // We need to map revealed letters to their positions in the base name
-    for (let i = 0; i < baseName.length; i++) {
-      if (revealedLetters[i]) {
-        // Show the letter - convert to title case for display
-        const char = baseName[i];
-        // Check if this is the start of a word (after space/hyphen or first char)
-        const isWordStart = i === 0 || /[-_\s]/.test(baseName[i - 1]);
-        displayChars.push(isWordStart ? char.toUpperCase() : char.toLowerCase());
-      } else {
-        // Show underscore
-        displayChars.push("_");
-      }
-    }
-    
-    // Join characters without any spaces - remove all spaces
-    let result = displayChars.join("").replace(/\s+/g, "");
-    
-    return result;
-  }, [pokemon?.name, revealedLetters, completion.isCompleted]);
+  // Name clue: answer letters are blanks until guessed in the right position; separators always show.
+  const nameClueChars = useMemo(() => {
+    if (!activePokemon) return null;
+    return nameSlots.map(({ char, index }) => {
+      if (index == null) return { char, kind: char.trim() ? "is-letter" : "is-space" };
+      if (isCompleted || revealedLetters[index]) return { char, kind: "is-letter" };
+      return { char: "_", kind: "is-underscore" };
+    });
+  }, [activePokemon, nameSlots, isCompleted, revealedLetters]);
 
   const typeLabel = useMemo(() => {
-    if (!pokemon?.types || pokemon.types.length === 0) return "Unknown";
-    return pokemon.types.map((t) => toTitleCase(t)).join(" / ");
-  }, [pokemon?.types]);
+    if (!activePokemon?.types?.length) return "Unknown";
+    return activePokemon.types.map((type) => toTitleCase(type)).join(" / ");
+  }, [activePokemon]);
 
-  const generationLabel = useMemo(() => formatGeneration(pokemon?.generation), [pokemon?.generation]);
+  const generationLabel = useMemo(() => formatGeneration(activePokemon?.generation), [activePokemon]);
 
   const hintList = useMemo(() => {
-    if (!pokemon) return [];
+    if (!activePokemon) return [];
     const hints = [];
     if (step >= 2) hints.push({ id: "types", label: "Type", value: typeLabel });
     if (step >= 3) {
-      const classification = pokemon.classification || "Unknown";
-      hints.push({ id: "classification", label: "Classification", value: classification });
+      hints.push({ id: "classification", label: "Classification", value: activePokemon.classification || "Unknown" });
       hints.push({ id: "generation", label: "Generation", value: generationLabel });
     }
     return hints;
-  }, [pokemon, step, typeLabel, generationLabel]);
+  }, [activePokemon, step, typeLabel, generationLabel]);
 
   const markCompletion = useCallback(
-    (resolvedStep) => {
-      if (!pokemon) return;
-      if (completion.isCompleted && currentRecord) return;
-
-      const baseName = getBasePokemonName(pokemon.name);
+    (outcome, resolvedStep = null) => {
+      if (!activePokemon || currentRecord) return;
       const record = {
         date: dailyKey,
-        pokemonId: pokemon.id,
-        pokemonName: toTitleCase(baseName),
+        pokemonId: activePokemon.id,
+        pokemonName: activePokemon.displayName,
         completedAt: new Date().toISOString(),
-        solvedAtStep: resolvedStep ?? STEP_COUNT,
+        outcome,
+        solvedAtStep: outcome === OUTCOME_SOLVED ? resolvedStep : null,
       };
-
-      setHistory((prevHistory) => {
-        const existingIndex = prevHistory.findIndex((entry) => entry.date === record.date);
-        let updated;
-        if (existingIndex >= 0) {
-          updated = [...prevHistory];
-          updated[existingIndex] = record;
-        } else {
-          updated = [record, ...prevHistory];
-        }
-        updated.sort((a, b) => b.date.localeCompare(a.date));
-        saveHistoryRecords(updated);
-        return updated;
-      });
-
-      setCompletion({ isCompleted: true, completedAt: record.completedAt });
-      setSolvedAtStep(record.solvedAtStep);
+      const updated = [record, ...history.filter((entry) => entry.date !== record.date)].sort((a, b) =>
+        b.date.localeCompare(a.date)
+      );
+      setHistory(updated);
+      saveHistoryRecords(updated);
       setShowHistory(true);
-      setCompletionCookie(record.date);
     },
-    [pokemon, completion.isCompleted, currentRecord, dailyKey]
+    [activePokemon, currentRecord, dailyKey, history]
   );
 
   const handleHistoryToggle = useCallback(() => {
     setShowHistory((prev) => !prev);
   }, []);
 
-  // Reveal matching letters from guess in Pokemon name (position-by-position matching)
-  const revealMatchingLetters = useCallback((guess) => {
-    if (!pokemon?.name || !guess) return;
-    
-    const baseName = getBasePokemonName(pokemon.name);
-    const normalizedBaseName = normalizeName(baseName);
-    const normalizedGuess = normalizeName(guess);
-    
-    if (!normalizedGuess || normalizedGuess.length === 0) return;
-    
-    // Create a mapping from normalized positions to original baseName positions
-    // This handles cases where baseName has hyphens/spaces that are removed in normalization
-    const normalizedToOriginal = [];
-    let normalizedIdx = 0;
-    for (let i = 0; i < baseName.length; i++) {
-      const char = baseName[i];
-      // Only map alphanumeric characters (those that survive normalization)
-      if (/[a-z0-9]/i.test(char)) {
-        normalizedToOriginal[normalizedIdx] = i;
-        normalizedIdx++;
-      }
-    }
-    
-    setRevealedLetters((prev) => {
-      const newRevealed = [...prev];
-      let hasChanges = false;
-      
-      // Match characters position-by-position
-      // Compare each character at the same position in both normalized strings
-      const minLength = Math.min(normalizedBaseName.length, normalizedGuess.length);
-      for (let i = 0; i < minLength; i++) {
-        if (normalizedBaseName[i] === normalizedGuess[i]) {
-          // Characters match at this position, reveal the corresponding letter
-          const originalPos = normalizedToOriginal[i];
-          if (originalPos !== undefined && !newRevealed[originalPos]) {
-            newRevealed[originalPos] = true;
-            hasChanges = true;
+  // Reveal letters of the answer that the guess has in the same position (ignoring punctuation).
+  const revealMatchingLetters = useCallback(
+    (normalizedGuess) => {
+      const target = activePokemon?.normalizedName || "";
+      if (!target || !normalizedGuess) return;
+      setRevealedLetters((prev) => {
+        let next = null;
+        const limit = Math.min(target.length, normalizedGuess.length);
+        for (let i = 0; i < limit; i += 1) {
+          if (target[i] === normalizedGuess[i] && !prev[i]) {
+            next = next || [...prev];
+            next[i] = true;
           }
         }
-      }
-      
-      return hasChanges ? newRevealed : prev;
-    });
-  }, [pokemon?.name]);
+        return next || prev;
+      });
+    },
+    [activePokemon]
+  );
 
   const handleGuessSubmit = useCallback(
-     (event) => {
-       event.preventDefault();
-       if (!pokemon || completion.isCompleted || loading) return;
- 
-       const rawGuess = guess.trim();
-       const normalizedGuess = normalizeName(rawGuess);
- 
-       const currentStep = step;
-       setGuess("");
- 
-       if (!normalizedGuess) {
-        if (currentStep < STEP_COUNT) {
-          const nextStep = Math.min(STEP_COUNT, currentStep + 1);
-          setStep(nextStep);
-          if (nextStep >= STEP_COUNT) {
-            markCompletion();
-          }
-        }
+    (event) => {
+      event.preventDefault();
+      if (!activePokemon || isCompleted) return;
+
+      const normalizedGuess = normalizeName(guess.trim());
+      setGuess("");
+
+      if (normalizedGuess && activePokemon.answers.includes(normalizedGuess)) {
+        const cluesUsed = Math.max(0, step - 1);
+        setFeedback(
+          cluesUsed === 0
+            ? "Incredible! You solved it without any clues!"
+            : `Correct! You solved it after ${formatCluesUsed(cluesUsed)}.`
+        );
+        setFeedbackType("success");
+        generateConfetti();
+        markCompletion(OUTCOME_SOLVED, step);
+        return;
+      }
+
+      // A wrong guess reveals matching letters and the next clue; an empty one just skips ahead.
+      revealMatchingLetters(normalizedGuess);
+      const nextStep = Math.min(STEP_COUNT, step + 1);
+      setProgressStep(nextStep);
+      if (nextStep >= STEP_COUNT) {
+        setFeedback(`Out of clues! It was ${activePokemon.displayName}.`);
+        setFeedbackType("warning");
+        markCompletion(OUTCOME_FAILED);
+      } else if (normalizedGuess) {
+        setFeedback("Not quite! Another clue has been revealed.");
+        setFeedbackType("error");
+      } else {
         setFeedback(null);
         setFeedbackType("info");
-        return;
-       }
- 
-       // Reveal matching letters from the guess
-       revealMatchingLetters(rawGuess);
+      }
+    },
+    [activePokemon, isCompleted, guess, step, generateConfetti, markCompletion, revealMatchingLetters]
+  );
 
-       if (normalizedGuess === normalizedTargetName) {
-         const resolvedStep = currentStep;
-         setStep(STEP_COUNT);
-         const cluesUsed = Math.max(0, resolvedStep - 1);
-         const cluesLabel = cluesUsed === 1 ? "clue" : "clues";
-         const successMessage =
-           resolvedStep <= 1
-             ? "Incredible! You solved it without any clues!"
-             : `Correct! You solved it after ${cluesUsed} ${cluesLabel}.`;
-         setFeedback(successMessage);
-         setFeedbackType("success");
-         generateConfetti();
-         markCompletion(resolvedStep);
-       } else {
-         if (currentStep < STEP_COUNT) {
-           const nextStep = Math.min(STEP_COUNT, currentStep + 1);
-           setStep(nextStep);
-           if (nextStep >= STEP_COUNT) {
-            setFeedback("So close! All clues are revealed—final reveal unlocked.");
-            setFeedbackType("warning");
-            markCompletion();
-           } else {
-             setFeedback("Not quite! Another clue has been revealed.");
-             setFeedbackType("error");
-           }
-         } else {
-           setFeedback("All clues are revealed—final reveal unlocked.");
-           setFeedbackType("warning");
-         }
-       }
-     },
-   [pokemon, completion.isCompleted, loading, guess, step, normalizedTargetName, generateConfetti, markCompletion, revealMatchingLetters]
-   );
+  // Revisiting a finished day shows its result unless this session just set a message.
+  let shownFeedback = feedback;
+  let shownFeedbackType = feedbackType;
+  if (!shownFeedback && currentRecord) {
+    shownFeedback = isSolved
+      ? `Daily complete: ${formatOutcomeSummary(currentRecord)}`
+      : `Not solved. It was ${currentRecord.pokemonName || displayName}.`;
+    shownFeedbackType = isSolved ? "success" : "warning";
+  }
 
   const totalHistory = fullHistory.length;
-  const completedCount = fullHistory.filter((entry) => entry.isCompleted).length;
+  const solvedCount = fullHistory.filter((entry) => entry.isCompleted && entry.outcome === OUTCOME_SOLVED).length;
+  const failedCount = fullHistory.filter((entry) => entry.isCompleted && entry.outcome !== OUTCOME_SOLVED).length;
   const hasHistory = totalHistory > 0;
 
-  // Get Pokemon name for history entry (from cache or entry)
-  const getHistoryPokemonName = useCallback((entry) => {
-    // For completed entries, show the pokemon name
-    if (entry.isCompleted) {
-      return entry.pokemonName || pokemonNamesCache.get(entry.pokemonId) || `#${entry.pokemonId}`;
-    }
-    // For uncompleted entries, hide the pokemon name
-    return "???";
-  }, [pokemonNamesCache]);
-  const guessDisabled = loading || !!error || completion.isCompleted || !pokemon;
+  const getHistoryPokemonName = (entry) => {
+    // Unplayed days keep their Pokémon hidden.
+    if (!entry.isCompleted) return "???";
+    return entry.pokemonName || nameForPokemonId(entry.pokemonId) || `#${entry.pokemonId}`;
+  };
+
+  const guessDisabled = !activePokemon || isCompleted;
   const revealDetailsStep = STEP_COUNT - 1;
   const showRevealDetails = step >= revealDetailsStep;
   const showFinalReveal = step >= STEP_COUNT;
@@ -853,7 +587,7 @@ export default function MinigamePage() {
   ]
     .filter(Boolean)
     .join(" ");
- 
+
   return (
     <div className="minigame-page">
       <div className="container">
@@ -878,10 +612,10 @@ export default function MinigamePage() {
               )}
             </span>
             <div className="minigame-status-controls">
-              <span className={`minigame-status-indicator${completion.isCompleted ? " is-complete" : ""}`}>
+              <span className={`minigame-status-indicator${isSolved ? " is-complete" : ""}`}>
                 <span className="minigame-status-dot" aria-hidden="true"></span>
-                {completion.isCompleted
-                  ? `Completed ${formatHistoryTimestamp(completion.completedAt)}`
+                {isCompleted
+                  ? `${isSolved ? "Completed" : "Revealed"} ${formatHistoryTimestamp(currentRecord.completedAt)}`
                   : "Not completed yet"}
               </span>
               <button type="button" className="minigame-status-button" onClick={handleHistoryToggle}>
@@ -917,11 +651,11 @@ export default function MinigamePage() {
             ) : error ? (
               <div className="minigame-error" role="alert">
                 <p>{error}</p>
-                <button type="button" onClick={loadDailyPokemon} className="minigame-button">
+                <button type="button" onClick={handleRetry} className="minigame-button">
                   Try Again
                 </button>
               </div>
-            ) : pokemon ? (
+            ) : (
               <div className="minigame-stage-content" aria-live="polite">
                 {hintList.length > 0 && (
                   <div className="minigame-stage-hints is-floating">
@@ -936,32 +670,23 @@ export default function MinigamePage() {
                     </div>
                   </div>
                 )}
-                {nameClueDisplay && (
+                {nameClueChars && nameClueChars.length > 0 && (
                   <div className="minigame-name-clue">
                     <span className="minigame-name-clue-title">Name</span>
                     <div className="minigame-name-clue-content">
-                      {nameClueDisplay.split("").map((char, index) => {
-                        const isUnderscore = char === "_";
-                        const isSpace = char === " ";
-                        return (
-                          <span
-                            key={index}
-                            className={`minigame-name-clue-char ${
-                              isUnderscore ? "is-underscore" : isSpace ? "is-space" : "is-letter"
-                            }`}
-                          >
-                            {char}
-                          </span>
-                        );
-                      })}
+                      {nameClueChars.map(({ char, kind }, index) => (
+                        <span key={index} className={`minigame-name-clue-char ${kind}`}>
+                          {char}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
                 <div className="minigame-stage-center">
                   <div className={spriteWrapperClassName}>
                     <SpriteImage
-                      id={pokemon.id}
-                      alt={showFinalReveal ? friendlyName : "Silhouette of a mystery Pokémon"}
+                      id={activePokemon.id}
+                      alt={showFinalReveal ? displayName : "Silhouette of a mystery Pokémon"}
                       className={spriteClassName}
                       variant="home"
                       width={256}
@@ -974,8 +699,6 @@ export default function MinigamePage() {
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="minigame-placeholder">No Pokémon available.</div>
             )}
           </div>
 
@@ -992,8 +715,8 @@ export default function MinigamePage() {
               <button
                 type="button"
                 className="minigame-nav-button"
-                onClick={handlePreviousDate}
-                disabled={!canGoPrevious}
+                onClick={() => loadGameForDate(previousDateKey)}
+                disabled={!previousDateKey}
                 aria-label="Previous date"
                 title="Previous date"
               >
@@ -1002,8 +725,8 @@ export default function MinigamePage() {
               <button
                 type="button"
                 className="minigame-nav-button"
-                onClick={handleNextDate}
-                disabled={!canGoNext}
+                onClick={() => loadGameForDate(nextDateKey)}
+                disabled={!nextDateKey}
                 aria-label="Next date"
                 title="Next date"
               >
@@ -1013,24 +736,24 @@ export default function MinigamePage() {
             <input
               className="minigame-guess-input"
               type="text"
-              placeholder={completion.isCompleted ? "Solved for today" : "Enter Pokémon name"}
+              placeholder={isCompleted ? (isSolved ? "Solved for today" : "Answer revealed") : "Enter Pokémon name"}
               value={guess}
               onChange={(event) => setGuess(event.target.value)}
               disabled={guessDisabled}
               aria-label="Guess the Pokémon"
             />
             <button type="submit" className="minigame-guess-button" disabled={guessDisabled}>
-              {completion.isCompleted ? "Solved" : "Submit Guess"}
+              {isCompleted ? (isSolved ? "Solved" : "Revealed") : "Submit Guess"}
             </button>
           </form>
 
-          {feedback && <div className={`minigame-feedback ${feedbackType}`}>{feedback}</div>}
+          {shownFeedback && <div className={`minigame-feedback ${shownFeedbackType}`}>{shownFeedback}</div>}
 
-          {!loading && !error && pokemon ? (
-             <>
-              {completion.isCompleted && (
+          {activePokemon ? (
+            <>
+              {isCompleted && (
                 <div className="minigame-success-summary">
-                  <span>{formatPerformanceSummary(solvedAtStep)}</span>
+                  <span>{formatOutcomeSummary(currentRecord)}</span>
                 </div>
               )}
 
@@ -1039,11 +762,11 @@ export default function MinigamePage() {
                   <div className="minigame-reveal-grid">
                     <div>
                       <span className="minigame-reveal-label">Height</span>
-                      <span className="minigame-reveal-value">{formatHeight(pokemon.height)}</span>
+                      <span className="minigame-reveal-value">{formatHeight(activePokemon.height)}</span>
                     </div>
                     <div>
                       <span className="minigame-reveal-label">Weight</span>
-                      <span className="minigame-reveal-value">{formatWeight(pokemon.weight)}</span>
+                      <span className="minigame-reveal-value">{formatWeight(activePokemon.weight)}</span>
                     </div>
                     <div>
                       <span className="minigame-reveal-label">Type</span>
@@ -1061,25 +784,28 @@ export default function MinigamePage() {
                 <section className="minigame-history" aria-live="polite">
                   <div className="minigame-history-header">
                     <h3>Game History</h3>
-                    <span className="minigame-history-count">{completedCount} of {totalHistory} completed</span>
+                    <span className="minigame-history-count">
+                      {solvedCount} of {totalHistory} solved
+                      {failedCount > 0 ? ` · ${failedCount} missed` : ""}
+                    </span>
                   </div>
                   {hasHistory ? (
                     <ul className="minigame-history-list">
                       {fullHistory.map((entry) => {
-                        const isCompleted = entry.isCompleted;
+                        const entryCompleted = entry.isCompleted;
                         const pokemonName = getHistoryPokemonName(entry);
-                        const completionColor = isCompleted ? getCompletionColor(entry.solvedAtStep) : null;
+                        const completionColor = entryCompleted ? getCompletionColor(entry) : null;
                         return (
-                          <li 
-                            key={entry.date} 
-                            className={`minigame-history-entry${!isCompleted ? " is-uncompleted" : ""}`}
+                          <li
+                            key={entry.date}
+                            className={`minigame-history-entry${!entryCompleted ? " is-uncompleted" : ""}`}
                             style={completionColor ? { backgroundColor: completionColor } : undefined}
                           >
                             <div className="minigame-history-entry-primary">
                               <span className="minigame-history-name">{pokemonName}</span>
                               <span className="minigame-history-date">{formatHistoryDate(entry.date)}</span>
                             </div>
-                            {isCompleted && (
+                            {entryCompleted && entry.pokemonId != null && (
                               <div className="minigame-history-entry-sprite">
                                 <SpriteImage
                                   id={entry.pokemonId}
@@ -1095,11 +821,11 @@ export default function MinigamePage() {
                               </div>
                             )}
                             <div className="minigame-history-entry-meta">
-                              {isCompleted && (
+                              {entryCompleted && entry.pokemonId != null && (
                                 <span className="minigame-history-id">ID #{entry.pokemonId}</span>
                               )}
-                              {isCompleted ? (
-                                <span className="minigame-history-time">{formatPerformanceSummary(entry.solvedAtStep)}</span>
+                              {entryCompleted ? (
+                                <span className="minigame-history-time">{formatOutcomeSummary(entry)}</span>
                               ) : (
                                 <>
                                   <span className="minigame-history-time">Not completed</span>
@@ -1130,5 +856,3 @@ export default function MinigamePage() {
     </div>
   );
 }
-
-

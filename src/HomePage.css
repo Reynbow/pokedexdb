@@ -301,7 +301,7 @@
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  text-transform: capitalize;
+  /* Names are already properly cased ("Jangmo-o", "Mr. Mime"); capitalize would alter them. */
   color: #f1f5f9;
   text-align: center;
   white-space: nowrap;
@@ -393,6 +393,13 @@
   .home-slot {
     width: 130px;
     height: 130px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* CategoryToggle is pinned to the bottom of the screen on mobile; keep the last row clear of it. */
+  .home-page {
+    padding-bottom: 96px;
   }
 }
 
