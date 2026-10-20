@@ -45,24 +45,6 @@ function SectionLink({ section, active, className, onNavigate, icon = null }) {
   );
 }
 
-/** The Pokédex lens mark: a big blue lens and three status lights, drawn as pixels. */
-function LensMark() {
-  return (
-    <svg className="wordmark__lens" viewBox="0 0 20 14" aria-hidden="true" focusable="false">
-      <rect x="2" y="0" width="8" height="1" fill="var(--ink)" />
-      <rect x="1" y="1" width="10" height="1" fill="var(--ink)" />
-      <rect x="0" y="2" width="12" height="8" fill="var(--ink)" />
-      <rect x="1" y="10" width="10" height="1" fill="var(--ink)" />
-      <rect x="2" y="11" width="8" height="1" fill="var(--ink)" />
-      <rect x="2" y="2" width="8" height="8" fill="var(--lens)" />
-      <rect x="1" y="3" width="10" height="6" fill="var(--lens)" />
-      <rect x="3" y="3" width="2" height="2" fill="#d6ebff" />
-      <rect x="14" y="1" width="2" height="2" fill="var(--red)" />
-      <rect x="17" y="1" width="2" height="2" fill="var(--warn)" />
-    </svg>
-  );
-}
-
 export default function SiteShell({ routeKey, children }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -108,7 +90,6 @@ export default function SiteShell({ routeKey, children }) {
               navigate(routeHref("pokemon"));
             }}
           >
-            <LensMark />
             <span className="wordmark__text">
               Pokédex<span className="wordmark__db">DB</span>
             </span>

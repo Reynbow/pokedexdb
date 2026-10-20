@@ -52,7 +52,7 @@ colors:
 typography:
   wordmark:
     fontFamily: "Pixelify Sans, DotGothic16, system-ui, sans-serif"
-    fontSize: "1.375rem"
+    fontSize: "1.625rem"
     fontWeight: 600
     lineHeight: 1
     letterSpacing: "0.02em"
@@ -101,7 +101,7 @@ typography:
     fontWeight: 600
   wordmark-plate:
     fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
-    fontSize: "0.875rem"
+    fontSize: "1rem"
     fontWeight: 800
     letterSpacing: "0.08em"
   body:
@@ -286,7 +286,7 @@ The palette is a cool blue-black screen with pale ink, plus a few rationed signa
 
 ### Secondary
 - **Pokédex Red** (red): the device red. It is used only for the "DB" plate in the wordmark and for red in-place stamps. **Red Wash** (red-wash) is its dark tint behind red marks.
-- **Lens Blue** (lens): the lens in the wordmark mark. It is not used in the UI.
+- **Lens Blue** (lens): a light accent blue, used only for pieces of the Who's That? celebration. It is not a UI colour.
 
 ### Tertiary
 - **Meter tiers** (meter-high blue, meter-mid amber, meter-low red): stat bars use exactly three tiers. High is blue, never green.
@@ -323,8 +323,8 @@ The palette is a cool blue-black screen with pale ink, plus a few rationed signa
 **Character:** DotGothic16 is a monospaced dot-matrix gothic that reads as a Game Boy screen. Its B/G, C/O and digits stay distinct at every size. The system sans next to it keeps names and prose quick to read.
 
 ### Hierarchy
-- **Wordmark** (Pixelify Sans 600, 1.375rem, line-height 1): the "Pokédex" wordmark only.
-- **Wordmark Plate** (UI sans 800, 0.875rem, 0.08em): the "DB" plate beside the wordmark, On-Type White on Pokédex Red, because the pixel B reads as an 8 at that size.
+- **Wordmark** (Pixelify Sans 600, 1.625rem, line-height 1): the "Pokédex" wordmark only. The wordmark is text alone, with no icon or mark beside it.
+- **Wordmark Plate** (UI sans 800, 1rem, 0.08em): the "DB" plate beside the wordmark, On-Type White on Pokédex Red, because the pixel B reads as an 8 at that size.
 - **Display** (DotGothic16 600, 2.25rem, 1.05; 1.75rem below 1180px, 1.375rem on phones): the entry's Pokémon name.
 - **Headline** (DotGothic16 500, 1.125rem, 0.04em): section heads such as the dex section title, followed by a single 1px Edge Strong rule that fills the line. The entry's dex number uses this size in Ink 3 (0.9375rem on phones). Tool page titles use the pixel face at 1.375rem.
 - **Title** (DotGothic16 500, 0.9375rem): window titles and sheet titles (uppercase, Ink 2), buttons, tabs and device-bar links.
@@ -335,7 +335,7 @@ The palette is a cool blue-black screen with pale ink, plus a few rationed signa
 - **Name** (UI sans 600, 0.9375rem): Pokémon, move, item and ability names in lists and cells.
 - **Body** (UI sans 400, 0.9375rem, 1.5): reading text, field input and meta lines.
 
-The scale steps are 0.75 / 0.8125 / 0.9375 / 1.125 / 1.375 / 1.75 / 2.25rem. Two fixed roles sit off the scale: Stamp at 0.6875rem and the Wordmark Plate at 0.875rem.
+The scale steps are 0.75 / 0.8125 / 0.9375 / 1.125 / 1.375 / 1.75 / 2.25rem. Fixed roles sit off the scale: Stamp at 0.6875rem, the Wordmark at 1.625rem and its plate at 1rem.
 
 ### Named Rules
 **The Pixel Voice, Sans Names Rule.** The device speaks in DotGothic16: numbers, headings, labels, tabs, buttons and dex text. Names and anything read as prose use the UI sans. Pixelify Sans was the first pixel face. It was demoted to the wordmark because its 5 reads as S and its B/C read as G/O.
