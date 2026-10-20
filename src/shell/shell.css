@@ -34,7 +34,7 @@
   z-index: var(--z-bar);
   height: var(--bar-h);
   background: var(--screen-0);
-  border-bottom: 2px solid var(--frame);
+  border-bottom: 1px solid var(--edge-strong);
   view-transition-name: devicebar;
 }
 
@@ -81,7 +81,7 @@
   font-weight: 800;
   background: var(--red);
   border-radius: var(--r-1);
-  color: #fff;
+  color: var(--on-type);
   font-size: 0.875rem;
   letter-spacing: 0.08em;
 }
@@ -98,8 +98,8 @@
   display: inline-flex;
   align-items: center;
   padding: 0 var(--s-3);
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   color: var(--ink-3);
   font-family: var(--font-pixel);
   font-size: var(--text-md);
@@ -142,7 +142,7 @@
   height: 18px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-1);
   color: var(--ink-3);
   font-family: var(--font-pixel);
@@ -273,7 +273,7 @@
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--screen-0);
-    border-top: 2px solid var(--frame);
+    border-top: 1px solid var(--edge-strong);
     view-transition-name: tabbar;
   }
   .tabbar__link {
@@ -286,8 +286,6 @@
     padding: 0;
     background: none;
     border: 0;
-    border-top: 3px solid transparent;
-    margin-top: -2px;
     color: var(--ink-3);
     font-family: var(--font-pixel);
     font-size: var(--text-xs);
@@ -307,5 +305,17 @@
 
   .shell__page {
     padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Slot a page can fill on phones (the open Pokédex entry puts "back to list" here) */
+.devicebar__slot {
+  display: none;
+}
+@media (max-width: 900px) {
+  .devicebar__slot:not(:empty) {
+    display: flex;
+    margin-left: calc(var(--s-2) * -1);
+    margin-right: calc(var(--s-3) * -1);
   }
 }

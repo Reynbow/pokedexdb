@@ -1,4 +1,5 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import SpriteImage from "./components/SpriteImage.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PokemonCard from "./components/PokemonCard.jsx";
@@ -1336,39 +1337,11 @@ function EvolutionDetailModal({ data, onClose, currentForm, pokemonName }) {
               <ul className="game-modal-game-options">
                 {evolutionRequirements.map((req, idx) => (
                   <li key={idx}>
-                    <div
-                      className="game-modal-method"
-                      style={{
-                        borderRadius: "12px",
-                        border: "1px solid rgba(148, 163, 184, 0.18)",
-                        background: "rgba(15, 23, 42, 0.55)",
-                        padding: "10px 12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      {req.icon && (
-                        <img
-                          src={req.icon}
-                          alt=""
-                          width={32}
-                          height={32}
-                          style={{
-                            imageRendering: "pixelated",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                            borderRadius: "6px",
-                            padding: "2px",
-                          }}
-                        />
-                      )}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
-                          {req.label}
-                        </div>
-                        <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-                          {req.value}
-                        </div>
+                    <div className="game-modal-method evo-req">
+                      {req.icon && <img className="evo-req__icon" src={req.icon} alt="" width={32} height={32} />}
+                      <div className="evo-req__text">
+                        <div className="evo-req__label">{req.label}</div>
+                        <div className="evo-req__value">{req.value}</div>
                       </div>
                     </div>
                   </li>
@@ -5199,6 +5172,11 @@ function DetailPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [prevEntry, nextEntry, onStep, onClose]);
 
+  const [barSlot, setBarSlot] = useState(null);
+  useEffect(() => {
+    setBarSlot(document.getElementById("devicebar-slot"));
+  }, []);
+
   // Swipe sideways on a phone to step, like the device's ◀ ▶
   const touchRef = useRef(null);
   const onTouchStart = (event) => {
@@ -5249,11 +5227,12 @@ function DetailPanel({
   );
 
   const renderStep = (entry, direction) => {
-    const Glyph = direction === "prev" ? "left" : "right";
+    const glyph = direction === "prev" ? "left" : "right";
+    const word = direction === "prev" ? "Previous" : "Next";
     if (!entry) {
       return (
-        <button type="button" className={`btn entry-step entry-step--${direction}`} disabled aria-label={direction === "prev" ? "No previous entry" : "No next entry"}>
-          <Icon name={Glyph} />
+        <button type="button" className="btn btn--icon entry-step" disabled aria-label={`No ${word.toLowerCase()} entry`}>
+          <Icon name={glyph} />
         </button>
       );
     }
@@ -5262,42 +5241,34 @@ function DetailPanel({
     return (
       <button
         type="button"
-        className={`btn entry-step entry-step--${direction}`}
+        className="btn btn--icon entry-step"
         onClick={() => onStep?.(entry)}
-        aria-label={`${direction === "prev" ? "Previous" : "Next"}: ${label}`}
-        title={`${direction === "prev" ? "Previous" : "Next"} (${direction === "prev" ? "←" : "→"})`}
+        aria-label={`${word}: ${label}`}
+        title={`${word}: ${number ? `${number} ` : ""}${label} (${direction === "prev" ? "←" : "→"})`}
       >
-        {direction === "prev" ? <Icon name="left" /> : null}
-        <span className="entry-step__text">
-          {number ? <span className="entry-step__no">{number}</span> : null}
-          <span className="entry-step__name">{label}</span>
-        </span>
-        {direction === "next" ? <Icon name="right" /> : null}
+        <Icon name={glyph} />
       </button>
     );
   };
 
-  return (
-    <article className="entry" aria-labelledby="entry-title" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <header className="entry-head">
+  // On phones the way back to the list sits in the device bar, so the entry spends no row on it
+  const backToList = barSlot
+    ? createPortal(
         <button
           type="button"
-          className="btn btn--quiet entry-head__back"
+          className="btn btn--quiet btn--icon devicebar__back"
           onClick={onClose}
           aria-label={`Back to the ${dexName || "Pokédex"}`}
         >
-          <Icon name="left" />
-          {(dexName || "Pokédex").replace(/ Pokédex$/, "") || "Pokédex"}
-        </button>
-        <div className="entry-head__step">
-          {renderStep(prevEntry, "prev")}
-          {renderStep(nextEntry, "next")}
-        </div>
-        <button type="button" className="btn btn--quiet btn--icon entry-head__close" onClick={onClose} aria-label="Close entry (Esc)" title="Close (Esc)">
-          <Icon name="close" />
-        </button>
-      </header>
+          <Icon name="left" className="icon--lg" />
+        </button>,
+        barSlot
+      )
+    : null;
 
+  return (
+    <article className="entry" aria-labelledby="entry-title" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {backToList}
       <div className="entry-top">
         <div className="entry-screen">
           <div className={`entry-screen__glass${animated ? " is-animated" : ""}`}>
@@ -5306,48 +5277,70 @@ function DetailPanel({
                 key={detailImg}
                 className={`entry-screen__art${isUnknownSprite ? " is-unknown" : ""}`}
                 src={detailImg}
-                alt={`${displayName}${shiny ? ", shiny colours" : ""}`}
+                alt={`${displayName}${shiny ? ", shiny colours" : ""}${hasGenderVariants ? (female ? ", female" : ", male") : ""}`}
                 onError={handleDetailArtError}
               />
             ) : (
               <span className="entry-screen__ghost skeleton" aria-hidden="true" />
             )}
-          </div>
-          <div className="entry-screen__controls">
-            <div className="seg" role="group" aria-label="Colours">
-              <button type="button" className="seg__btn" aria-pressed={!shiny} onClick={() => setShiny?.(false)}>
-                Normal
+            {/* Sprite keys live on the screen itself, like the device's view toggles */}
+            <div className="screen-keys" role="group" aria-label="Sprite view">
+              <button
+                type="button"
+                className="screen-key"
+                aria-pressed={shiny}
+                aria-label="Shiny colours"
+                title={shiny ? "Shiny colours: on" : "Shiny colours: off"}
+                onClick={() => setShiny?.((value) => !value)}
+              >
+                <Icon name="sparkle" />
               </button>
-              <button type="button" className="seg__btn" aria-pressed={shiny} onClick={() => setShiny?.(true)}>
-                <Icon name="sparkle" /> Shiny
+              <button
+                type="button"
+                className="screen-key"
+                aria-pressed={animated}
+                aria-label="Animated sprite"
+                title={animated ? "Animated sprite: on" : "Animated sprite: off"}
+                onClick={() => setAnimated?.((value) => !value)}
+              >
+                <Icon name="play" />
               </button>
-            </div>
-            <div className="seg" role="group" aria-label="Sprite style">
-              <button type="button" className="seg__btn" aria-pressed={!animated} onClick={() => setAnimated?.(false)}>
-                Art
-              </button>
-              <button type="button" className="seg__btn" aria-pressed={animated} onClick={() => setAnimated?.(true)}>
-                Animated
-              </button>
-            </div>
-            {hasGenderVariants ? (
-              <div className="seg" role="group" aria-label="Gender">
-                <button type="button" className="seg__btn" aria-pressed={!female} onClick={() => setFemale(false)}>
-                  Male
+              {hasGenderVariants ? (
+                <button
+                  type="button"
+                  className="screen-key"
+                  aria-pressed={female}
+                  aria-label="Female form"
+                  title={female ? "Showing the female form" : "Showing the male form"}
+                  onClick={() => setFemale((value) => !value)}
+                >
+                  <Icon name={female ? "female" : "male"} />
                 </button>
-                <button type="button" className="seg__btn" aria-pressed={female} onClick={() => setFemale(true)}>
-                  Female
-                </button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </div>
 
         <div className="entry-id">
-          <p className="entry-id__no">
-            {dexNoLabel}
-            {!inDex && selectedGame ? <span className="stamp stamp--red">Not in {dexName}</span> : null}
-          </p>
+          <div className="entry-id__top">
+            <p className="entry-id__no">
+              {dexNoLabel}
+              {!inDex && selectedGame ? <span className="stamp stamp--red">Not in {dexName}</span> : null}
+            </p>
+            <nav className="entry-nav" aria-label="Step through the Pokédex">
+              {renderStep(prevEntry, "prev")}
+              {renderStep(nextEntry, "next")}
+              <button
+                type="button"
+                className="btn btn--quiet btn--icon entry-nav__close"
+                onClick={onClose}
+                aria-label="Close entry (Esc)"
+                title="Close (Esc)"
+              >
+                <Icon name="close" />
+              </button>
+            </nav>
+          </div>
           <h1 className="entry-id__name" id="entry-title">
             {displayName}
           </h1>
@@ -6560,7 +6553,7 @@ function ItemOverlay({ itemName, onClose, pokemonAlias, generationHint }) {
                         ) : null}
                         <span className="text-capitalize">{humanizeName(it.name)}</span>
                       </div>
-                      <div style={{ color: "#cbd5f5", fontSize: "0.9rem" }}>
+                      <div className="nature-info-card-text">
                         {it.effect || it.flavor || "No description available."}
                       </div>
                     </li>

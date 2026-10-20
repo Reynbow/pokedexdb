@@ -27,20 +27,19 @@
 
 /* ---------------------------------------------------------------- Window */
 
-/* The double-ruled Game Boy window: a frame rule, a gap, a hairline. */
+/* A device panel: it sits on the screen by tone, with a faint edge rather than a frame. */
 .win {
   position: relative;
   background: var(--screen-1);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line);
 }
 
 /* Single rule for dense, repeated items */
 .win--plain {
   box-shadow: none;
   border-width: 1px;
-  border-color: var(--line);
+  border-color: var(--edge);
 }
 
 .win__head {
@@ -74,7 +73,7 @@
   min-height: 36px;
   padding: 0 var(--s-4);
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-2);
   color: var(--ink);
   font-family: var(--font-pixel);
@@ -89,7 +88,7 @@
 }
 .btn:hover {
   background: var(--screen-3);
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
   color: var(--ink);
 }
 .btn:active {
@@ -99,7 +98,7 @@
 .btn[aria-disabled="true"] {
   cursor: not-allowed;
   color: var(--ink-mute);
-  border-color: var(--line);
+  border-color: var(--edge);
   background: var(--screen-1);
   transform: none;
 }
@@ -122,7 +121,7 @@
 }
 .btn--quiet:hover {
   background: var(--screen-2);
-  border-color: var(--line);
+  border-color: var(--edge);
   color: var(--ink);
 }
 .btn--sm {
@@ -175,7 +174,7 @@
   min-height: 40px;
   padding: 0 var(--s-3);
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-2);
   color: var(--ink);
   font-family: var(--font-ui);
@@ -190,7 +189,7 @@
   opacity: 1;
 }
 .field__input:hover {
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 .field__input:focus {
   outline: none;
@@ -224,7 +223,7 @@ select.field__input {
   padding: 0 8px;
   background: var(--type);
   border-radius: var(--r-1);
-  color: #fff;
+  color: var(--on-type);
   font-family: var(--font-pixel);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -252,7 +251,7 @@ button.tag:hover {
 .tag--off {
   background: var(--screen-2);
   color: var(--ink-3);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--edge);
 }
 .tag--off:hover {
   color: var(--ink);
@@ -332,15 +331,15 @@ button.tag:hover {
 }
 .meter__track {
   position: relative;
-  height: 10px;
-  background: var(--screen-0);
-  border: 1px solid var(--frame);
-  border-radius: var(--r-1);
+  height: 8px;
+  background: var(--edge);
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 .meter__fill {
   display: block;
   height: 100%;
+  border-radius: inherit;
   width: calc(var(--pct, 0) * 1%);
   background: var(--meter-high);
   transition: width 420ms var(--ease-out);
@@ -359,9 +358,9 @@ button.tag:hover {
   position: relative;
   padding: var(--s-4) var(--s-5) var(--s-5);
   background: var(--screen-1);
-  border: 3px solid var(--ink-2);
+  border: 2px solid var(--edge-hover);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 3px var(--screen-1), inset 0 0 0 4px var(--frame);
+  box-shadow: inset 0 0 0 3px var(--screen-1), inset 0 0 0 4px var(--edge);
   font-family: var(--font-pixel);
   font-size: 1rem;
   line-height: 1.6;
@@ -436,7 +435,7 @@ button.tag:hover {
   padding: 2px;
   gap: 2px;
   background: var(--screen-0);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
 }
 .seg__btn {
@@ -486,16 +485,16 @@ button.tag:hover {
   position: fixed;
   z-index: var(--z-sheet);
   background: var(--screen-1);
-  border: 2px solid var(--frame-strong);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line), var(--shadow-pop);
+  box-shadow: var(--shadow-pop);
   color: var(--ink);
 }
 .scrim {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-sheet) - 1);
-  background: rgba(4, 6, 10, 0.7);
+  background: var(--scrim);
 }
 
 /* ---------------------------------------------------------------- Loading & empty */
@@ -551,7 +550,7 @@ button.tag:hover {
   justify-content: space-between;
   gap: var(--s-3);
   padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--edge);
 }
 .popsheet__title {
   margin: 0;
@@ -575,7 +574,7 @@ button.tag:hover {
   justify-content: space-between;
   gap: var(--s-3);
   padding: var(--s-3) var(--s-4);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .popsheet--bottom {
   left: 0;
@@ -626,6 +625,6 @@ button.tag:hover {
 .btn--primary:disabled,
 .btn--primary[aria-disabled="true"] {
   background: var(--screen-1);
-  border-color: var(--line);
+  border-color: var(--edge);
   color: var(--ink-mute);
 }

@@ -1,66 +1,10 @@
-/* The Pokédex entry: header with ◀ ▶ stepping, the sprite screen, the dex text box and its pages. */
+/* The Pokédex entry: the sprite screen, the identity with ◀ ▶ stepping, the dex text box and its pages. */
 
 .entry {
   display: grid;
-  gap: var(--s-4);
+  gap: var(--s-5);
   min-width: 0;
   padding-bottom: var(--s-6);
-}
-
-/* ---------------------------------------------------------------- Header */
-
-.entry-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  min-height: 44px;
-}
-.entry-head__back {
-  display: none;
-  padding-left: var(--s-2);
-}
-.entry-head__step {
-  display: flex;
-  flex: 1;
-  justify-content: space-between;
-  gap: var(--s-2);
-  min-width: 0;
-}
-.entry-head__close {
-  flex: none;
-}
-
-.entry-step {
-  flex: 0 1 15rem;
-  justify-content: flex-start;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0 var(--s-3);
-}
-.entry-step--next {
-  justify-content: flex-end;
-  text-align: right;
-}
-.entry-step:disabled {
-  flex: 0 0 44px;
-  justify-content: center;
-  padding: 0;
-}
-.entry-step__text {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-.entry-step__no {
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-}
-.entry-step__name {
-  overflow: hidden;
-  font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------- Screen + identity */
@@ -86,20 +30,17 @@
   margin: 0;
 }
 
-.entry-screen {
-  display: grid;
-  gap: var(--s-3);
-}
-/* The device's screen: a recessed panel inside the double-ruled frame */
+/* The device's screen: a recessed well the artwork sits in, with its view keys in the corner */
 .entry-screen__glass {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  padding: var(--s-4);
+  /* The bottom strip belongs to the view keys, so they never sit on the artwork */
+  padding: var(--s-4) var(--s-4) 54px;
   background: var(--screen-2);
-  border: 2px solid var(--frame);
-  border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 2px var(--screen-2), inset 0 0 0 3px var(--line), inset 0 6px 0 3px var(--screen-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-4);
 }
 .entry-screen__art {
   width: 100%;
@@ -119,16 +60,42 @@
   height: 60%;
   border-radius: var(--r-3);
 }
-.entry-screen__controls {
+
+.screen-keys {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--s-2);
+  gap: 4px;
+  padding: 3px;
+  background: var(--screen-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-2);
 }
-.entry-screen__controls .seg__btn .icon {
-  width: 12px;
-  height: 12px;
-  vertical-align: -1px;
+.screen-key {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-1);
+  color: var(--ink-3);
+  transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.screen-key:hover {
+  background: var(--screen-3);
+  color: var(--ink);
+}
+.screen-key[aria-pressed="true"] {
+  background: var(--select);
+  color: var(--select-ink);
+}
+.screen-key .icon {
+  width: 14px;
+  height: 14px;
 }
 
 .entry-id {
@@ -137,17 +104,38 @@
   gap: var(--s-2);
   min-width: 0;
 }
+/* Number on the left, ◀ ▶ × on the right: one line, no row of its own for stepping */
+.entry-id__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-width: 0;
+}
 .entry-id__no {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-2);
+  min-width: 0;
   margin: 0;
   color: var(--ink-3);
   font-family: var(--font-pixel);
   font-size: var(--text-lg);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+}
+.entry-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+.entry-step:disabled {
+  background: transparent;
+  border-color: transparent;
+}
+.entry-nav__close {
+  margin-left: var(--s-1);
 }
 .entry-id__name {
   margin: 0;
@@ -181,11 +169,10 @@
   margin: var(--s-1) 0 0;
 }
 
+/* Facts read as a list under the name, not another box */
 .entry-facts {
-  padding: var(--s-3) var(--s-4);
-  background: var(--screen-1);
-  border: 1px solid var(--line);
-  border-radius: var(--r-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--edge);
   grid-template-columns: max-content minmax(0, 1fr);
 }
 .entry-facts dd {
@@ -263,10 +250,10 @@
 /* ---------------------------------------------------------------- Pages */
 
 .entry-tabs {
-  border-bottom: 2px solid var(--frame);
+  border-bottom: 1px solid var(--edge-strong);
 }
 .entry-tabs .tab {
-  margin-bottom: -2px;
+  margin-bottom: -1px;
   min-height: 44px;
 }
 
@@ -312,7 +299,7 @@
   justify-content: space-between;
   gap: var(--s-3);
   padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .statbox__total {
   display: flex;
@@ -329,7 +316,6 @@
   gap: var(--s-3);
   padding: var(--s-3) var(--s-4) var(--s-4);
   background: var(--screen-1);
-  border: 1px solid var(--line);
   border-radius: var(--r-3);
 }
 .comp .label {
@@ -393,7 +379,7 @@
   padding: var(--s-4);
   overflow-x: auto;
   background: var(--screen-1);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--r-3);
   box-shadow: none;
 }
@@ -449,7 +435,7 @@
   place-items: center;
   padding: 2px;
   background: var(--screen-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
 }
 .evo .evo-tree-item {
@@ -475,7 +461,7 @@
   min-width: 92px;
   padding: var(--s-2) var(--s-2) var(--s-2);
   background: var(--screen-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-3);
   color: var(--ink);
   font-family: var(--font-ui);
@@ -486,7 +472,7 @@
 .evo .evo-tree-pokemon:hover,
 .evo .evo-tree-pokemon:focus-visible {
   background: var(--screen-3);
-  border-color: var(--frame);
+  border-color: var(--edge-hover);
   color: var(--ink);
 }
 .evo .evo-tree-pokemon.is-current,
@@ -531,12 +517,11 @@
 }
 .area-game {
   background: var(--screen-1);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-3);
 }
 .area-game--primary {
-  border: 2px solid var(--frame);
-  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line);
+  border: 1px solid var(--edge-strong);
 }
 .area-game__head {
   display: flex;
@@ -594,7 +579,7 @@ details[open] > summary .area-game__chevron {
   padding: var(--s-3) 0;
 }
 .area-method + .area-method {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .area-method__label {
   margin: 0;
@@ -628,7 +613,7 @@ details[open] > summary .area-game__chevron {
   margin: 0;
   padding: var(--s-3) var(--s-4);
   background: var(--screen-1);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-3);
   color: var(--ink-2);
 }
@@ -661,7 +646,7 @@ details[open] > summary .area-game__chevron {
   min-height: 40px;
   padding: 0 var(--s-3);
   background: var(--screen-1);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
 }
 .moves-set__name {
@@ -691,7 +676,7 @@ details[open] > summary .area-game__chevron {
 .moves-scroll {
   overflow-x: auto;
   background: var(--screen-1);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-3);
 }
 .moves {
@@ -704,7 +689,7 @@ details[open] > summary .area-game__chevron {
   top: 0;
   padding: var(--s-2) var(--s-3);
   background: var(--screen-2);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--edge);
   color: var(--ink-3);
   font-family: var(--font-pixel);
   font-size: var(--text-xs);
@@ -716,7 +701,7 @@ details[open] > summary .area-game__chevron {
 }
 .moves td {
   padding: 6px var(--s-3);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--edge);
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -775,46 +760,14 @@ details[open] > summary .area-game__chevron {
 
 @media (max-width: 900px) {
   .entry {
-    gap: var(--s-3);
-    padding-top: var(--s-2);
-  }
-  .entry-head {
-    position: sticky;
-    top: var(--bar-h);
-    z-index: calc(var(--z-bar) - 1);
-    margin: 0 calc(var(--s-4) * -1);
-    padding: var(--s-2) var(--s-4);
-    background: var(--screen-0);
-    border-bottom: 1px solid var(--line);
-  }
-  .entry-head__back {
-    display: inline-flex;
-    flex: none;
-    max-width: 40%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .entry-head__close {
-    display: none;
-  }
-  .entry-head__step {
-    justify-content: flex-end;
-  }
-  .entry-step {
-    flex: 0 0 44px;
-    justify-content: center;
-    padding: 0;
-  }
-  .entry-step__text {
-    display: none;
+    gap: var(--s-4);
+    padding-top: var(--s-3);
   }
 
   .entry-top {
     grid-template-columns: 132px minmax(0, 1fr);
-    gap: var(--s-3);
-  }
-  .entry-top {
     grid-template-rows: auto;
+    gap: var(--s-3);
   }
   .entry-screen {
     display: contents;
@@ -822,20 +775,34 @@ details[open] > summary .area-game__chevron {
   .entry-screen__glass {
     grid-column: 1;
     grid-row: 1;
-    padding: var(--s-2);
+    padding: var(--s-2) var(--s-2) 38px;
+    border-radius: var(--r-3);
   }
   .entry-id {
     grid-column: 2;
     grid-row: 1;
   }
-  .entry-screen__controls {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
-  }
   .entry-facts {
     grid-column: 1 / -1;
-    grid-row: 3;
+    grid-row: 2;
+  }
+  .screen-keys {
+    bottom: 5px;
+    gap: 2px;
+    padding: 2px;
+  }
+  .screen-key {
+    width: 26px;
+    height: 26px;
+  }
+  .screen-key .icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* The device bar carries "back to list" on phones; the entry keeps only ◀ ▶ */
+  .entry-nav__close {
+    display: none;
   }
   .entry-id__no {
     font-size: var(--text-md);
@@ -852,14 +819,12 @@ details[open] > summary .area-game__chevron {
   }
   .entry-tabs {
     position: sticky;
-    top: calc(var(--bar-h) + 61px);
+    top: var(--bar-h);
     z-index: calc(var(--z-bar) - 2);
+    gap: 0;
     margin: 0 calc(var(--s-4) * -1);
     padding: 0 var(--s-2);
     background: var(--screen-0);
-  }
-  .entry-tabs {
-    gap: 0;
   }
   .entry-tabs .tab {
     gap: 4px;
@@ -884,11 +849,4 @@ details[open] > summary .area-game__chevron {
     padding-left: var(--s-2);
     padding-right: var(--s-2);
   }
-}
-
-/* Step buttons carry names: the UI sans reads cleanly at this size */
-.entry-step__name {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  letter-spacing: 0;
 }

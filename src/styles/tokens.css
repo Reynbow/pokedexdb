@@ -35,6 +35,11 @@
   --frame: #44536a; /* window frame rule */
   --frame-strong: #8796ad; /* focused / emphasised frame */
 
+  /* Edges: panels separate by tone plus a faint edge, never a hard frame */
+  --edge: rgba(174, 184, 199, 0.09); /* panel and divider edge */
+  --edge-strong: rgba(174, 184, 199, 0.16); /* controls, fields, floating sheets */
+  --edge-hover: rgba(174, 184, 199, 0.32); /* hovered control edge */
+
   /* Screen ink */
   --ink: #e3e8f0; /* primary text */
   --ink-2: #aeb8c7; /* secondary text */
@@ -60,6 +65,8 @@
   --warn: #e3b341;
   --error: #ef6a5b;
   --info: #8cc4f0;
+  --on-type: #ffffff; /* text on type colours and the red plate */
+  --scrim: rgba(4, 6, 10, 0.72); /* behind sheets and popups on phones */
 
   /* Type colours: flat, white-text safe */
   --t-normal: #7a7650;
@@ -105,9 +112,11 @@
   --s-7: 48px;
 
   /* Shape */
-  --r-1: 2px;
-  --r-2: 4px;
-  --r-3: 6px;
+  --r-1: 3px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-4: 14px; /* large panels: the browse window, the sprite screen */
+  --r-pill: 999px; /* meter tracks */
 
   /* Layers */
   --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);

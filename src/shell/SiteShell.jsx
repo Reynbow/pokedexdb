@@ -97,6 +97,8 @@ export default function SiteShell({ routeKey, children }) {
       </a>
       <header className="devicebar">
         <div className="devicebar__inner">
+          {/* Pages can put a back control here on phones (the open Pokédex entry does) */}
+          <div className="devicebar__slot" id="devicebar-slot" />
           <a
             className="wordmark"
             href={routeHref("pokemon")}

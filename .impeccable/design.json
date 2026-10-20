@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-20T04:30:02.388Z",
+  "generatedAt": "2026-10-20T05:07:10.000Z",
   "title": "Design System: Pokedex DB",
   "extensions": {
     "colorMeta": {
@@ -64,19 +64,49 @@
           "#e3e8f0"
         ]
       },
-      "line": {
+      "edge": {
         "role": "neutral",
-        "displayName": "Hairline",
-        "canonical": "#2a3442",
+        "displayName": "Edge",
+        "canonical": "rgba(174, 184, 199, 0.09)",
         "tonalRamp": [
-          "#0b0e13",
-          "#121720",
-          "#18202b",
-          "#212b38",
-          "#2a3442",
-          "#44536a",
-          "#8796ad",
-          "#e3e8f0"
+          "rgba(174, 184, 199, 0.05)",
+          "rgba(174, 184, 199, 0.09)",
+          "rgba(174, 184, 199, 0.16)",
+          "rgba(174, 184, 199, 0.24)",
+          "rgba(174, 184, 199, 0.32)",
+          "rgba(174, 184, 199, 0.48)",
+          "rgba(174, 184, 199, 0.7)",
+          "rgba(174, 184, 199, 1)"
+        ]
+      },
+      "edge-strong": {
+        "role": "neutral",
+        "displayName": "Edge Strong",
+        "canonical": "rgba(174, 184, 199, 0.16)",
+        "tonalRamp": [
+          "rgba(174, 184, 199, 0.05)",
+          "rgba(174, 184, 199, 0.09)",
+          "rgba(174, 184, 199, 0.16)",
+          "rgba(174, 184, 199, 0.24)",
+          "rgba(174, 184, 199, 0.32)",
+          "rgba(174, 184, 199, 0.48)",
+          "rgba(174, 184, 199, 0.7)",
+          "rgba(174, 184, 199, 1)"
+        ]
+      },
+      "edge-hover": {
+        "role": "neutral",
+        "displayName": "Edge Hover",
+        "canonical": "rgba(174, 184, 199, 0.32)",
+        "tonalRamp": [
+          "rgba(174, 184, 199, 0.05)",
+          "rgba(174, 184, 199, 0.09)",
+          "rgba(174, 184, 199, 0.16)",
+          "rgba(174, 184, 199, 0.24)",
+          "rgba(174, 184, 199, 0.32)",
+          "rgba(174, 184, 199, 0.48)",
+          "rgba(174, 184, 199, 0.7)",
+          "rgba(174, 184, 199, 1)"
         ]
       },
       "frame": {
@@ -347,6 +377,36 @@
           "#71a8d3",
           "#96cefb",
           "#e0f1ff"
+        ]
+      },
+      "on-type": {
+        "role": "neutral",
+        "displayName": "On-Type White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#1f2329",
+          "#3b4048",
+          "#5a6069",
+          "#7b818a",
+          "#9da3ab",
+          "#c0c5cb",
+          "#e2e5e8",
+          "#ffffff"
+        ]
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Scrim",
+        "canonical": "rgba(4, 6, 10, 0.72)",
+        "tonalRamp": [
+          "rgba(4, 6, 10, 0.12)",
+          "rgba(4, 6, 10, 0.24)",
+          "rgba(4, 6, 10, 0.36)",
+          "rgba(4, 6, 10, 0.48)",
+          "rgba(4, 6, 10, 0.6)",
+          "rgba(4, 6, 10, 0.72)",
+          "rgba(4, 6, 10, 0.84)",
+          "rgba(4, 6, 10, 0.96)"
         ]
       },
       "t-normal": {
@@ -657,11 +717,11 @@
       },
       "display": {
         "displayName": "Display",
-        "purpose": "Entry Pokémon name (1.75rem on narrow screens)."
+        "purpose": "Entry Pokémon name (1.75rem below 1180px, 1.375rem on phones)."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Section heads, followed by a double rule filling the line."
+        "purpose": "Section heads, followed by a single 1px Edge Strong rule filling the line; also the entry dex number in Ink 3."
       },
       "title": {
         "displayName": "Title",
@@ -675,6 +735,10 @@
         "displayName": "Label",
         "purpose": "Uppercase key/value terms, meter and field labels in Ink 3."
       },
+      "stamp": {
+        "displayName": "Stamp",
+        "purpose": "In-place stamps and type tags in dense lists (dex cells and rows, move tables); 0.6875rem."
+      },
       "number": {
         "displayName": "Number",
         "purpose": "Dex numbers, stat values and counts; tabular, one face per figure."
@@ -682,6 +746,10 @@
       "name": {
         "displayName": "Name",
         "purpose": "Pokémon, move, item and ability names in the UI sans."
+      },
+      "wordmark-plate": {
+        "displayName": "Wordmark Plate",
+        "purpose": "The \"DB\" plate beside the wordmark, UI sans 800 on Pokédex Red, because the pixel B reads as an 8."
       },
       "body": {
         "displayName": "Body",
@@ -692,17 +760,12 @@
       {
         "name": "shadow-pop",
         "value": "0 10px 28px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4)",
-        "purpose": "Floating layers only: popover sheets and jump results."
-      },
-      {
-        "name": "window-rule",
-        "value": "inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line)",
-        "purpose": "Inner rule of the double-ruled window frame; structure, not elevation."
+        "purpose": "Floating layers only: popover sheets, modals, jump results and the back-to-top key."
       },
       {
         "name": "dialog-rule",
-        "value": "inset 0 0 0 3px var(--screen-1), inset 0 0 0 4px var(--frame)",
-        "purpose": "Inner rule of the dialog box under its 3px Ink 2 outer rule."
+        "value": "inset 0 0 0 3px var(--screen-1), inset 0 0 0 4px var(--edge)",
+        "purpose": "Inner rule of the dex-text dialog box under its 2px Edge Hover outer rule; the only double rule in the system."
       }
     ],
     "motion": [
@@ -765,9 +828,9 @@
       "name": "Button",
       "kind": "button",
       "refersTo": "button",
-      "description": "Default device key: framed, pixel face, Second Layer fill.",
+      "description": "Default device key: soft 6px corners, 1px Edge Strong, pixel face, Second Layer fill.",
       "html": "<button class=\"ds-btn\">Filters</button>",
-      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; background: var(--screen-2, #18202b); border: 2px solid var(--frame, #44536a); border-radius: 4px; color: var(--ink, #e3e8f0); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { background: var(--screen-3, #212b38); border-color: var(--frame-strong, #8796ad); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 6px; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); background: var(--screen-2, #18202b); border: 1px solid var(--edge-strong, rgba(174,184,199,0.16)); color: var(--ink, #e3e8f0); } .ds-btn:hover { background: var(--screen-3, #212b38); border-color: var(--edge-hover, rgba(174,184,199,0.32)); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
     },
     {
       "name": "Primary Button",
@@ -775,7 +838,7 @@
       "refersTo": "button-primary",
       "description": "The page's one main action: inverse ink, so blue stays selection-only.",
       "html": "<button class=\"ds-btn-primary\">Guess</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; background: var(--ink, #e3e8f0); border: 2px solid var(--ink, #e3e8f0); border-radius: 4px; color: var(--screen-0, #0b0e13); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { background: var(--screen-0, #0b0e13); color: var(--ink, #e3e8f0); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 6px; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); background: var(--ink, #e3e8f0); border: 1px solid var(--ink, #e3e8f0); color: var(--screen-0, #0b0e13); } .ds-btn-primary:hover { background: var(--screen-0, #0b0e13); color: var(--ink, #e3e8f0); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
     },
     {
       "name": "Selected Button",
@@ -783,31 +846,31 @@
       "refersTo": "button-select",
       "description": "Pressed / selected state (aria-pressed): Cursor Blue fill with Screen-Off Ink.",
       "html": "<button class=\"ds-btn-select\" aria-pressed=\"true\">Red / Blue</button>",
-      "css": ".ds-btn-select { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; background: var(--select, #62b2ff); border: 2px solid var(--select, #62b2ff); border-radius: 4px; color: var(--select-ink, #06101c); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; } .ds-btn-select:hover { border-color: var(--ink, #e3e8f0); } .ds-btn-select:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+      "css": ".ds-btn-select { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 6px; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); background: var(--select, #62b2ff); border: 1px solid var(--select, #62b2ff); color: var(--select-ink, #06101c); } .ds-btn-select:hover { border-color: var(--ink, #e3e8f0); } .ds-btn-select:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
     },
     {
       "name": "Quiet Button",
       "kind": "button",
       "refersTo": "button-quiet",
-      "description": "Frameless secondary control; gains a well on hover.",
+      "description": "Borderless secondary control; gains a Second Layer fill and an Edge on hover.",
       "html": "<button class=\"ds-btn-quiet\">Clear</button>",
-      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; background: transparent; border: 2px solid transparent; border-radius: 4px; color: var(--ink-2, #aeb8c7); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; line-height: 1; cursor: pointer; transition: background-color 120ms, border-color 120ms, color 120ms; } .ds-btn-quiet:hover { background: var(--screen-2, #18202b); border-color: var(--line, #2a3442); color: var(--ink, #e3e8f0); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 6px; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); background: transparent; border: 1px solid transparent; color: var(--ink-2, #aeb8c7); } .ds-btn-quiet:hover { background: var(--screen-2, #18202b); border-color: var(--edge, rgba(174,184,199,0.09)); color: var(--ink, #e3e8f0); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
     },
     {
       "name": "Search Field",
       "kind": "input",
       "refersTo": "field",
-      "description": "Framed field in the UI sans with a pixel search icon; focus turns the frame blue.",
+      "description": "Edged field in the UI sans with a pixel search icon; hover lights the edge, focus turns it Cursor Blue.",
       "html": "<label class=\"ds-field\"><svg class=\"ds-field-icon\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><path d=\"M3 0h4v1H3zM2 1h1v1H2zM7 1h1v1H7zM1 2h1v4H1zM8 2h1v4H8zM2 6h1v1H2zM7 6h1v1H7zM3 7h4v1H3zM8 7h1v1H8zM9 8h1v1H9zM10 9h1v1h-1zM11 10h1v1h-1z\"/></svg><input class=\"ds-field-input\" type=\"search\" placeholder=\"Name or number\"></label>",
-      "css": ".ds-field { position: relative; display: flex; align-items: center; width: 280px; } .ds-field-icon { position: absolute; left: 12px; width: 16px; height: 16px; fill: var(--ink-3, #8592a5); pointer-events: none; } .ds-field-input { width: 100%; min-height: 40px; padding: 0 12px 0 36px; background: var(--screen-2, #18202b); border: 2px solid var(--frame, #44536a); border-radius: 4px; color: var(--ink, #e3e8f0); font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-size: 0.9375rem; transition: border-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-field-input::placeholder { color: var(--ink-3, #8592a5); opacity: 1; } .ds-field-input:hover { border-color: var(--frame-strong, #8796ad); } .ds-field-input:focus { outline: none; border-color: var(--select, #62b2ff); }"
+      "css": ".ds-field { position: relative; display: flex; align-items: center; width: 280px; } .ds-field-icon { position: absolute; left: 12px; width: 16px; height: 16px; fill: var(--ink-3, #8592a5); pointer-events: none; } .ds-field-input { width: 100%; min-height: 40px; padding: 0 12px 0 36px; background: var(--screen-2, #18202b); border: 1px solid var(--edge-strong, rgba(174,184,199,0.16)); border-radius: 6px; color: var(--ink, #e3e8f0); font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-size: 0.9375rem; transition: border-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-field-input::placeholder { color: var(--ink-3, #8592a5); opacity: 1; } .ds-field-input:hover { border-color: var(--edge-hover, rgba(174,184,199,0.32)); } .ds-field-input:focus { outline: none; border-color: var(--select, #62b2ff); }"
     },
     {
       "name": "Device Bar Navigation",
       "kind": "nav",
       "refersTo": "device-bar",
-      "description": "56px device bar: pixel section links, current link underlined in Cursor Blue.",
+      "description": "56px device bar on a 1px Edge Strong rule: pixel section links, current link underlined 2px in Cursor Blue.",
       "html": "<nav class=\"ds-bar\"><a class=\"ds-bar-link\" aria-current=\"page\" href=\"#\">Pokédex</a><a class=\"ds-bar-link\" href=\"#\">Moves</a><a class=\"ds-bar-link\" href=\"#\">Abilities</a><a class=\"ds-bar-link\" href=\"#\">Items</a></nav>",
-      "css": ".ds-bar { display: flex; align-items: stretch; gap: 2px; height: 56px; padding: 0 24px; background: var(--screen-0, #0b0e13); border-bottom: 2px solid var(--frame, #44536a); } .ds-bar-link { display: inline-flex; align-items: center; padding: 0 12px; margin-bottom: -2px; border-bottom: 3px solid transparent; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; letter-spacing: 0.03em; text-decoration: none; } .ds-bar-link:hover { color: var(--ink, #e3e8f0); } .ds-bar-link[aria-current=\"page\"] { color: var(--ink, #e3e8f0); border-bottom-color: var(--select, #62b2ff); } .ds-bar-link:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: -2px; }"
+      "css": ".ds-bar { display: flex; align-items: stretch; gap: 2px; height: 56px; padding: 0 24px; background: var(--screen-0, #0b0e13); border-bottom: 1px solid var(--edge-strong, rgba(174,184,199,0.16)); } .ds-bar-link { display: inline-flex; align-items: center; padding: 0 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; letter-spacing: 0.03em; text-decoration: none; } .ds-bar-link:hover { color: var(--ink, #e3e8f0); } .ds-bar-link[aria-current=\"page\"] { color: var(--ink, #e3e8f0); border-bottom-color: var(--select, #62b2ff); } .ds-bar-link:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: -2px; }"
     },
     {
       "name": "Tabs with Cursor",
@@ -815,7 +878,7 @@
       "refersTo": "tab-current",
       "description": "Entry tabs: the selected tab shows the drawn ▶ cursor and a blue underline.",
       "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\"><svg class=\"ds-cursor\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>Stats</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\"><svg class=\"ds-cursor\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>Matchups</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\"><svg class=\"ds-cursor\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>Evolution</button></div>",
-      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line, #2a3442); } .ds-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; cursor: pointer; } .ds-tab:hover { color: var(--ink, #e3e8f0); } .ds-tab[aria-selected=\"true\"] { color: var(--ink, #e3e8f0); border-bottom-color: var(--select, #62b2ff); } .ds-cursor { width: 8px; height: 10px; fill: var(--select, #62b2ff); shape-rendering: crispEdges; visibility: hidden; } .ds-tab[aria-selected=\"true\"] .ds-cursor { visibility: visible; } .ds-tab:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--edge-strong, rgba(174,184,199,0.16)); } .ds-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; cursor: pointer; } .ds-tab:hover { color: var(--ink, #e3e8f0); } .ds-tab[aria-selected=\"true\"] { color: var(--ink, #e3e8f0); border-bottom-color: var(--select, #62b2ff); } .ds-cursor { width: 8px; height: 10px; fill: var(--select, #62b2ff); shape-rendering: crispEdges; visibility: hidden; } .ds-tab[aria-selected=\"true\"] .ds-cursor { visibility: visible; } .ds-tab:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; }"
     },
     {
       "name": "Type Tags and Stamps",
@@ -823,39 +886,55 @@
       "refersTo": "type-tag",
       "description": "Flat type-colour tags (data) and outlined in-place stamps.",
       "html": "<div class=\"ds-tags\"><span class=\"ds-tag\" style=\"--type:#b24a1e\">Fire</span><span class=\"ds-tag\" style=\"--type:#5f56ad\">Flying</span><span class=\"ds-stamp\">Mega</span><span class=\"ds-stamp ds-stamp-red\">Not in this game</span></div>",
-      "css": ".ds-tags { display: flex; align-items: center; gap: 6px; } .ds-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: var(--type, #505a68); border-radius: 2px; color: #fff; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-stamp { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid currentColor; border-radius: 2px; color: var(--ink-2, #aeb8c7); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-stamp-red { color: var(--red, #e5483a); }"
+      "css": ".ds-tags { display: flex; align-items: center; gap: 6px; } .ds-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: var(--type, #505a68); border-radius: 3px; color: var(--on-type, #ffffff); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-stamp { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid currentColor; border-radius: 3px; color: var(--ink-2, #aeb8c7); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-stamp-red { color: var(--red, #e5483a); }"
     },
     {
-      "name": "Dex Cell in Window",
+      "name": "Dex Cell in Panel",
       "kind": "card",
       "refersTo": "dex-cell-selected",
-      "description": "Double-ruled window holding hairline-ruled dex cells; hover/focus/selected inverts to Cursor Blue with the ▶ cursor.",
+      "description": "The browse panel (Window Fill, 1px Edge, 14px corners) holding edge-ruled dex cells; hover/focus/selected inverts to Cursor Blue with the ▶ cursor.",
       "html": "<div class=\"ds-win\"><ul class=\"ds-grid\"><li><a class=\"ds-mon\" href=\"#\"><span class=\"ds-mon-no\"><svg class=\"ds-mon-cur\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>No. 0004</span><span class=\"ds-mon-name\">Charmander</span><span class=\"ds-mon-tag\">Fire</span></a></li><li><a class=\"ds-mon ds-is-selected\" href=\"#\"><span class=\"ds-mon-no\"><svg class=\"ds-mon-cur\" viewBox=\"0 0 8 10\" aria-hidden=\"true\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"10\"/><rect x=\"2\" y=\"1\" width=\"2\" height=\"8\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"6\"/><rect x=\"6\" y=\"3\" width=\"2\" height=\"4\"/></svg>No. 0006</span><span class=\"ds-mon-name\">Charizard</span><span class=\"ds-mon-tag\">Fire</span></a></li></ul></div>",
-      "css": ".ds-win { background: var(--screen-1, #121720); border: 2px solid var(--frame, #44536a); border-radius: 6px; box-shadow: inset 0 0 0 2px var(--screen-1, #121720), inset 0 0 0 3px var(--line, #2a3442); padding: 3px; width: 340px; } .ds-grid { display: grid; grid-template-columns: repeat(2, 1fr); margin: 0; padding: 0; list-style: none; } .ds-mon { display: grid; justify-items: center; gap: 8px; padding: 12px; color: var(--ink, #e3e8f0); text-decoration: none; box-shadow: inset -1px -1px 0 var(--line, #2a3442); } .ds-mon-no { justify-self: start; display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; font-variant-numeric: tabular-nums; } .ds-mon-cur { width: 8px; height: 10px; fill: currentColor; shape-rendering: crispEdges; visibility: hidden; } .ds-mon-name { font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-weight: 600; font-size: 0.9375rem; } .ds-mon-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: #b24a1e; border-radius: 2px; color: #fff; font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; text-transform: uppercase; } .ds-mon:hover, .ds-mon:focus-visible, .ds-mon.ds-is-selected { background: var(--select, #62b2ff); color: var(--select-ink, #06101c); outline: none; } .ds-mon:hover .ds-mon-no, .ds-mon:focus-visible .ds-mon-no, .ds-mon.ds-is-selected .ds-mon-no { color: var(--select-ink, #06101c); } .ds-mon:hover .ds-mon-cur, .ds-mon:focus-visible .ds-mon-cur, .ds-mon.ds-is-selected .ds-mon-cur { visibility: visible; }"
+      "css": ".ds-win { background: var(--screen-1, #121720); border: 1px solid var(--edge, rgba(174,184,199,0.09)); border-radius: 14px; overflow: hidden; width: 340px; } .ds-grid { display: grid; grid-template-columns: repeat(2, 1fr); margin: 0; padding: 0; list-style: none; } .ds-mon { display: grid; justify-items: center; gap: 8px; padding: 12px; color: var(--ink, #e3e8f0); text-decoration: none; box-shadow: inset -1px -1px 0 var(--edge, rgba(174,184,199,0.09)); } .ds-mon-no { justify-self: start; display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; font-variant-numeric: tabular-nums; } .ds-mon-cur { width: 8px; height: 10px; fill: currentColor; shape-rendering: crispEdges; visibility: hidden; } .ds-mon-name { font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-weight: 600; font-size: 0.9375rem; } .ds-mon-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; background: #b24a1e; border-radius: 3px; color: var(--on-type, #ffffff); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.75rem; text-transform: uppercase; } .ds-mon:hover, .ds-mon:focus-visible, .ds-mon.ds-is-selected { background: var(--select, #62b2ff); color: var(--select-ink, #06101c); outline: none; } .ds-mon:hover .ds-mon-no, .ds-mon:focus-visible .ds-mon-no, .ds-mon.ds-is-selected .ds-mon-no { color: var(--select-ink, #06101c); } .ds-mon:hover .ds-mon-cur, .ds-mon:focus-visible .ds-mon-cur, .ds-mon.ds-is-selected .ds-mon-cur { visibility: visible; }"
     },
     {
       "name": "Dex Dialog Box",
       "kind": "custom",
       "refersTo": "dialog",
-      "description": "The Game Boy text box: dex text types in, then the ▼ prompt blinks.",
+      "description": "The Game Boy text box and the only double-ruled element: 2px Edge Hover, 3px gap, 1px Edge, 10px corners. Dex text types in, then the ▼ prompt blinks.",
       "html": "<div class=\"ds-dialog\"><p class=\"ds-dialog-text\">It spits fire that is hot enough to melt boulders.</p><span class=\"ds-dialog-caret\" aria-hidden=\"true\">▼</span></div>",
-      "css": ".ds-dialog { position: relative; max-width: 520px; padding: 16px 24px 24px; background: var(--screen-1, #121720); border: 3px solid var(--ink-2, #aeb8c7); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--screen-1, #121720), inset 0 0 0 4px var(--frame, #44536a); color: var(--ink, #e3e8f0); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 1rem; line-height: 1.6; letter-spacing: 0; } .ds-dialog-text { margin: 0; min-height: 3.2em; max-width: 62ch; } .ds-dialog-caret { position: absolute; right: 14px; bottom: 10px; color: var(--ink-2, #aeb8c7); animation: ds-blink 900ms steps(1) infinite; } @keyframes ds-blink { 50% { opacity: 0; } }"
+      "css": ".ds-dialog { position: relative; max-width: 520px; padding: 16px 24px 24px; background: var(--screen-1, #121720); border: 2px solid var(--edge-hover, rgba(174,184,199,0.32)); border-radius: 10px; box-shadow: inset 0 0 0 3px var(--screen-1, #121720), inset 0 0 0 4px var(--edge, rgba(174,184,199,0.09)); color: var(--ink, #e3e8f0); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 1rem; line-height: 1.6; letter-spacing: 0; } .ds-dialog-text { margin: 0; min-height: 3.2em; max-width: 62ch; } .ds-dialog-caret { position: absolute; right: 14px; bottom: 10px; color: var(--ink-2, #aeb8c7); animation: ds-blink 900ms steps(1) infinite; } @keyframes ds-blink { 50% { opacity: 0; } }"
     },
     {
       "name": "Stat Meter",
       "kind": "custom",
-      "refersTo": "",
-      "description": "Three-tier stat meter: blue high, amber mid, red low; never green.",
+      "refersTo": "meter-track",
+      "description": "Three-tier stat meter on an 8px pill track in Edge: blue high, amber mid, red low; never green.",
       "html": "<div class=\"ds-meters\"><div class=\"ds-meter\"><span class=\"ds-meter-label\">Sp. Atk</span><span class=\"ds-meter-value\">109</span><span class=\"ds-meter-track\"><span class=\"ds-meter-fill\" style=\"width:64%\"></span></span></div><div class=\"ds-meter ds-meter-mid\"><span class=\"ds-meter-label\">HP</span><span class=\"ds-meter-value\">78</span><span class=\"ds-meter-track\"><span class=\"ds-meter-fill\" style=\"width:42%\"></span></span></div><div class=\"ds-meter ds-meter-low\"><span class=\"ds-meter-label\">Def</span><span class=\"ds-meter-value\">43</span><span class=\"ds-meter-track\"><span class=\"ds-meter-fill\" style=\"width:22%\"></span></span></div></div>",
-      "css": ".ds-meters { display: grid; gap: 8px; width: 360px; } .ds-meter { display: grid; grid-template-columns: 5.5rem 2.75rem 1fr; align-items: center; gap: 12px; } .ds-meter-label { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.8125rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-3, #8592a5); } .ds-meter-value { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink, #e3e8f0); } .ds-meter-track { height: 10px; background: var(--screen-0, #0b0e13); border: 1px solid var(--frame, #44536a); border-radius: 2px; overflow: hidden; } .ds-meter-fill { display: block; height: 100%; background: var(--meter-high, #62b2ff); transition: width 420ms cubic-bezier(0.16,1,0.3,1); } .ds-meter-mid .ds-meter-fill { background: var(--meter-mid, #e3b341); } .ds-meter-low .ds-meter-fill { background: var(--meter-low, #e0503f); }"
+      "css": ".ds-meters { display: grid; gap: 8px; width: 360px; } .ds-meter { display: grid; grid-template-columns: 5.5rem 2.75rem 1fr; align-items: center; gap: 12px; } .ds-meter-label { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.8125rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-3, #8592a5); } .ds-meter-value { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.9375rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink, #e3e8f0); } .ds-meter-track { height: 8px; background: var(--edge, rgba(174,184,199,0.09)); border-radius: 999px; overflow: hidden; } .ds-meter-fill { display: block; height: 100%; border-radius: inherit; background: var(--meter-high, #62b2ff); transition: width 420ms cubic-bezier(0.16,1,0.3,1); } .ds-meter-mid .ds-meter-fill { background: var(--meter-mid, #e3b341); } .ds-meter-low .ds-meter-fill { background: var(--meter-low, #e0503f); }"
+    },
+    {
+      "name": "Entry Header",
+      "kind": "custom",
+      "refersTo": "entry-step",
+      "description": "Dex number and ◀ ▶ × on one line at the top of the identity block; neighbour names live in the step labels and tooltips. No row of its own.",
+      "html": "<div class=\"ds-eid\"><div class=\"ds-eid-top\"><p class=\"ds-eid-no\">No. 0006</p><nav class=\"ds-eid-nav\" aria-label=\"Step through the Pokédex\"><button class=\"ds-step\" aria-label=\"Previous: Charmeleon\" title=\"Previous: No.0005 Charmeleon (←)\"><svg class=\"ds-ico\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><rect x=\"6\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"10\" width=\"1\" height=\"1\"/></svg></button><button class=\"ds-step\" aria-label=\"Next: Squirtle\" title=\"Next: No.0007 Squirtle (→)\"><svg class=\"ds-ico\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><rect x=\"4\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"10\" width=\"1\" height=\"1\"/></svg></button><button class=\"ds-step ds-step-quiet\" aria-label=\"Close entry (Esc)\" title=\"Close (Esc)\"><svg class=\"ds-ico\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><rect x=\"1\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"9\" width=\"1\" height=\"1\"/></svg></button></nav></div><h1 class=\"ds-eid-name\">Charizard</h1><p class=\"ds-eid-genus\">Flame Pokémon</p><dl class=\"ds-facts\"><dt>Height</dt><dd>1.7 m</dd><dt>Weight</dt><dd>90.5 kg</dd></dl></div>",
+      "css": ".ds-eid { display: grid; gap: 8px; width: 420px; } .ds-eid-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .ds-eid-no { margin: 0; color: var(--ink-3, #8592a5); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 1.125rem; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; } .ds-eid-nav { display: flex; align-items: center; gap: 4px; } .ds-step { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; background: var(--screen-2, #18202b); border: 1px solid var(--edge-strong, rgba(174,184,199,0.16)); border-radius: 6px; color: var(--ink, #e3e8f0); cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-step:hover { background: var(--screen-3, #212b38); border-color: var(--edge-hover, rgba(174,184,199,0.32)); } .ds-step:active { transform: translateY(1px); } .ds-step:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; } .ds-step-quiet { margin-left: 4px; background: transparent; border-color: transparent; color: var(--ink-2, #aeb8c7); } .ds-step-quiet:hover { background: var(--screen-2, #18202b); border-color: var(--edge, rgba(174,184,199,0.09)); color: var(--ink, #e3e8f0); } .ds-ico { width: 16px; height: 16px; fill: currentColor; } .ds-eid-name { margin: 0; color: var(--ink, #e3e8f0); font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 2.25rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1.05; } .ds-eid-genus { margin: 0; color: var(--ink-2, #aeb8c7); font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-size: 0.9375rem; } .ds-facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--edge, rgba(174,184,199,0.09)); } .ds-facts dt { font-family: \"DotGothic16\", system-ui, sans-serif; font-size: 0.8125rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-3, #8592a5); } .ds-facts dd { margin: 0; color: var(--ink, #e3e8f0); font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; font-size: 0.9375rem; }"
+    },
+    {
+      "name": "Sprite Screen Keys",
+      "kind": "custom",
+      "refersTo": "screen-key-pressed",
+      "description": "View toggles on the sprite screen itself: a Window Fill tray in a reserved bottom strip holding sparkle (shiny), play (animated) and ♂/♀ (gender) keys; pressed is Cursor Blue.",
+      "html": "<div class=\"ds-screen\"><span class=\"ds-screen-art\" aria-hidden=\"true\"></span><div class=\"ds-keys\" role=\"group\" aria-label=\"Sprite view\"><button class=\"ds-key\" aria-pressed=\"true\" aria-label=\"Shiny colours\"><svg class=\"ds-ico\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><rect x=\"5\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"10\" width=\"1\" height=\"1\"/></svg></button><button class=\"ds-key\" aria-pressed=\"false\" aria-label=\"Animated sprite\"><svg class=\"ds-ico\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><rect x=\"2\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"10\" width=\"1\" height=\"1\"/></svg></button><button class=\"ds-key\" aria-pressed=\"false\" aria-label=\"Female form\"><svg class=\"ds-ico\" viewBox=\"0 0 12 12\" shape-rendering=\"crispEdges\" aria-hidden=\"true\"><rect x=\"7\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"10\" width=\"1\" height=\"1\"/></svg></button></div></div>",
+      "css": ".ds-screen { position: relative; display: grid; place-items: center; width: 260px; aspect-ratio: 1; padding: 16px 16px 54px; background: var(--screen-2, #18202b); border: 1px solid var(--edge, rgba(174,184,199,0.09)); border-radius: 14px; } .ds-screen-art { width: 60%; height: 60%; border-radius: 10px; background: var(--screen-3, #212b38); } .ds-keys { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 4px; padding: 3px; background: var(--screen-1, #121720); border: 1px solid var(--edge, rgba(174,184,199,0.09)); border-radius: 6px; } .ds-key { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; background: transparent; border: 0; border-radius: 3px; color: var(--ink-3, #8592a5); cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-key:hover { background: var(--screen-3, #212b38); color: var(--ink, #e3e8f0); } .ds-key[aria-pressed=\"true\"] { background: var(--select, #62b2ff); color: var(--select-ink, #06101c); } .ds-key:focus-visible { outline: 2px solid var(--select, #62b2ff); outline-offset: 2px; } .ds-key .ds-ico { width: 14px; height: 14px; fill: currentColor; }"
     }
   ],
   "narrative": {
     "northStar": "The Pokédex Device",
-    "overview": "The site is the in-game Pokédex, rebuilt for today. It is a numbered list and a live entry page that always show the chosen game. It is not a dashboard of sprite cards under a wall of filter chips. Everything sits on a dark, cool slate screen. Content lives inside double-ruled Game Boy windows. Selection works like the device menu: a drawn ▶ cursor and inverse video. A dot-matrix pixel face carries the device's voice: numbers, headings, labels, tabs, buttons and the dex text. A plain system sans carries names and reading text, so a lookup made on a phone in a few seconds stays legible.\n\nDensity is high but ordered. The browse Pokédex is one window whose cells are split by hairline rules. With an entry open, the grid becomes a 336px numbered list beside the entry page. On phones, cells become numbered rows and a bottom tab bar holds the sections. Motion is short and functional, with one signature moment: the dex text types itself into a dialog box, a ▼ prompt blinks, and ◀ ▶ (arrow keys or a swipe) steps to the neighbouring entry.\n\nThe world is dark only, in slate greys and blues. Green never appears in the chrome. Fills are flat: no gradients, glows or glass.",
+    "overview": "The site is the in-game Pokédex, rebuilt for today. It is a numbered list and a live entry page that always show the chosen game. It is not a dashboard of sprite cards under a wall of filter chips. Everything sits on a dark, cool slate screen. Content sits in soft-cornered panels that step up from the screen by tone, with only a faint 1px edge; the Game Boy double rule survives on one element, the dex-text dialog box. Selection works like the device menu: a drawn ▶ cursor and inverse video. A dot-matrix pixel face carries the device's voice: numbers, headings, labels, tabs, buttons and the dex text. A plain system sans carries names and reading text, so a lookup made on a phone in a few seconds stays legible.\n\nDensity is high but ordered. The browse Pokédex is one panel whose cells are split by faint edge rules. With an entry open, the grid becomes a 336px numbered list beside the entry page. On phones, cells become numbered rows and a bottom tab bar holds the sections. Small controls never spend a row of their own: ◀ ▶ and × sit on the entry's number line, and the sprite view keys sit on the sprite screen. Motion is short and functional, with one signature moment: the dex text types itself into a dialog box, a ▼ prompt blinks, and ◀ ▶ (arrow keys or a swipe) steps to the neighbouring entry.\n\nThe world is dark only, in slate greys and blues. Green never appears in the chrome. Fills are flat: no gradients, glows or glass.",
     "keyCharacteristics": [
       "Dark slate screen ramp as the only neutrals; one bright blue for selection and nothing else.",
-      "Double-ruled window frames (frame rule, gap, hairline) for every major container.",
+      "Panels separate by tone with a faint 1px edge and soft corners; the dex-text dialog box is the only double-ruled element.",
       "Inverse-video selection with a drawn ▶ cursor, on dex cells, tabs, menu rows and the phone tab bar.",
       "DotGothic16 for the device voice, system sans for names and prose, Pixelify Sans for the wordmark only.",
       "Pixel icons drawn on a 12×12 grid with crisp edges, in one stroke weight.",
@@ -899,25 +978,33 @@
       },
       {
         "name": "The Flat Screen Rule",
-        "body": "Fills are flat. No gradients, glows, blurs or glass. A surface rises by changing tone and frame, and floats only when it is a popover.",
+        "body": "Fills are flat. No gradients, glows, blurs or glass. A surface rises by changing tone and edge, and floats only when it is a popover.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Quiet Edge Rule",
+        "body": "Panels separate by tone first and a 1px Edge second. No container or control takes a 2px frame or an inset double rule; the dex-text dialog box is the one double-ruled element.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do put every major container in a double-ruled window (2px Frame Rule, inset hairline, 6px corners).",
+      "Do set panels apart by tone plus a faint 1px Edge, at 10px corners (14px for the browse window, the 336px list and the sprite screen).",
       "Do show selection as inverse video in Cursor Blue (#62b2ff) with Screen-Off Ink, plus the ▶ cursor where the item is a list or tab.",
       "Do set numbers, headings, labels, tabs, buttons and dex text in DotGothic16, and names and reading text in the UI sans.",
       "Do keep tabular figures and keep each number in one face.",
       "Do keep the chosen game visible as the context on every Pokédex view.",
       "Do mark status in place with a stamp rather than hiding the item.",
       "Do use three meter tiers, blue / amber / red.",
-      "Do draw new icons on the 12×12 pixel grid with crisp edges."
+      "Do draw new icons on the 12×12 pixel grid with crisp edges.",
+      "Do put small controls where their subject lives: stepping and close on the entry's number line, sprite view keys on the sprite screen."
     ],
     "donts": [
       "Don't use green anywhere in the chrome. Type colours on type tags are the only exception.",
       "Don't use Cursor Blue for anything that isn't selection, current or focus. That includes the main action, which is inverse ink.",
       "Don't use Pokédex Red as a button or accent colour. It belongs to the wordmark and stamps.",
       "Don't add gradients, glows, blurs or glass, or cast shadows on anything that doesn't float.",
+      "Don't frame containers or controls with a 2px rule or an inset double rule. The dex-text dialog box is the only double-ruled element.",
+      "Don't give a few small toggles or step keys a row of their own.",
       "Don't use Pixelify Sans outside the wordmark.",
       "Don't track pixel text beyond 0.04em.",
       "Don't set form fields below 16px on touch screens.",

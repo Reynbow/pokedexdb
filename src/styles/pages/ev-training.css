@@ -118,8 +118,8 @@
   content: "";
   flex: 1;
   height: 2px;
-  border-top: 2px solid var(--frame);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--edge-strong);
+  border-bottom: 1px solid var(--edge);
   box-sizing: content-box;
 }
 
@@ -133,14 +133,14 @@
   width: 100%;
   padding: 0;
   background: var(--screen-0);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
   overflow: hidden;
   cursor: zoom-in;
   transition: border-color var(--dur-1) var(--ease-out);
 }
 .evt-map__open:hover {
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 .evt-map__img {
   display: block;
@@ -158,13 +158,13 @@
   width: 28px;
   height: 28px;
   background: var(--screen-0);
-  border: 1px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-1);
   color: var(--ink-2);
 }
 .evt-map__open:hover .evt-map__zoom {
   color: var(--ink);
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 .evt-map__chip {
   display: inline-flex;
@@ -172,7 +172,7 @@
   min-height: 24px;
   padding: 3px 8px;
   background: var(--screen-0);
-  border: 1px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-1);
   color: var(--ink);
   font-family: var(--font-pixel);
@@ -211,7 +211,7 @@
   padding: var(--s-3) 0;
 }
 .evt-target + .evt-target {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .evt-target__yield {
   display: grid;
@@ -349,7 +349,7 @@
   cursor: pointer;
 }
 .evt-meter__slider:hover .meter__track {
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 .evt-meter__slider:has(.evt-meter__input:focus-visible) .meter__track {
   outline: 2px solid var(--select);
@@ -367,7 +367,7 @@
 .evt-meter--total {
   margin: var(--s-2) 0 var(--s-3);
   padding-top: var(--s-2);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .evt-meter--total .meter__label {
   padding-left: 14px; /* lines up with the stat names after the cursor column */
@@ -384,7 +384,7 @@
 }
 .evt-items__group + .evt-items__group {
   padding-top: var(--s-4);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .evt-items__title {
   margin: 0 0 var(--s-1);
@@ -448,7 +448,7 @@
   padding: var(--s-2) 0;
 }
 .evt-item--grit + .evt-item--grit {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
   border-radius: 0;
 }
 .evt-item__well {
@@ -458,7 +458,7 @@
   height: 48px;
   overflow: hidden;
   background: var(--screen-0);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
 }
 .evt-item--grit .evt-item__icon {

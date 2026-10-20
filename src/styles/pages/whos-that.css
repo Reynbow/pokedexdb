@@ -119,8 +119,8 @@
 .wt-pip {
   width: 12px;
   height: 12px;
-  border: 2px solid var(--frame);
-  border-radius: 1px;
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--r-1);
 }
 .wt-pip--used {
   background: var(--ink-3);
@@ -143,14 +143,13 @@
   height: var(--wt-stage-h);
   overflow: hidden;
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 2px var(--screen-2), inset 0 0 0 3px var(--line);
   transition: background-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 .wt-stage.is-on {
   background: var(--frame-strong);
-  box-shadow: inset 0 0 0 2px var(--frame-strong), inset 0 0 0 3px var(--frame);
+  border-color: transparent;
 }
 
 .wt-art {
@@ -207,7 +206,7 @@
   width: 1.35rem;
   height: 2.125rem;
   padding-bottom: 3px;
-  border-bottom: 3px solid var(--frame);
+  border-bottom: 2px solid var(--edge-hover);
   color: var(--ink);
   font-family: var(--font-pixel);
   font-size: var(--text-xl);
@@ -276,7 +275,7 @@
 .wt-guess__input.field__input:disabled {
   cursor: not-allowed;
   background: var(--screen-1);
-  border-color: var(--line);
+  border-color: var(--edge);
   color: var(--ink-3);
 }
 .wt-guess__btn.btn {
@@ -466,7 +465,7 @@
 }
 .wt-day.is-unplayed .wt-day__sprite {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--edge);
 }
 
 /* Inverse video: the day on screen */

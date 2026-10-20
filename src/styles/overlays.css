@@ -7,7 +7,7 @@
 .ev-modal-backdrop,
 .game-modal-backdrop {
   z-index: var(--z-modal);
-  background: rgba(4, 6, 10, 0.72);
+  background: var(--scrim);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -16,9 +16,9 @@
 .ev-modal,
 .game-modal {
   background: var(--screen-1);
-  border: 2px solid var(--frame-strong);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 2px var(--screen-1), inset 0 0 0 3px var(--line), var(--shadow-pop);
+  box-shadow: var(--shadow-pop);
   color: var(--ink);
   font-family: var(--font-ui);
 }
@@ -34,7 +34,7 @@
 .ability-modal-right,
 .game-modal-column-right {
   background: transparent;
-  border-color: var(--line);
+  border-color: var(--edge);
 }
 
 .ability-modal-title,
@@ -81,7 +81,7 @@
   height: 36px;
   padding: 0 var(--s-2);
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-2);
   box-shadow: none;
   color: var(--ink);
@@ -96,7 +96,7 @@
 .game-modal-close:hover,
 .game-modal-close:focus-visible {
   background: var(--screen-3);
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
   box-shadow: none;
 }
 
@@ -122,7 +122,7 @@
 .game-modal-empty,
 .game-modal-game-button {
   background: var(--screen-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
   box-shadow: none;
   color: var(--ink);
@@ -137,7 +137,7 @@
 .game-modal-game-button:hover,
 .game-modal-game-button:focus-visible {
   background: var(--screen-3);
-  border-color: var(--frame);
+  border-color: var(--edge-hover);
   transform: none;
 }
 /* The current choice: inverse video */
@@ -154,7 +154,7 @@
 .nature-item.is-recommended,
 .nature-item.is-recommended:not(.is-active) {
   background: var(--screen-2);
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 
 /* Marks: positive / negative / flavour as stamps */
@@ -176,7 +176,7 @@
 }
 .nature-highlight-flavor-hate {
   background: transparent;
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 .nature-item-chip,
 .nature-item-chip-neutral,
@@ -188,7 +188,7 @@
 .ev-item-stat,
 .ev-item-icon {
   background: var(--screen-1);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-1);
   box-shadow: none;
   color: var(--ink-2);
@@ -205,12 +205,12 @@
 .nature-chip:hover,
 .ability-chip:hover {
   background: var(--screen-3);
-  border-color: var(--frame);
+  border-color: var(--edge-hover);
   box-shadow: none;
 }
 
 .nature-spinner {
-  border-color: var(--line);
+  border-color: var(--edge);
   border-top-color: var(--select);
 }
 
@@ -218,7 +218,7 @@
 .ability-search-input {
   min-height: 40px;
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-2);
   box-shadow: none;
   color: var(--ink);
@@ -233,7 +233,7 @@
   min-height: 32px;
   padding: 0 var(--s-3);
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-2);
   color: var(--ink);
   font-family: var(--font-pixel);
@@ -251,7 +251,7 @@
   border: 0;
   border-radius: var(--r-1);
   box-shadow: none;
-  color: #fff;
+  color: var(--on-type);
   font-family: var(--font-pixel);
   letter-spacing: 0.06em;
   text-shadow: none;
@@ -260,16 +260,16 @@
 :is(.ability-modal, .ev-modal, .game-modal) .ability-type-chip:not(.is-active) {
   background: var(--screen-2);
   color: var(--ink-2);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--edge);
 }
 :is(.ability-modal, .ev-modal, .game-modal) .ability-type-chip.is-active {
   background: var(--type, var(--t-unknown));
-  color: #fff;
+  color: var(--on-type);
   box-shadow: inset 0 0 0 2px var(--ink);
 }
 :is(.ability-modal, .ev-modal, .game-modal) .ability-learner-type::after {
   background: var(--screen-0);
-  border: 1px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   box-shadow: var(--shadow-pop);
   color: var(--ink);
 }
@@ -316,4 +316,36 @@
     padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px));
     animation: popsheet-up var(--dur-2) var(--ease-out);
   }
+}
+
+/* Evolution method rows and item notes (were inline styles) */
+.evo-req {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+}
+.evo-req__icon {
+  flex: none;
+  padding: 2px;
+  background: var(--screen-1);
+  border-radius: var(--r-2);
+  image-rendering: pixelated;
+}
+.evo-req__text {
+  flex: 1;
+  min-width: 0;
+}
+.evo-req__label {
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.evo-req__value {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.nature-info-card-text {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
 }
