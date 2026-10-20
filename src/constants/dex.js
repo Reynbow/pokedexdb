@@ -115,7 +115,7 @@ export const DEX_FILTERS = [
   {
     key: "kalos",
     label: "Kalos",
-    apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain", "lumiose-city"],
+    apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain", "lumiose-city", "hyperspace"],
     pad: 3,
     games: [
       {
@@ -123,12 +123,22 @@ export const DEX_FILTERS = [
         label: "X & Y",
         apiNames: ["kalos-central", "kalos-coastal", "kalos-mountain"],
         logos: ["x.png", "y.png"],
+        // X & Y number each of the three Kalos Pokédexes separately
+        sections: [
+          { key: "kalos-central", label: "Central Kalos", apiNames: ["kalos-central"] },
+          { key: "kalos-coastal", label: "Coastal Kalos", apiNames: ["kalos-coastal"] },
+          { key: "kalos-mountain", label: "Mountain Kalos", apiNames: ["kalos-mountain"] },
+        ],
       },
       {
         key: "legends-za",
         label: "Legends: Z-A",
-        apiNames: ["lumiose-city"],
+        apiNames: ["lumiose-city", "hyperspace"],
         logos: ["za.png"],
+        sections: [
+          { key: "lumiose-city", apiNames: ["lumiose-city"] },
+          { key: "hyperspace", label: "Hyperspace Lumiose (Mega Dimension)", apiNames: ["hyperspace"] },
+        ],
       },
     ],
   },
@@ -155,14 +165,19 @@ export const DEX_FILTERS = [
   {
     key: "galar",
     label: "Galar",
-    apiNames: ["galar"],
+    apiNames: ["galar", "isle-of-armor", "crown-tundra"],
     pad: 3,
     games: [
       {
         key: "sword-shield",
         label: "Sword & Shield",
-        apiNames: ["galar"],
+        apiNames: ["galar", "isle-of-armor", "crown-tundra"],
         logos: ["sword.png", "shield.png"],
+        sections: [
+          { key: "galar", apiNames: ["galar"] },
+          { key: "isle-of-armor", label: "The Isle of Armor", apiNames: ["isle-of-armor"] },
+          { key: "crown-tundra", label: "The Crown Tundra", apiNames: ["crown-tundra"] },
+        ],
       },
     ],
   },
