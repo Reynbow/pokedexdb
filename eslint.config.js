@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'docs']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -24,6 +24,18 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // `catch {}` is used on purpose for best-effort storage/URL access
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
+  },
+  {
+    // Build and data scripts run in Node
+    files: ['scripts/**/*.mjs', 'vite.config.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
     },
   },
 ])

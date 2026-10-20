@@ -1,34 +1,56 @@
 #!/usr/bin/env node
+// Writes a static HTML page per Pokémon and per tool page into dist/, each with its own title,
+// description, canonical URL and social-preview tags (the app itself is a client-side SPA, so
+// without these every URL would look like the home page to search engines and link previews).
+//
+// Pages are written as dist/<path>.html: GitHub Pages serves /pikachu from pikachu.html with a
+// 200 and no redirect, so the canonical URL is the clean /pikachu.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PAGE_ROUTES, SITE_NAME, SITE_URL } from "../src/routeMeta.js";
+import { formatPokemonName } from "../src/utils/pokemonNames.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// "charizard-mega-x" -> "Mega Charizard X", "kyogre-primal" -> "Primal Kyogre"
+const formatFormTitle = (slug) => {
+  const tokens = slug.split("-");
+  if (tokens.includes("gmax")) return `Gigantamax ${formatPokemonName(slug)}`;
+  if (tokens.includes("mega")) return `Mega ${formatPokemonName(slug)}`;
+  if (tokens.includes("primal")) return `Primal ${formatPokemonName(tokens.filter((t) => t !== "primal").join("-"))}`;
+  return formatPokemonName(slug);
+};
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 const TEMPLATE_PATH = path.join(DIST_DIR, "index.html");
 const DATASET_PATH = path.join(ROOT_DIR, "public", "data", "pokemon_all.json");
+const INDEX_PATH = path.join(ROOT_DIR, "public", "data", "pokemon-index.json");
 
 const MARKER_START = "<!-- share-meta:start -->";
 const MARKER_END = "<!-- share-meta:end -->";
-const BASE_URL = "https://pokedexdb.com";
+const SITE_IMAGE = { url: `${SITE_URL}/favicon-og.png`, width: 128, height: 128, alt: `${SITE_NAME} logo` };
+const ARTWORK_URL = (id) =>
+  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+
+// Newest first: the description uses the most recent Pokédex entry available
 const FLAVOR_PRIORITY = [
+  "Legends: Z-A",
   "Scarlet",
   "Violet",
-  "Legends: Z-A",
-  "Legends: Z-a",
-  "Legends: Arceus",
   "Legends: Arceus",
   "Brilliant Diamond",
   "Shining Pearl",
   "Sword",
   "Shield",
+  "Let's Go Pikachu",
   "Ultra Sun",
   "Ultra Moon",
   "Sun",
   "Moon",
+  "Omega Ruby",
+  "Alpha Sapphire",
   "X",
   "Y",
   "Black 2",
@@ -38,162 +60,92 @@ const FLAVOR_PRIORITY = [
   "HeartGold",
   "SoulSilver",
   "Platinum",
+  "Diamond",
+  "Pearl",
+  "FireRed",
+  "LeafGreen",
   "Emerald",
   "Ruby",
   "Sapphire",
   "Crystal",
   "Gold",
   "Silver",
+  "Yellow",
   "Red",
   "Blue",
-  "Yellow",
 ];
 
-const sanitizeText = (value) => {
-  if (!value) return "";
-  let text = String(value)
+const sanitizeText = (value) =>
+  String(value || "")
     .replace(/\s+/g, " ")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .replace(/[–—]/g, "-");
-  text = text
+    .replace(/[–—]/g, "-")
+    .trim();
+
+const escapeHtml = (value) =>
+  String(value).replace(/[&"'<>]/g, (ch) => ({ "&": "&amp;", '"': "&quot;", "'": "&#39;", "<": "&lt;", ">": "&gt;" })[ch]);
+
+const normalizeLocalKey = (value) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/♀/g, "-f")
+    .replace(/♂/g, "-m")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\x20-\x7E]+/g, "")
-    .trim();
-  return text;
-};
+    .replace(/['’.:]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
-const escapeHtmlAttr = (value) =>
-  String(value).replace(/[&"'<>]/g, (ch) => {
-    switch (ch) {
-      case "&":
-        return "&amp;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      default:
-        return ch;
-    }
-  });
-
-const normalizeLocalKey = (value) => {
-  if (value == null) return "";
-  let normalized = String(value)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  normalized = normalized
-    .replace(/pok[eé]mon/g, "pokemon")
-    .replace(/["'’]/g, "")
-    .replace(/&/g, " and ")
-    .replace(/\+/g, " plus ");
-  normalized = normalized.replace(/[^a-z0-9]+/g, "-");
-  normalized = normalized.replace(/-([a-z0-9])-(?=[a-z0-9]($|-))/g, "-$1");
-  normalized = normalized.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-  return normalized;
-};
-
-const toDisplayName = (slug) =>
+const toTitle = (slug) =>
   slug
     .split("-")
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
+const truncate = (value, max) => {
+  if (!value || value.length <= max) return value || "";
+  return `${value.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+};
+
+const formatDexNumber = (id) => (id && id < 10000 ? `#${String(id).padStart(4, "0")}` : null);
+
 const pickFlavorEntry = (record) => {
-  if (!record || typeof record !== "object") return null;
-  const entries = record.entries;
+  const entries = record?.entries;
   if (!entries || typeof entries !== "object") return null;
   for (const key of FLAVOR_PRIORITY) {
     if (entries[key]) return entries[key];
   }
-  for (const value of Object.values(entries)) {
-    if (value) return value;
-  }
-  return null;
+  return Object.values(entries).find(Boolean) || null;
 };
 
-const formatDexNumber = (id) => {
-  if (!id || Number.isNaN(Number(id))) return null;
-  const num = Number(id);
-  if (num < 10000) {
-    return `#${String(num).padStart(4, "0")}`;
-  }
-  return `#${num}`;
-};
-
-const selectImageUrl = (id) => {
-  return {
-    primary: `${BASE_URL}/favicon-og.png`,
-    alt: "Pokedex DB Logo",
-  };
-};
-
-const truncate = (value, max = 280) => {
-  if (!value) return "";
-  if (value.length <= max) return value;
-  const sliced = value.slice(0, max - 1).trimEnd();
-  return `${sliced}…`;
-};
-
-const buildMetaBlock = ({
-  canonicalUrl,
-  description,
-  ogTitle,
-  twitterTitle,
-  imageUrl,
-  imageAlt,
-  pageTitle,
-  displayName,
-  pokemonId,
-}) => {
+const buildMetaBlock = ({ canonicalUrl, title, socialTitle, description, image, jsonLd }) => {
   const indent = "    ";
   const lines = [
-    `${indent}<link rel="canonical" href="${escapeHtmlAttr(canonicalUrl)}" />`,
-    `${indent}<meta name="description" content="${escapeHtmlAttr(description)}" />`,
-    `${indent}<meta property="og:site_name" content="Pokedex DB" />`,
-    `${indent}<meta property="og:type" content="website" />`,
-    `${indent}<meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}" />`,
-    `${indent}<meta property="og:title" content="${escapeHtmlAttr(ogTitle)}" />`,
-    `${indent}<meta property="og:description" content="${escapeHtmlAttr(description)}" />`,
-    `${indent}<meta property="og:image" content="${escapeHtmlAttr(imageUrl)}" />`,
-    `${indent}<meta property="og:image:width" content="128" />`,
-    `${indent}<meta property="og:image:height" content="128" />`,
-    `${indent}<meta property="og:image:alt" content="${escapeHtmlAttr(imageAlt)}" />`,
-    `${indent}<meta name="twitter:card" content="summary" />`,
-    `${indent}<meta name="twitter:title" content="${escapeHtmlAttr(twitterTitle)}" />`,
-    `${indent}<meta name="twitter:description" content="${escapeHtmlAttr(description)}" />`,
-    `${indent}<meta name="twitter:image" content="${escapeHtmlAttr(imageUrl)}" />`,
-    `${indent}<meta name="twitter:image:alt" content="${escapeHtmlAttr(imageAlt)}" />`,
-    `${indent}<title>${escapeHtmlAttr(pageTitle)}</title>`,
+    `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`,
+    `<meta name="description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:site_name" content="${escapeHtml(SITE_NAME)}" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`,
+    `<meta property="og:title" content="${escapeHtml(socialTitle)}" />`,
+    `<meta property="og:description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:image" content="${escapeHtml(image.url)}" />`,
+    `<meta property="og:image:width" content="${image.width}" />`,
+    `<meta property="og:image:height" content="${image.height}" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(image.alt)}" />`,
+    `<meta name="twitter:card" content="summary" />`,
+    `<meta name="twitter:title" content="${escapeHtml(socialTitle)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(image.url)}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(image.alt)}" />`,
+    `<title>${escapeHtml(title)}</title>`,
   ];
-  
-  // Add JSON-LD structured data for better search engine understanding
-  if (displayName && pokemonId) {
-    const structuredData = {
-      "@context": "https://schema.org",
-      "@type": "WebPage",
-      "name": pageTitle,
-      "description": description,
-      "url": canonicalUrl,
-      "mainEntity": {
-        "@type": "Article",
-        "headline": ogTitle,
-        "image": imageUrl,
-        "description": description,
-      },
-    };
-    const jsonLd = JSON.stringify(structuredData, null, 0);
-    lines.push(`${indent}<script type="application/ld+json">${jsonLd}</script>`);
+  if (jsonLd) {
+    // "<" is escaped so the JSON can never close the script element
+    lines.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, "\\u003c")}</script>`);
   }
-  
-  return lines.join("\n");
+  return lines.map((line) => `${indent}${line}`).join("\n");
 };
 
 const loadTemplate = async () => {
@@ -203,107 +155,90 @@ const loadTemplate = async () => {
   if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
     throw new Error("share meta markers not found in dist/index.html");
   }
-  const blockStart = startIndex + MARKER_START.length;
-  const before = template.slice(0, blockStart);
-  const after = template.slice(endIndex);
-  return { before, after };
+  return {
+    before: template.slice(0, startIndex + MARKER_START.length),
+    after: template.slice(endIndex),
+  };
 };
 
 const loadDataset = async () => {
-  const raw = await readFile(DATASET_PATH, "utf8");
-  const json = JSON.parse(raw);
+  const json = JSON.parse(await readFile(DATASET_PATH, "utf8"));
   const map = new Map();
-  if (Array.isArray(json)) {
-    for (const record of json) {
-      if (!record || typeof record.name !== "string") continue;
-      const key = normalizeLocalKey(record.name);
-      if (!key) continue;
-      if (!map.has(key)) {
-        map.set(key, record);
-      }
-    }
+  for (const record of Array.isArray(json) ? json : []) {
+    if (typeof record?.name !== "string") continue;
+    const key = normalizeLocalKey(record.name);
+    if (key && !map.has(key)) map.set(key, record);
   }
   return map;
 };
 
-const fetchPokemonList = async () => {
-  const response = await fetch("https://pokeapi.co/api/v2/pokemon?limit=100000&offset=0", {
-    headers: { "User-Agent": "pokedexdb-share-generator/1.0" },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Pokemon index: ${response.status} ${response.statusText}`);
-  }
-  const json = await response.json();
-  if (!json || !Array.isArray(json.results)) {
-    throw new Error("Unexpected payload from Pokemon index endpoint");
-  }
-  return json.results
-    .filter((entry) => entry?.name && !entry.name.includes("totem"))
-    .map((entry) => {
-      const urlParts = String(entry.url || "").split("/").filter(Boolean);
-      const id = Number(urlParts[urlParts.length - 1]) || null;
-      return {
-        slug: entry.name,
-        id,
-      };
-    })
-    .filter((entry) => entry.slug)
-    .sort((a, b) => a.slug.localeCompare(b.slug));
+const loadPokemonIndex = async () => {
+  const json = JSON.parse(await readFile(INDEX_PATH, "utf8"));
+  return (json.pokemon || []).filter((entry) => entry?.n && !entry.n.includes("totem"));
 };
 
-const buildDescription = (displayName, flavor) => {
-  return `View ${displayName}'s complete stats, evolutions, abilities, moves, and weakness chart on Pokedex DB - your complete Pokemon database with EV training tools, move/ability/item databases, save file reading, and more.`;
+const writePage = async (relativePath, before, after, meta) => {
+  const html = `${before}\n${buildMetaBlock(meta)}\n${after}`;
+  await writeFile(path.join(DIST_DIR, `${relativePath}.html`), html, "utf8");
 };
 
 const generate = async () => {
-  const [{ before, after }, dataset, index] = await Promise.all([
-    loadTemplate(),
-    loadDataset(),
-    fetchPokemonList(),
-  ]);
+  const [{ before, after }, dataset, index] = await Promise.all([loadTemplate(), loadDataset(), loadPokemonIndex()]);
+  const nameById = new Map(index.map((entry) => [entry.i, entry.n]));
 
-  let created = 0;
-  for (const entry of index) {
-    const { slug, id } = entry;
-    const normalized = normalizeLocalKey(slug);
-    const canonicalUrl = `${BASE_URL}/${encodeURIComponent(slug)}`;
-    const record = dataset.get(normalized) || null;
-    const displayName = record?.name || toDisplayName(slug);
-    const flavor = pickFlavorEntry(record);
-    const description = sanitizeText(buildDescription(displayName, flavor));
-    const dexNumber = formatDexNumber(id);
-    const { primary: imageUrl, alt: imageAltBase } = selectImageUrl(id);
-    const imageAlt = imageAltBase.replace("this Pokemon", displayName ? `${displayName}` : "this Pokemon");
-    const ogTitle = dexNumber
-      ? `${displayName} ${dexNumber} - Stats, Evolutions & Weaknesses | Pokedex DB`
-      : `${displayName} - Stats, Evolutions & Weaknesses | Pokedex DB`;
-    const twitterTitle = ogTitle;
-    const pageTitle = dexNumber ? `${displayName} ${dexNumber} | Pokedex DB` : `${displayName} | Pokedex DB`;
-
-    const metaBlock = buildMetaBlock({
-      canonicalUrl,
-      description,
-      ogTitle,
-      twitterTitle,
-      imageUrl,
-      imageAlt,
-      pageTitle,
-      displayName,
-      pokemonId: id,
+  for (const route of PAGE_ROUTES) {
+    await writePage(route.path, before, after, {
+      canonicalUrl: `${SITE_URL}/${route.path}`,
+      title: route.title,
+      socialTitle: route.title,
+      description: route.description,
+      image: SITE_IMAGE,
+      jsonLd: { "@context": "https://schema.org", "@type": "WebPage", name: route.title, description: route.description, url: `${SITE_URL}/${route.path}` },
     });
-
-    const html = `${before}\n${metaBlock}\n${after}`;
-    const dir = path.join(DIST_DIR, slug);
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, "index.html"), html, "utf8");
-    created += 1;
   }
 
-  console.log(`Generated share metadata pages for ${created} Pokemon routes.`);
+  for (const entry of index) {
+    const slug = entry.n;
+    const canonicalUrl = `${SITE_URL}/${encodeURIComponent(slug)}`;
+    // Forms share their species' dataset record and dex number
+    const speciesSlug = nameById.get(entry.s) || slug;
+    const record = dataset.get(normalizeLocalKey(slug)) || dataset.get(normalizeLocalKey(speciesSlug)) || null;
+    const isForm = entry.i >= 10000;
+    const displayName = !isForm && record?.name ? record.name : formatFormTitle(slug);
+    const dexNumber = formatDexNumber(entry.s);
+    const types = (entry.t || []).map(toTitle).join("/");
+    const flavor = sanitizeText(pickFlavorEntry(record));
+    const summary = `${displayName}${dexNumber ? ` (${dexNumber})` : ""} is a${/^[AEIOU]/.test(types) ? "n" : ""} ${types}-type Pokemon.`;
+    const description = truncate(
+      `${summary} ${flavor ? `${flavor} ` : ""}Stats, evolutions, moves, abilities, weaknesses and where to catch it in every game.`,
+      300
+    );
+    const title = `${displayName}${dexNumber ? ` ${dexNumber}` : ""} - Stats, Evolutions & Weaknesses | ${SITE_NAME}`;
+    await writePage(slug, before, after, {
+      canonicalUrl,
+      title,
+      socialTitle: title,
+      description,
+      image: { url: ARTWORK_URL(entry.i), width: 475, height: 475, alt: `Official artwork of ${displayName}` },
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: title,
+        description,
+        url: canonicalUrl,
+        primaryImageOfPage: ARTWORK_URL(entry.i),
+      },
+    });
+  }
+
+  // SPA fallback for any other URL (e.g. old /pikachu/ links with a trailing slash). The
+  // Pages workflow also copies this, but `npm run deploy` (gh-pages) relies on it being here.
+  await copyFile(TEMPLATE_PATH, path.join(DIST_DIR, "404.html"));
+
+  console.log(`Generated ${PAGE_ROUTES.length} tool pages and ${index.length} Pokemon pages.`);
 };
 
 generate().catch((error) => {
   console.error("Failed to generate share metadata pages:", error);
   process.exitCode = 1;
 });
-

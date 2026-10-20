@@ -3,9 +3,11 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
+  /* The site is dark-themed only; a light page background would flash between pages,
+     before the app renders and when over-scrolling. */
+  color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #0b0e1a;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -26,6 +28,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: #0b0e1a;
 }
 
 #root {
@@ -56,15 +59,39 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Shown only on a direct visit to a page whose code is still downloading */
+.route-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 50vh;
+  color: #cbd5f5;
+}
+.route-loading__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: #5d8ed2;
+  border-radius: 50%;
+  animation: route-loading-spin 0.8s linear infinite;
+}
+@keyframes route-loading-spin {
+  to {
+    transform: rotate(360deg);
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+}
+
+/* Page-to-page cross-fade (View Transitions API; browsers without it switch instantly) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+  animation-timing-function: ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
   }
 }

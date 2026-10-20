@@ -35,7 +35,7 @@ try {
   let sharp;
   try {
     sharp = (await import("sharp")).default;
-  } catch (e) {
+  } catch {
     console.log("\nSharp not found. Creating a simple base64 approach...");
     // Fallback: create instructions for manual conversion
     console.log("\nTo create the PNG manually:");
