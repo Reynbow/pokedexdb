@@ -348,7 +348,7 @@ The scale steps are 0.75 / 0.8125 / 0.9375 / 1.125 / 1.375 / 1.75 / 2.25rem. Two
 
 ## Layout
 
-The page is centred to 1360px. A sticky 56px device bar carries the wordmark, section tabs and a jump-to search (focus it with `/`). On the Pokédex, a sticky context strip sits below it: the game cartridge button (logo, game, dex size), the dex search, a Filters button that opens a sheet, active-filter tokens, the result count including forms, and section jump chips. One count is shown per scope.
+The page is centred to 1360px. A sticky 56px device bar carries the wordmark, section tabs and a jump-to search (focus it with `/`). On the Pokédex, a sticky context strip sits below it: the game cartridge button (logo, game, dex size), the dex search, a Filters button that opens a sheet, active-filter tokens, the result count including forms, and part chips. The part chips choose which part of the game's Pokédex is shown (All, each of its own dexes listed in full with its own numbers and real size, or its Mega / Gigantamax forms); the chosen chip is the pressed, Cursor Blue state, and a new game starts on All. One count is shown per scope.
 
 The browse grid is a single panel. Cells are `auto-fill, minmax(156px, 1fr)`, separated by faint edge rules rather than gaps. A container query on the dex (600px or less) turns cells into numbered rows: cursor, number, sprite, name over types, stamps. The same rows serve the 336px list when an entry is open. On desktop that list sits on the left and the entry page fills the right. The entry's top is a two-column grid: the sprite screen on the left (220–300px), the identity block and facts list on the right.
 
