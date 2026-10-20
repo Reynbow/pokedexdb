@@ -30,34 +30,42 @@
   margin: 0;
 }
 
-/* The device's screen: a recessed well the artwork sits in, with its view keys in the corner */
+/* The device's screen: a fixed square well. The artwork is positioned inside it, so no image
+   (512px artwork, a 60px animated sprite, a reload in progress) can change the screen's size. */
 .entry-screen__glass {
+  --screen-pad: var(--s-4);
+  --screen-keys: 54px; /* bottom strip for the view keys, so they never sit on the artwork */
   position: relative;
-  display: grid;
-  place-items: center;
   aspect-ratio: 1;
-  /* The bottom strip belongs to the view keys, so they never sit on the artwork */
-  padding: var(--s-4) var(--s-4) 54px;
+  overflow: hidden;
   background: var(--screen-2);
   border: 1px solid var(--edge);
   border-radius: var(--r-4);
 }
-.entry-screen__art {
-  width: 100%;
-  height: 100%;
+.entry-screen__art,
+.entry-screen__ghost {
+  position: absolute;
+  top: var(--screen-pad);
+  left: var(--screen-pad);
+  width: calc(100% - var(--screen-pad) * 2);
+  height: calc(100% - var(--screen-pad) - var(--screen-keys));
   object-fit: contain;
 }
 .entry-screen__glass.is-animated .entry-screen__art {
-  width: 70%;
-  height: 70%;
+  top: calc(var(--screen-pad) + 12%);
+  left: calc(var(--screen-pad) + 12%);
+  width: calc(100% - var(--screen-pad) * 2 - 24%);
+  height: calc(100% - var(--screen-pad) - var(--screen-keys) - 24%);
   image-rendering: pixelated;
 }
 .entry-screen__art.is-unknown {
   opacity: 0.5;
 }
 .entry-screen__ghost {
-  width: 60%;
-  height: 60%;
+  top: calc(var(--screen-pad) + 18%);
+  left: calc(var(--screen-pad) + 18%);
+  width: calc(100% - var(--screen-pad) * 2 - 36%);
+  height: calc(100% - var(--screen-pad) - var(--screen-keys) - 36%);
   border-radius: var(--r-3);
 }
 
@@ -773,9 +781,10 @@ details[open] > summary .area-game__chevron {
     display: contents;
   }
   .entry-screen__glass {
+    --screen-pad: var(--s-2);
+    --screen-keys: 38px;
     grid-column: 1;
     grid-row: 1;
-    padding: var(--s-2) var(--s-2) 38px;
     border-radius: var(--r-3);
   }
   .entry-id {

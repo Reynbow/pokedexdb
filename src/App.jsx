@@ -5274,7 +5274,7 @@ function DetailPanel({
           <div className={`entry-screen__glass${animated ? " is-animated" : ""}`}>
             {detailImg ? (
               <img
-                key={detailImg}
+                key={id}
                 className={`entry-screen__art${isUnknownSprite ? " is-unknown" : ""}`}
                 src={detailImg}
                 alt={`${displayName}${shiny ? ", shiny colours" : ""}${hasGenderVariants ? (female ? ", female" : ", male") : ""}`}
