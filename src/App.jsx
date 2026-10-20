@@ -3236,15 +3236,6 @@ function App() {
           ↑ Top
         </button>
       ) : null}
-      <a
-        className="discord-support-fab"
-        href="https://discord.gg/WXMjmyjeC3"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Report a bug or request a feature on Discord"
-      >
-        Feedback · Discord
-      </a>
       <HeaderSection
         title="Pokedex"
         subtitle="Search and explore every Pokemon"

@@ -1465,15 +1465,6 @@ export default function SavPage() {
 
   return (
     <div className="app-shell sav-page">
-      <a
-        className="discord-support-fab"
-        href="https://discord.gg/WXMjmyjeC3"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Report a bug or request a feature on Discord"
-      >
-        Feedback · Discord
-      </a>
       <header className="app-header">
         <div className="container">
           <h1 className="title logo">

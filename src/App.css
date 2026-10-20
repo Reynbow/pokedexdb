@@ -41,63 +41,8 @@
 
 .app-shell {
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(124, 140, 255, 0.15), transparent 60%),
-    radial-gradient(800px 500px at 90% 0%, rgba(56, 189, 248, 0.12), transparent 60%),
-    linear-gradient(180deg, #0f1220 0%, #0b0e1a 60%, #0a0d18 100%);
+  background: #0b0e1a;
   color: #e5e7eb;
-}
-
-/* Floating support button (top-right) */
-.discord-support-fab {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  z-index: 3000;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd5f5;
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  box-shadow: 0 6px 18px rgba(8, 12, 24, 0.35);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-}
-
-.discord-support-fab:hover,
-.discord-support-fab:focus-visible {
-  transform: translateY(-1px);
-  background: rgba(124, 140, 255, 0.28);
-  border-color: rgba(124, 140, 255, 0.55);
-  color: #f8fafc;
-  outline: none;
-  box-shadow: 0 10px 24px rgba(8, 12, 24, 0.5);
-}
-
-.discord-support-fab:active {
-  transform: translateY(0);
-}
-
-@media (max-width: 768px) {
-  .discord-support-fab {
-    top: 14px;
-    left: 14px;
-    right: auto;
-    bottom: auto;
-  }
-
-  /* Hide Discord button when a modal is open */
-  body:has(.game-modal-backdrop) .discord-support-fab,
-  body:has(.ev-modal-backdrop) .discord-support-fab,
-  body:has(.ability-modal-backdrop) .discord-support-fab {
-    display: none;
-  }
 }
 
 /* Floating scroll-to-top button (bottom-right) */
@@ -147,7 +92,7 @@
 
 @media (max-width: 520px) {
   .scroll-top-fab {
-    /* Lift above the search bar, bottom navigation, and Discord button */
+    /* Lift above the search bar and bottom navigation */
     bottom: 150px;
   }
 }
@@ -6558,7 +6503,7 @@ button.type-chip {
 /* Minigame page */
 .minigame-page {
   padding: 32px 0 72px;
-  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 0.94) 40%, rgba(2, 6, 23, 1) 100%);
+  background: #0b0e1a;
   min-height: 100vh;
 }
 
