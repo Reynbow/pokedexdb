@@ -12,6 +12,14 @@ html {
   background: var(--screen-0);
   -webkit-text-size-adjust: 100%;
   scrollbar-color: var(--frame) var(--screen-0);
+  /* Always keep the scrollbar's space: when a page briefly gets shorter than the window
+     (an entry loading), the layout must not widen and shift sideways */
+  scrollbar-gutter: stable;
+}
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
 }
 
 body {
