@@ -1,5 +1,6 @@
-/* Save Reader: load a save (the cartridge slot), then the save file card, the party as rows and
-   the Pokédex with caught status and encounter locations. An entry opens in a Sheet. */
+/* Save Reader: load a save (the cartridge slot), then the trainer card, the party as rows, the PC
+   boxes as slot grids and the Pokédex with caught status and encounter locations. An entry or a
+   box slot opens in a Sheet. */
 
 .sv {
   display: grid;
@@ -98,7 +99,7 @@ a:hover .sv-ext-icon {
 .sv-ext {
   padding: 1px 5px;
   background: var(--screen-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-1);
   color: var(--ink);
   font-family: var(--font-pixel);
@@ -134,7 +135,7 @@ a:hover .sv-ext-icon {
 }
 .sv-drop:hover {
   background: var(--screen-3);
-  border-color: var(--frame-strong);
+  border-color: var(--edge-hover);
 }
 .sv-drop:has(.sv-drop__input:focus-visible) {
   outline: 2px solid var(--select);
@@ -235,10 +236,10 @@ a:hover .sv-ext-icon {
 }
 .sv-support__links {
   padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 
-/* ---------------------------------------------------------------- Save file card */
+/* ---------------------------------------------------------------- Trainer card */
 
 .sv-save {
   display: grid;
@@ -249,32 +250,126 @@ a:hover .sv-ext-icon {
   display: grid;
   gap: var(--s-4);
 }
+.sv-trainer {
+  display: grid;
+  gap: var(--s-3);
+}
+.sv-trainer__name {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.sv-card__facts {
+  row-gap: 6px;
+}
 .sv-card__facts dd {
   min-width: 0;
 }
-.sv-card__file {
+.sv-card__rival {
   overflow-wrap: anywhere;
-  font-family: var(--font-pixel);
-  letter-spacing: 0.02em;
+  font-weight: 600;
 }
-.sv-card__dex {
+.sv-card__section {
   display: grid;
   gap: var(--s-2);
   padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
-.sv-card__dex-head {
+.sv-card__section-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-3);
 }
-.sv-card__dex-head .label {
+.sv-card__section-head .label {
   margin: 0;
 }
 .sv-card__meter.meter__track {
   display: block;
   height: 12px;
+}
+
+/* The badge case, four across as on the trainer card. Earned badges are lit stamps;
+   missing ones are dashed, like the Missing status stamp. */
+.sv-badges {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sv-badge {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px 2px 6px;
+  border: 1px dashed var(--edge-strong);
+  border-radius: var(--r-1);
+  color: var(--ink-mute);
+}
+.sv-badge.is-earned {
+  border-style: solid;
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+.sv-badge__icon.icon {
+  width: 24px;
+  height: 24px;
+}
+.sv-badge__name {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sv-badge.is-earned .sv-badge__name {
+  color: var(--ink);
+}
+
+.sv-card__meta {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--edge);
+  font-size: var(--text-sm);
+}
+.sv-card__meta div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.sv-card__meta dt {
+  flex: none;
+  width: 2.75rem;
+  color: var(--ink-3);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sv-card__meta dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink-2);
+}
+.sv-card__file {
+  overflow-wrap: anywhere;
+  font-family: var(--font-pixel);
+  letter-spacing: 0.02em;
 }
 
 /* ---------------------------------------------------------------- Party rows */
@@ -300,7 +395,7 @@ a:hover .sv-ext-icon {
   padding: var(--s-3) 0;
 }
 .sv-mon + .sv-mon {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .sv-mon:first-child {
   padding-top: var(--s-1);
@@ -415,6 +510,10 @@ a:hover .sv-ext-icon {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* A boxed Pokemon stores its HP but not its max HP, so it shows the value alone */
+.sv-hp--plain {
+  grid-template-columns: auto minmax(0, 1fr);
+}
 
 .sv-mon__stats {
   grid-area: stats;
@@ -478,6 +577,21 @@ a:hover .sv-ext-icon {
   letter-spacing: 0.03em;
 }
 
+/* In place of the stats, for a boxed Pokemon */
+.sv-mon__note {
+  grid-area: stats;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+/* The same summary in the box slot sheet */
+.sv-mon.sv-mon--sheet {
+  padding: 0;
+}
+.sv-sheet__slot {
+  color: var(--ink-3);
+}
+
 /* An empty party slot */
 .sv-mon--empty {
   display: flex;
@@ -522,6 +636,220 @@ a:hover .sv-ext-icon {
   }
 }
 
+/* ---------------------------------------------------------------- PC boxes */
+
+.sv-boxes__body {
+  container: sv-boxes / inline-size;
+  display: grid;
+  gap: var(--s-3);
+}
+
+/* ◀ BOX n ▶, as in the games */
+.sv-boxbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+}
+.sv-boxbar .btn--icon {
+  width: 44px;
+  min-height: 44px;
+}
+.sv-boxbar__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px var(--s-3);
+}
+.sv-boxbar__name {
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.sv-boxbar__count .sv-num {
+  font-size: var(--text-md);
+}
+
+/* All twelve boxes at a glance: a well like the segmented control, the shown box pressed */
+.sv-boxlist {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  background: var(--screen-0);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-2);
+}
+.sv-boxlist__btn {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-1);
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.sv-boxlist__btn:hover {
+  background: var(--screen-2);
+  color: var(--ink);
+}
+.sv-boxlist__no {
+  font-size: var(--text-md);
+}
+.sv-boxlist__count {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.sv-boxlist__btn.is-empty {
+  color: var(--ink-3);
+}
+.sv-boxlist__btn[aria-pressed="true"],
+.sv-boxlist__btn[aria-pressed="true"] .sv-boxlist__count {
+  background: var(--select);
+  color: var(--select-ink);
+}
+
+/* The box itself: 20 slots, 5 across (4 on narrow screens) */
+.sv-slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sv-slot {
+  min-width: 0;
+}
+.sv-slot--empty {
+  border: 1px dashed var(--edge-strong);
+  border-radius: var(--r-2);
+}
+.sv-slot--empty:not(.is-pad-5) {
+  display: none;
+}
+.sv-slot__btn {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 4px 8px;
+  background: var(--screen-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  color: var(--ink);
+  text-align: center;
+  scroll-margin-top: calc(var(--bar-h) + var(--s-4));
+  transition: background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+}
+.sv-slot__btn:hover {
+  background: var(--screen-3);
+  border-color: var(--edge-hover);
+}
+.sv-slot__cursor {
+  position: absolute;
+  top: 8px;
+  left: 6px;
+  visibility: hidden;
+  color: var(--select);
+}
+.sv-slot__btn:hover .sv-slot__cursor,
+.sv-slot__btn:focus-visible .sv-slot__cursor {
+  visibility: visible;
+}
+/* Gen 1 art is 56×56, centred in the 96×96 sprite file: crop to it so it shows at 1:1 */
+.sv-slot__sprite {
+  display: block;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+}
+.sv-slot__img {
+  display: block;
+  width: 96px;
+  height: 96px;
+  max-width: none;
+  margin: -20px;
+  image-rendering: pixelated;
+}
+.sv-slot__name {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv-slot__lv {
+  color: var(--ink-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.sv-slot__lv-label {
+  margin-right: 2px;
+  color: var(--ink-3);
+}
+
+/* Inverse video: the slot that is open */
+.sv-slot.is-open .sv-slot__btn {
+  background: var(--select);
+  border-color: var(--select);
+  color: var(--select-ink);
+}
+.sv-slot.is-open :is(.sv-slot__cursor, .sv-slot__lv, .sv-slot__lv-label) {
+  color: var(--select-ink);
+}
+.sv-slot.is-open .sv-slot__cursor {
+  visibility: visible;
+}
+
+.sv-boxes__empty {
+  padding: var(--s-6) var(--s-4);
+}
+
+@container sv-boxes (max-width: 460px) {
+  .sv-boxlist {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .sv-slots {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .sv-slot--empty.is-pad-5 {
+    display: none;
+  }
+  .sv-slot--empty.is-pad-4 {
+    display: block;
+  }
+  .sv-slot__btn {
+    padding-inline: 2px;
+  }
+  .sv-slot__name {
+    font-size: var(--text-xs);
+  }
+}
+
 /* ---------------------------------------------------------------- Pokédex */
 
 .sv-dex__intro {
@@ -563,7 +891,7 @@ a:hover .sv-ext-icon {
   margin: 0 calc(var(--s-4) * -1 + 3px) var(--s-2);
   padding: var(--s-2) calc(var(--s-4) - 3px);
   background: var(--screen-1);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--edge);
 }
 .sv-tools__search {
   flex: 1 1 220px;
@@ -608,7 +936,7 @@ a:hover .sv-ext-icon {
   scroll-margin-top: calc(var(--bar-h) + 80px);
 }
 .sv-entry + .sv-entry {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 
 /* The sprite button opens the entry */
@@ -631,7 +959,7 @@ a:hover .sv-ext-icon {
 }
 button.sv-entry__open:hover {
   background: var(--screen-2);
-  border-color: var(--line);
+  border-color: var(--edge);
 }
 .sv-entry__cursor {
   grid-area: cursor;
@@ -723,7 +1051,7 @@ a.sv-entry__name:hover,
   min-height: 26px;
   max-width: 100%;
   padding: 2px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--r-2);
   color: var(--ink-2);
   font-size: var(--text-sm);
@@ -778,7 +1106,7 @@ a.sv-entry__name:hover,
 }
 .sv-evo__method {
   padding: 0 6px;
-  border: 1px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-1);
   color: var(--ink-2);
   font-size: var(--text-xs);
@@ -903,9 +1231,8 @@ a.sv-entry__name:hover,
   place-items: center;
   height: 208px;
   background: var(--screen-2);
-  border: 2px solid var(--frame);
+  border: 1px solid var(--edge-strong);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 2px var(--screen-2), inset 0 0 0 3px var(--line);
 }
 .sv-detail__img {
   display: block;
@@ -948,7 +1275,7 @@ a.sv-entry__name:hover,
   display: grid;
   gap: var(--s-2);
   padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--edge);
 }
 .sv-detail__section > .label {
   margin: 0;
@@ -1036,8 +1363,12 @@ a.sv-entry__name:hover,
     grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
   }
   .sv-card {
+    grid-row: span 2;
     position: sticky;
     top: calc(var(--bar-h) + var(--s-4));
+  }
+  .sv-boxes {
+    grid-column: 2;
   }
 }
 
@@ -1059,7 +1390,8 @@ a.sv-entry__name:hover,
 
 @media (prefers-reduced-motion: reduce) {
   .sv-drop,
-  .sv-entry__open {
+  .sv-entry__open,
+  .sv-slot__btn {
     transition: none;
   }
 }
