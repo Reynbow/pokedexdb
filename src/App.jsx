@@ -1015,15 +1015,24 @@ async function loadLocalEncounterEntriesForPokemon(_pokemonId, ...nameCandidates
   return normalized;
 }
 
-async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) {
+const EMPTY_LOCAL_FLAVOR = { entries: [], otherFormTexts: new Set() };
+
+// Pokédex text from pokemon_all.json for one Pokémon. A record's `entries` are the base species';
+// `forms` holds each form's own entries by PokeAPI name ("vulpix-alola", "rotom-wash"), which
+// replace the base text for that form. Also returns the text of the species' other forms:
+// PokeAPI's species text for some games is a form's entry (Hisuian Arcanine in Legends: Arceus,
+// Attack Forme Deoxys in FireRed), so it must not be shown for the base species or other forms.
+async function loadLocalPokedexEntriesForSpecies(pokemonName, ...nameCandidates) {
   const candidates = nameCandidates.filter(Boolean);
   const records = await findCombinedRecords(candidates);
 
   if (!Array.isArray(records) || records.length === 0) {
-    return [];
+    return EMPTY_LOCAL_FLAVOR;
   }
 
-  const versionTextMap = new Map();
+  const baseTextMap = new Map();
+  const formTextMap = new Map();
+  let versionTextMap = baseTextMap;
 
   const addVersionText = (version, text, language) => {
     const cleaned = String(text ?? "").trim();
@@ -1091,14 +1100,40 @@ async function loadLocalPokedexEntriesForSpecies(_speciesId, ...nameCandidates) 
   };
 
   records.forEach(processRecord);
-  fillCollapsedPartners(versionTextMap, (info) => ({ ...info, inferred: true }));
 
-  return Array.from(versionTextMap.entries()).map(([version, info]) => ({
-    version,
-    text: info.text,
-    language: info.language || "en",
-    inferred: Boolean(info.inferred),
-  }));
+  const formKey = normalizeLocalKey(pokemonName);
+  const otherFormTexts = new Set();
+  versionTextMap = formTextMap;
+  records.forEach((record) => {
+    Object.entries(record?.forms || {}).forEach(([formName, entries]) => {
+      if (formKey && normalizeLocalKey(formName) === formKey) {
+        processRecord({ entries });
+      } else {
+        Object.values(entries || {}).forEach((text) => otherFormTexts.add(normalizeSearchText(text)));
+      }
+    });
+  });
+
+  const inferPartner = (info) => ({ ...info, inferred: true });
+  fillCollapsedPartners(baseTextMap, inferPartner);
+  fillCollapsedPartners(formTextMap, inferPartner);
+  const merged = new Map(baseTextMap);
+  formTextMap.forEach((info, version) => {
+    const base = merged.get(version);
+    if (!info.inferred || !base || base.inferred) merged.set(version, info);
+  });
+  // Text this Pokémon shares with another form is its own too
+  merged.forEach((info) => otherFormTexts.delete(normalizeSearchText(info.text)));
+
+  return {
+    entries: Array.from(merged.entries()).map(([version, info]) => ({
+      version,
+      text: info.text,
+      language: info.language || "en",
+      inferred: Boolean(info.inferred),
+    })),
+    otherFormTexts,
+  };
 }
 
 const getFormPriority = (entry) => {
@@ -3003,7 +3038,7 @@ function DetailPanel({
   const [isEvolutionDetailModalOpen, setIsEvolutionDetailModalOpen] = useState(false);
   const [evolutionDetailData, setEvolutionDetailData] = useState(null);
   const [currentPokemonForm, setCurrentPokemonForm] = useState(null);
-  const [localFlavorEntries, setLocalFlavorEntries] = useState([]);
+  const [localFlavor, setLocalFlavor] = useState(EMPTY_LOCAL_FLAVOR);
   const [learnset, setLearnset] = useState({ levelUp: [], machine: [], tm: [], hm: [] });
   const [learnsetMeta, setLearnsetMeta] = useState({
     versionGroup: null,
@@ -3104,12 +3139,14 @@ function DetailPanel({
     if (Array.isArray(species?.flavor_text_entries)) {
       for (const entry of species.flavor_text_entries) {
         if (entry?.language?.name !== "en") continue;
+        // PokeAPI's species text is sometimes a form's entry (Hisuian Arcanine in Legends: Arceus)
+        if (localFlavor.otherFormTexts.has(normalizeSearchText(entry?.flavor_text))) continue;
         pushEntry(entry?.version?.name, entry?.flavor_text, 1);
       }
     }
 
-    if (Array.isArray(localFlavorEntries)) {
-      for (const entry of localFlavorEntries) {
+    if (Array.isArray(localFlavor.entries)) {
+      for (const entry of localFlavor.entries) {
         const versionName = entry?.version;
         const lang = (entry?.language || "en").toLowerCase();
         if (lang && lang !== "en") continue;
@@ -3130,7 +3167,7 @@ function DetailPanel({
       return a.displayName.localeCompare(b.displayName);
     });
     return result;
-  }, [species?.flavor_text_entries, localFlavorEntries]);
+  }, [species?.flavor_text_entries, localFlavor]);
   
   // Auto-select flavor text version based on selectedDex/selectedGame
   useEffect(() => {
@@ -4215,21 +4252,19 @@ function DetailPanel({
     const run = async () => {
       const sid = species?.id;
       if (sid == null) {
-        setLocalFlavorEntries([]);
+        setLocalFlavor(EMPTY_LOCAL_FLAVOR);
         return;
       }
       try {
-        const entries = await loadLocalPokedexEntriesForSpecies(
-          sid,
+        const result = await loadLocalPokedexEntriesForSpecies(
+          details?.name,
           species?.name,
           pokemonIdMap.get(Number(details?.id)),
           details?.name
         );
-        if (!cancelled) {
-          setLocalFlavorEntries(Array.isArray(entries) ? entries : []);
-        }
+        if (!cancelled) setLocalFlavor(result);
       } catch {
-        if (!cancelled) setLocalFlavorEntries([]);
+        if (!cancelled) setLocalFlavor(EMPTY_LOCAL_FLAVOR);
       }
     };
     run();
